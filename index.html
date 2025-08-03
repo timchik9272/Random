@@ -1,0 +1,2303 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Random | Улучшенный генератор</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #6c5ce7;
+            --primary-dark: #5649c0;
+            --secondary: #00cec9;
+            --accent: #fd79a8;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --success: #00b894;
+            --warning: #fdcb6e;
+            --danger: #d63031;
+            --gray: #adb5bd;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: #f5f6fa;
+            color: var(--dark);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 2rem 0;
+            border-radius: 0 0 20px 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-top: 0.5rem;
+        }
+        
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 2rem;
+            gap: 5px;
+        }
+        
+        .tab-btn {
+            padding: 12px 24px;
+            background: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            color: var(--dark);
+        }
+        
+        .tab-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            margin-bottom: 2rem;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Карточки */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .card-title {
+            font-size: 1.3rem;
+            margin-top: 0;
+            color: var(--primary);
+            border-bottom: 2px solid var(--secondary);
+            padding-bottom: 0.5rem;
+            display: inline-block;
+        }
+        
+        /* Формы */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        input:focus, select:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.2);
+        }
+        
+        /* Кнопки */
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        button:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        button:disabled {
+            background: var(--gray);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .btn-secondary {
+            background: var(--secondary);
+        }
+        
+        .btn-secondary:hover {
+            background: #00b5ad;
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+        }
+        
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 0.9rem;
+        }
+        
+        /* Результаты */
+        .result {
+            margin-top: 1.5rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+            transition: all 0.3s ease;
+        }
+        
+        .result-number {
+            font-size: 3rem;
+            font-weight: 700;
+            text-align: center;
+            color: var(--primary);
+            margin: 1rem 0;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .error {
+            color: var(--danger);
+            margin-top: 1rem;
+            font-weight: 600;
+            animation: shake 0.5s;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+        
+        .success {
+            color: var(--success);
+            margin-top: 1rem;
+            font-weight: 600;
+        }
+        
+        /* Инструменты */
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .tool-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+            border: 2px solid transparent;
+        }
+        
+        .tool-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-color: var(--primary);
+        }
+        
+        .tool-card.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .tool-card i {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+        
+        .tool-card.active i {
+            color: white;
+        }
+        
+        /* Монета */
+        .coin-container {
+            perspective: 1000px;
+            width: 150px;
+            height: 150px;
+            margin: 2rem auto;
+        }
+        
+        .coin {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 1s ease;
+            cursor: pointer;
+        }
+        
+        .coin.flipping {
+            animation: flip-coin 3s ease-out;
+        }
+        
+        @keyframes flip-coin {
+            0% { transform: rotateY(0); }
+            50% { transform: rotateY(1800deg); }
+            100% { transform: rotateY(3600deg); }
+        }
+        
+        .coin-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            background: linear-gradient(135deg, #fdcb6e, #e17055);
+        }
+        
+        .coin-front {
+            background: linear-gradient(135deg, #fdcb6e, #e17055);
+            transform: rotateY(0deg);
+        }
+        
+        .coin-back {
+            background: linear-gradient(135deg, #a29bfe, #6c5ce7);
+            transform: rotateY(180deg);
+        }
+        
+        .coin-image {
+            width: 80%;
+            height: 80%;
+            object-fit: contain;
+        }
+        
+        /* Кубик */
+        .dice-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin: 2rem 0;
+            perspective: 1000px;
+        }
+        
+        .die-wrapper {
+            perspective: 1000px;
+            width: 80px;
+            height: 80px;
+            margin: 0 auto;
+        }
+        
+        .die {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 1s ease;
+            transform: rotateX(0) rotateY(0) rotateZ(0);
+        }
+        
+        .die.rolling {
+            animation: roll-die 1.5s ease-out;
+        }
+        
+        @keyframes roll-die {
+            0% { transform: rotateX(0) rotateY(0) rotateZ(0); }
+            100% { transform: rotateX(720deg) rotateY(720deg) rotateZ(720deg); }
+        }
+        
+        .die-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #eee;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+        
+        .dot {
+            width: 12px;
+            height: 12px;
+            background: #333;
+            border-radius: 50%;
+            position: absolute;
+        }
+        
+        /* Расположение точек для каждой грани */
+        .face-1 .dot:nth-child(1) {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .face-2 .dot:nth-child(1) {
+            top: 25%;
+            left: 25%;
+        }
+        
+        .face-2 .dot:nth-child(2) {
+            bottom: 25%;
+            right: 25%;
+        }
+        
+        .face-3 .dot:nth-child(1) {
+            top: 25%;
+            left: 25%;
+        }
+        
+        .face-3 .dot:nth-child(2) {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .face-3 .dot:nth-child(3) {
+            bottom: 25%;
+            right: 25%;
+        }
+        
+        .face-4 .dot:nth-child(1) {
+            top: 25%;
+            left: 25%;
+        }
+        
+        .face-4 .dot:nth-child(2) {
+            top: 25%;
+            right: 25%;
+        }
+        
+        .face-4 .dot:nth-child(3) {
+            bottom: 25%;
+            left: 25%;
+        }
+        
+        .face-4 .dot:nth-child(4) {
+            bottom: 25%;
+            right: 25%;
+        }
+        
+        .face-5 .dot:nth-child(1) {
+            top: 25%;
+            left: 25%;
+        }
+        
+        .face-5 .dot:nth-child(2) {
+            top: 25%;
+            right: 25%;
+        }
+        
+        .face-5 .dot:nth-child(3) {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .face-5 .dot:nth-child(4) {
+            bottom: 25%;
+            left: 25%;
+        }
+        
+        .face-5 .dot:nth-child(5) {
+            bottom: 25%;
+            right: 25%;
+        }
+        
+        .face-6 .dot:nth-child(1) {
+            top: 25%;
+            left: 25%;
+        }
+        
+        .face-6 .dot:nth-child(2) {
+            top: 25%;
+            right: 25%;
+        }
+        
+        .face-6 .dot:nth-child(3) {
+            top: 50%;
+            left: 25%;
+            transform: translateY(-50%);
+        }
+        
+        .face-6 .dot:nth-child(4) {
+            top: 50%;
+            right: 25%;
+            transform: translateY(-50%);
+        }
+        
+        .face-6 .dot:nth-child(5) {
+            bottom: 25%;
+            left: 25%;
+        }
+        
+        .face-6 .dot:nth-child(6) {
+            bottom: 25%;
+            right: 25%;
+        }
+        
+        /* Позиционирование граней кубика */
+        .face-1 { transform: rotateY(0deg) translateZ(40px); }
+        .face-2 { transform: rotateY(90deg) translateZ(40px); }
+        .face-3 { transform: rotateY(180deg) translateZ(40px); }
+        .face-4 { transform: rotateY(-90deg) translateZ(40px); }
+        .face-5 { transform: rotateX(90deg) translateZ(40px); }
+        .face-6 { transform: rotateX(-90deg) translateZ(40px); }
+        
+        /* Цвет */
+        .color-box {
+            width: 100%;
+            height: 120px;
+            border-radius: 10px;
+            margin: 1.5rem 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1.2rem;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            transition: all 0.5s ease;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .color-box::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(0,0,0,0.1));
+        }
+        
+        .color-info {
+            background: rgba(0,0,0,0.7);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            z-index: 1;
+            text-align: center;
+        }
+        
+        .color-copy {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 2;
+        }
+        
+        .color-copy:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.1);
+        }
+        
+        .color-copy i {
+            font-size: 0.9rem;
+        }
+        
+        /* Пароль */
+        .password-display {
+            font-family: monospace;
+            font-size: 1.2rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            word-break: break-all;
+            text-align: center;
+            margin: 1rem 0;
+            position: relative;
+        }
+        
+        .password-copy {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: var(--primary);
+            border: none;
+            color: white;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .password-copy:hover {
+            background: var(--primary-dark);
+        }
+        
+        .password-copy i {
+            font-size: 0.7rem;
+        }
+        
+        /* История */
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+            transition: all 0.2s;
+        }
+        
+        .history-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        
+        .history-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        /* Статистика */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1rem;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+            text-align: center;
+            transition: all 0.3s ease;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin: 0.5rem 0;
+        }
+        
+        .stat-label {
+            color: var(--gray);
+            font-size: 0.8rem;
+        }
+        
+        /* Прогресс бар */
+        .progress-container {
+            width: 100%;
+            background: #e9ecef;
+            border-radius: 50px;
+            height: 10px;
+            margin-top: 1rem;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        
+        /* График */
+        .history-chart {
+            height: 300px;
+            margin: 2rem 0;
+        }
+        
+        /* Подсказки */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: var(--dark);
+            color: white;
+            text-align: center;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.9rem;
+            font-weight: normal;
+        }
+        
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        /* Анимации */
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .rotate {
+            animation: rotate 2s linear infinite;
+        }
+        
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .tabs {
+                flex-direction: column;
+            }
+            
+            .tab-btn {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+            
+            .tools-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+            
+            .dice-container {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Super Random</h1>
+            <div class="subtitle">Мощный генератор случайных чисел и событий</div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="tabs">
+            <button class="tab-btn active" onclick="openTab(event, 'generator')"><i class="fas fa-random"></i> Генератор</button>
+            <button class="tab-btn" onclick="openTab(event, 'random-tools')"><i class="fas fa-tools"></i> Инструменты</button>
+            <button class="tab-btn" onclick="openTab(event, 'randomness-test')"><i class="fas fa-check-double"></i> Тест</button>
+            <button class="tab-btn" onclick="openTab(event, 'history')"><i class="fas fa-history"></i> История</button>
+            <button class="tab-btn" onclick="openTab(event, 'about')"><i class="fas fa-info-circle"></i> О проекте</button>
+        </div>
+        
+        <!-- Генератор чисел -->
+        <div id="generator" class="tab-content active">
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-random"></i> Генератор случайных чисел</h2>
+                <div class="form-group">
+                    <label for="min"><i class="fas fa-arrow-down"></i> Минимальное значение:</label>
+                    <input type="number" id="min" value="1" min="-1000000" max="1000000">
+                </div>
+                <div class="form-group">
+                    <label for="max"><i class="fas fa-arrow-up"></i> Максимальное значение:</label>
+                    <input type="number" id="max" value="100" min="-1000000" max="1000000">
+                </div>
+                <div class="form-group">
+                    <label for="count"><i class="fas fa-list-ol"></i> Количество чисел:</label>
+                    <input type="number" id="count" value="1" min="1" max="1000">
+                </div>
+                <button onclick="generateNumbers()"><i class="fas fa-bolt"></i> Сгенерировать</button>
+                <div id="generator-error" class="error"></div>
+                <div id="generator-result" class="result"></div>
+            </div>
+        </div>
+        
+        <!-- Инструменты -->
+        <div id="random-tools" class="tab-content">
+            <div class="tools-grid" id="tools-grid">
+                <div class="tool-card active" data-tool="coin" onclick="selectTool('coin')">
+                    <i class="fas fa-coins"></i>
+                    <h3>Орёл или решка</h3>
+                </div>
+                <div class="tool-card" data-tool="dice" onclick="selectTool('dice')">
+                    <i class="fas fa-dice"></i>
+                    <h3>Бросок кубика</h3>
+                </div>
+                <div class="tool-card" data-tool="color" onclick="selectTool('color')">
+                    <i class="fas fa-palette"></i>
+                    <h3>Случайный цвет</h3>
+                </div>
+                <div class="tool-card" data-tool="password" onclick="selectTool('password')">
+                    <i class="fas fa-key"></i>
+                    <h3>Генератор паролей</h3>
+                </div>
+                <div class="tool-card" data-tool="choice" onclick="selectTool('choice')">
+                    <i class="fas fa-random"></i>
+                    <h3>Случайный выбор</h3>
+                </div>
+            </div>
+            
+            <!-- Орёл или решка -->
+            <div id="coin-tool" class="card tool-content active">
+                <h2 class="card-title"><i class="fas fa-coins"></i> Орёл или решка</h2>
+                <div class="coin-container">
+                    <div class="coin" id="coin" onclick="flipCoin()">
+                        <div class="coin-face coin-front">
+                            <img src="https://i.imgur.com/7WJj6yO.png" alt="Орёл" class="coin-image">
+                        </div>
+                        <div class="coin-face coin-back">
+                            <img src="https://i.imgur.com/5XJQ7bT.png" alt="Решка" class="coin-image">
+                        </div>
+                    </div>
+                </div>
+                <button onclick="flipCoin()"><i class="fas fa-redo"></i> Подбросить монету</button>
+                <div id="coin-result" class="result"></div>
+            </div>
+            
+            <!-- Бросок кубика -->
+            <div id="dice-tool" class="card tool-content">
+                <h2 class="card-title"><i class="fas fa-dice"></i> Бросок кубика</h2>
+                <p>Выберите количество кубиков:</p>
+                <div class="dice-container" id="dice-container">
+                    <div class="die-wrapper">
+                        <div class="die" id="die-1" data-value="1">
+                            <div class="die-face face-1"><div class="dot"></div></div>
+                            <div class="die-face face-2"><div class="dot"></div><div class="dot"></div></div>
+                            <div class="die-face face-3"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                            <div class="die-face face-4"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                            <div class="die-face face-5"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                            <div class="die-face face-6"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                        </div>
+                    </div>
+                    <div class="die-wrapper">
+                        <div class="die" id="die-2" data-value="1">
+                            <div class="die-face face-1"><div class="dot"></div></div>
+                            <div class="die-face face-2"><div class="dot"></div><div class="dot"></div></div>
+                            <div class="die-face face-3"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                            <div class="die-face face-4"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                            <div class="die-face face-5"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                            <div class="die-face face-6"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                        </div>
+                    </div>
+                    <div class="die-wrapper">
+                        <div class="die" id="die-3" data-value="1">
+                            <div class="die-face face-1"><div class="dot"></div></div>
+                            <div class="die-face face-2"><div class="dot"></div><div class="dot"></div></div>
+                            <div class="die-face face-3"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                            <div class="die-face face-4"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                            <div class="die-face face-5"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                            <div class="die-face face-6"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button onclick="rollDice(1)"><i class="fas fa-dice-one"></i> 1 кубик</button>
+                    <button onclick="rollDice(2)"><i class="fas fa-dice-two"></i> 2 кубика</button>
+                    <button onclick="rollDice(3)"><i class="fas fa-dice-three"></i> 3 кубика</button>
+                </div>
+                <div id="dice-result" class="result"></div>
+            </div>
+            
+            <!-- Случайный цвет -->
+            <div id="color-tool" class="card tool-content">
+                <h2 class="card-title"><i class="fas fa-palette"></i> Случайный цвет</h2>
+                <button onclick="generateColor()"><i class="fas fa-sync-alt"></i> Сгенерировать цвет</button>
+                <div class="color-box" id="color-box">
+                    <div class="color-info">
+                        RGB(0, 0, 0)<br>
+                        HEX #000000
+                    </div>
+                    <button class="color-copy" onclick="copyColor()" title="Копировать цвет">
+                        <i class="far fa-copy"></i>
+                    </button>
+                </div>
+                <div id="color-result" class="result"></div>
+            </div>
+            
+            <!-- Генератор паролей -->
+            <div id="password-tool" class="card tool-content">
+                <h2 class="card-title"><i class="fas fa-key"></i> Генератор паролей</h2>
+                <div class="form-group">
+                    <label for="pass-length"><i class="fas fa-ruler-horizontal"></i> Длина пароля (4-64):</label>
+                    <input type="number" id="pass-length" value="12" min="4" max="64">
+                </div>
+                <div class="form-group">
+                    <label for="pass-complexity"><i class="fas fa-shield-alt"></i> Сложность:</label>
+                    <select id="pass-complexity">
+                        <option value="simple">Только буквы</option>
+                        <option value="medium">Буквы и цифры</option>
+                        <option value="strong">Буквы, цифры и символы</option>
+                    </select>
+                </div>
+                <button onclick="generatePassword()"><i class="fas fa-key"></i> Сгенерировать пароль</button>
+                <div class="password-display" id="password-display">
+                    <button class="password-copy" onclick="copyPassword()" title="Копировать пароль">
+                        <i class="far fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Случайный выбор -->
+            <div id="choice-tool" class="card tool-content">
+                <h2 class="card-title"><i class="fas fa-random"></i> Случайный выбор</h2>
+                <div class="form-group">
+                    <label for="options"><i class="fas fa-list-ul"></i> Варианты (разделяйте запятыми):</label>
+                    <input type="text" id="options" placeholder="Красный, Зеленый, Синий">
+                </div>
+                <button onclick="randomChoice()"><i class="fas fa-random"></i> Выбрать случайно</button>
+                <div id="choice-result" class="result"></div>
+            </div>
+        </div>
+        
+        <!-- Тест случайности -->
+        <div id="randomness-test" class="tab-content">
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-check-double"></i> Тест случайности</h2>
+                <p>Этот тест генерирует 100 чисел за один запрос и анализирует их распределение. Можно выполнять 1 раз в день.</p>
+                
+                <div class="form-group">
+                    <label for="test-min"><i class="fas fa-arrow-down"></i> Минимальное значение:</label>
+                    <input type="number" id="test-min" value="1" min="1" max="100">
+                </div>
+                
+                <div class="form-group">
+                    <label for="test-max"><i class="fas fa-arrow-up"></i> Максимальное значение:</label>
+                    <input type="number" id="test-max" value="10" min="2" max="100">
+                </div>
+                
+                <button id="test-btn" onclick="runRandomnessTest()"><i class="fas fa-play"></i> Запустить тест</button>
+                <div class="progress-container">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+                
+                <div id="test-result" class="result"></div>
+                <div id="test-error" class="error"></div>
+                
+                <div class="stats-grid" id="stats">
+                    <!-- Статистика будет здесь -->
+                </div>
+                
+                <div class="history-chart">
+                    <canvas id="histogram-chart"></canvas>
+                </div>
+                
+                <button class="btn-secondary" onclick="downloadTestData()"><i class="fas fa-download"></i> Скачать данные теста</button>
+            </div>
+        </div>
+        
+        <!-- История -->
+        <div id="history" class="tab-content">
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-history"></i> История генераций</h2>
+                
+                <div class="form-group">
+                    <label for="history-filter"><i class="fas fa-filter"></i> Фильтр по типу:</label>
+                    <select id="history-filter" onchange="filterHistory()">
+                        <option value="all">Все</option>
+                        <option value="numbers">Числа</option>
+                        <option value="coin">Монета</option>
+                        <option value="dice">Кубик</option>
+                        <option value="color">Цвет</option>
+                        <option value="password">Пароль</option>
+                        <option value="choice">Выбор</option>
+                    </select>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 1rem;">
+                    <button class="btn-secondary" onclick="downloadHistory()"><i class="fas fa-download"></i> Скачать историю</button>
+                    <button class="btn-danger" onclick="clearHistory()"><i class="fas fa-trash"></i> Очистить историю</button>
+                </div>
+                
+                <div id="history-stats" class="stats-grid"></div>
+                
+                <div id="history-items" style="margin-top: 2rem;">
+                    <!-- История будет здесь -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- О проекте -->
+        <div id="about" class="tab-content">
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-info-circle"></i> О проекте Super Random</h2>
+                <p>Этот генератор использует API <a href="https://random.org" target="_blank">Random.org</a>, который создает истинно случайные числа на основе атмосферного шума.</p>
+                
+                <h3><i class="fas fa-question-circle"></i> Почему это важно?</h3>
+                <p>Большинство генераторов случайных чисел в компьютерах являются псевдослучайными - они используют алгоритмы, которые создают числа, кажущиеся случайными, но на самом деле предсказуемые, если знать начальное значение.</p>
+                <p>Random.org использует природные процессы (атмосферный шум), которые по своей природе случайны и непредсказуемы.</p>
+                
+                <h3><i class="fas fa-star"></i> Особенности этого генератора:</h3>
+                <ul>
+                    <li><strong>Реалистичные анимации</strong> - подбрасывание монеты, бросок кубика</li>
+                    <li><strong>10 различных инструментов</strong> - от генерации чисел до случайного выбора</li>
+                    <li><strong>Полная история</strong> - с возможностью фильтрации и экспорта</li>
+                    <li><strong>Тест случайности</strong> - с визуализацией распределения</li>
+                    <li><strong>Удобный интерфейс</strong> - адаптивный и интуитивно понятный</li>
+                </ul>
+                
+                <h3><i class="fas fa-tachometer-alt"></i> Ограничения</h3>
+                <p>Бесплатная версия API Random.org имеет лимиты:</p>
+                <ul>
+                    <li>1,000 случайных чисел в день</li>
+                    <li>Максимум 10,000 чисел за один запрос</li>
+                    <li>Тест случайности можно выполнять 1 раз в день</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Конфигурация
+        const API_KEY = "6d0cf7c4-6064-49a1-8d76-519e3969e538";
+        const TEST_LIMIT_PER_DAY = 1;
+        let history = JSON.parse(localStorage.getItem('randomHistory')) || [];
+        let testData = [];
+        let lastTestDate = localStorage.getItem('lastTestDate');
+        let testCountToday = parseInt(localStorage.getItem('testCountToday')) || 0;
+        let histogramChart = null;
+        let currentTool = 'coin';
+        let currentColor = { r: 0, g: 0, b: 0 };
+        
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', function() {
+            updateHistoryDisplay();
+            updateHistoryStats();
+            checkTestLimit();
+            initDice();
+        });
+        
+        // Функции вкладок
+        function openTab(evt, tabName) {
+            const tabContents = document.getElementsByClassName("tab-content");
+            for (let i = 0; i < tabContents.length; i++) {
+                tabContents[i].classList.remove("active");
+            }
+            
+            const tabLinks = document.getElementsByClassName("tab-btn");
+            for (let i = 0; i < tabLinks.length; i++) {
+                tabLinks[i].classList.remove("active");
+            }
+            
+            document.getElementById(tabName).classList.add("active");
+            evt.currentTarget.classList.add("active");
+            
+            // Обновляем график при открытии вкладки с тестом
+            if (tabName === 'randomness-test' && testData.length > 0) {
+                updateHistogramChart();
+            }
+        }
+        
+        // Выбор инструмента
+        function selectTool(tool) {
+            currentTool = tool;
+            
+            // Обновляем активные карточки инструментов
+            const toolCards = document.querySelectorAll('.tool-card');
+            toolCards.forEach(card => {
+                card.classList.remove('active');
+                if (card.dataset.tool === tool) {
+                    card.classList.add('active');
+                }
+            });
+            
+            // Показываем соответствующий инструмент
+            const toolContents = document.querySelectorAll('.tool-content');
+            toolContents.forEach(content => {
+                content.classList.remove('active');
+                if (content.id === `${tool}-tool`) {
+                    content.classList.add('active');
+                }
+            });
+        }
+        
+        // Проверка лимита тестов
+        function checkTestLimit() {
+            const today = new Date().toDateString();
+            const testBtn = document.getElementById('test-btn');
+            
+            if (lastTestDate !== today) {
+                testCountToday = 0;
+                localStorage.setItem('lastTestDate', today);
+                localStorage.setItem('testCountToday', '0');
+            }
+            
+            if (testCountToday >= TEST_LIMIT_PER_DAY) {
+                testBtn.disabled = true;
+                testBtn.innerHTML = '<i class="fas fa-ban"></i> Лимит тестов на сегодня исчерпан';
+            }
+        }
+        
+        // ========== Генератор чисел ==========
+        async function generateNumbers() {
+            const min = parseInt(document.getElementById("min").value);
+            const max = parseInt(document.getElementById("max").value);
+            const count = parseInt(document.getElementById("count").value);
+            
+            const errorDiv = document.getElementById("generator-error");
+            const resultDiv = document.getElementById("generator-result");
+            
+            errorDiv.textContent = "";
+            resultDiv.innerHTML = '<div style="text-align: center;"><i class="fas fa-spinner fa-spin fa-2x"></i><br>Генерация...</div>';
+            
+            // Валидация
+            if (min >= max) {
+                errorDiv.textContent = "Минимальное значение должно быть меньше максимального";
+                return;
+            }
+            
+            if (count < 1 || count > 1000) {
+                errorDiv.textContent = "Количество должно быть от 1 до 1000";
+                return;
+            }
+            
+            try {
+                const response = await fetch("https://api.random.org/json-rpc/4/invoke", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        "jsonrpc": "2.0",
+                        "method": "generateIntegers",
+                        "params": {
+                            "apiKey": API_KEY,
+                            "n": count,
+                            "min": min,
+                            "max": max,
+                            "replacement": true,
+                            "base": 10
+                        },
+                        "id": 1
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    errorDiv.textContent = `Ошибка API: ${data.error.message}`;
+                    resultDiv.textContent = "";
+                } else {
+                    const numbers = data.result.random.data;
+                    
+                    if (numbers.length === 1) {
+                        resultDiv.innerHTML = `
+                            <div class="result-number">${numbers[0]}</div>
+                            <div style="text-align: center;">Сгенерировано число от ${min} до ${max}</div>
+                        `;
+                    } else {
+                        resultDiv.innerHTML = `
+                            <strong>Результат (${numbers.length} чисел от ${min} до ${max}):</strong><br>
+                            <div style="max-height: 200px; overflow-y: auto; margin-top: 10px;">
+                                ${numbers.join(", ")}
+                            </div>
+                        `;
+                    }
+                    
+                    // Сохраняем в историю
+                    addToHistory({
+                        type: 'numbers',
+                        timestamp: new Date().toISOString(),
+                        params: { min, max, count },
+                        result: numbers
+                    });
+                }
+            } catch (error) {
+                errorDiv.textContent = `Ошибка при запросе: ${error.message}`;
+                resultDiv.textContent = "";
+            }
+        }
+        
+        // ========== ИНСТРУМЕНТЫ ==========
+        
+        // Орёл или решка
+        function flipCoin() {
+            const coin = document.getElementById('coin');
+            const resultDiv = document.getElementById('coin-result');
+            
+            coin.classList.add('flipping');
+            resultDiv.innerHTML = '<div style="text-align: center;"><i class="fas fa-spinner fa-spin"></i> Подбрасываем монету...</div>';
+            
+            // Генерируем случайное число (0 или 1)
+            setTimeout(async () => {
+                try {
+                    const response = await fetch("https://api.random.org/json-rpc/4/invoke", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            "jsonrpc": "2.0",
+                            "method": "generateIntegers",
+                            "params": {
+                                "apiKey": API_KEY,
+                                "n": 1,
+                                "min": 0,
+                                "max": 1,
+                                "replacement": true,
+                                "base": 10
+                            },
+                            "id": 1
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        throw new Error(data.error.message);
+                    }
+                    
+                    const result = data.result.random.data[0] === 0 ? "Орёл" : "Решка";
+                    resultDiv.innerHTML = `<strong>Результат:</strong> ${result}`;
+                    
+                    // Сохраняем в историю
+                    addToHistory({
+                        type: 'coin',
+                        timestamp: new Date().toISOString(),
+                        result: result
+                    });
+                } catch (error) {
+                    resultDiv.textContent = `Ошибка: ${error.message}`;
+                } finally {
+                    setTimeout(() => {
+                        coin.classList.remove('flipping');
+                    }, 3000); // Даем время завершить анимацию
+                }
+            }, 100);
+        }
+        
+        // Инициализация кубиков
+        function initDice() {
+            // Устанавливаем начальное значение для каждого кубика (1)
+            for (let i = 1; i <= 3; i++) {
+                const die = document.getElementById(`die-${i}`);
+                setDieValue(die, 1);
+            }
+        }
+        
+        // Установка значения кубика
+        function setDieValue(die, value) {
+            // Ограничиваем значение от 1 до 6
+            value = Math.max(1, Math.min(6, value));
+            
+            // Устанавливаем значение в data-атрибут
+            die.dataset.value = value;
+            
+            // Поворачиваем кубик, чтобы показать нужную грань
+            switch(value) {
+                case 1:
+                    die.style.transform = 'rotateX(0deg) rotateY(0deg) rotateZ(0deg)';
+                    break;
+                case 2:
+                    die.style.transform = 'rotateX(0deg) rotateY(-90deg) rotateZ(0deg)';
+                    break;
+                case 3:
+                    die.style.transform = 'rotateX(0deg) rotateY(180deg) rotateZ(0deg)';
+                    break;
+                case 4:
+                    die.style.transform = 'rotateX(0deg) rotateY(90deg) rotateZ(0deg)';
+                    break;
+                case 5:
+                    die.style.transform = 'rotateX(-90deg) rotateY(0deg) rotateZ(0deg)';
+                    break;
+                case 6:
+                    die.style.transform = 'rotateX(90deg) rotateY(0deg) rotateZ(0deg)';
+                    break;
+            }
+        }
+        
+        // Бросок кубика
+        async function rollDice(count) {
+            const diceContainer = document.getElementById('dice-container');
+            const resultDiv = document.getElementById('dice-result');
+            
+            resultDiv.innerHTML = '<div style="text-align: center;"><i class="fas fa-spinner fa-spin"></i> Бросаем кубик...</div>';
+            
+            try {
+                const response = await fetch("https://api.random.org/json-rpc/4/invoke", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        "jsonrpc": "2.0",
+                        "method": "generateIntegers",
+                        "params": {
+                            "apiKey": API_KEY,
+                            "n": count,
+                            "min": 1,
+                            "max": 6,
+                            "replacement": true,
+                            "base": 10
+                        },
+                        "id": 1
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error.message);
+                }
+                
+                const diceValues = data.result.random.data;
+                
+                // Анимируем броски
+                for (let i = 0; i < count; i++) {
+                    const die = document.getElementById(`die-${i+1}`);
+                    die.classList.add('rolling');
+                    
+                    // Через 1.5 секунды останавливаем анимацию и показываем результат
+                    setTimeout(() => {
+                        die.classList.remove('rolling');
+                        setDieValue(die, diceValues[i]);
+                    }, 1500);
+                }
+                
+                // Показываем результат после завершения анимации
+                setTimeout(() => {
+                    const sum = diceValues.slice(0, count).reduce((a, b) => a + b, 0);
+                    resultDiv.innerHTML = `<strong>Результат:</strong> ${diceValues.slice(0, count).join(", ")} (сумма: ${sum})`;
+                    
+                    // Сохраняем в историю
+                    addToHistory({
+                        type: 'dice',
+                        timestamp: new Date().toISOString(),
+                        params: { count },
+                        result: diceValues.slice(0, count)
+                    });
+                }, 1600);
+            } catch (error) {
+                resultDiv.textContent = `Ошибка: ${error.message}`;
+            }
+        }
+        
+        // Генератор цвета
+        async function generateColor() {
+            const colorBox = document.getElementById('color-box');
+            const resultDiv = document.getElementById('color-result');
+            
+            resultDiv.innerHTML = '<div style="text-align: center;"><i class="fas fa-spinner fa-spin"></i> Генерация цвета...</div>';
+            
+            try {
+                const response = await fetch("https://api.random.org/json-rpc/4/invoke", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        "jsonrpc": "2.0",
+                        "method": "generateIntegers",
+                        "params": {
+                            "apiKey": API_KEY,
+                            "n": 3,
+                            "min": 0,
+                            "max": 255,
+                            "replacement": true,
+                            "base": 10
+                        },
+                        "id": 1
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error.message);
+                }
+                
+                const [r, g, b] = data.result.random.data;
+                currentColor = { r, g, b };
+                
+                // Преобразуем в HEX
+                const hex = rgbToHex(r, g, b);
+                
+                // Преобразуем в HSL
+                const hsl = rgbToHsl(r, g, b);
+                
+                // Анимируем изменение цвета
+                colorBox.style.transition = 'background 0.5s ease';
+                colorBox.style.background = `rgb(${r}, ${g}, ${b})`;
+                colorBox.querySelector('.color-info').innerHTML = `
+                    RGB(${r}, ${g}, ${b})<br>
+                    HEX ${hex}<br>
+                    HSL(${hsl.h}, ${hsl.s}%, ${hsl.l}%)
+                `;
+                
+                resultDiv.innerHTML = `<strong>Сгенерирован цвет:</strong> RGB(${r}, ${g}, ${b}) | ${hex} | HSL(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`;
+                
+                // Сохраняем в историю
+                addToHistory({
+                    type: 'color',
+                    timestamp: new Date().toISOString(),
+                    result: { r, g, b, hex, hsl }
+                });
+            } catch (error) {
+                resultDiv.textContent = `Ошибка: ${error.message}`;
+            }
+        }
+        
+        // Копирование цвета
+        function copyColor() {
+            const hex = rgbToHex(currentColor.r, currentColor.g, currentColor.b);
+            navigator.clipboard.writeText(hex).then(() => {
+                alert(`Цвет ${hex} скопирован в буфер обмена!`);
+            }).catch(err => {
+                alert('Не удалось скопировать цвет: ' + err);
+            });
+        }
+        
+        // Преобразование RGB в HEX
+        function rgbToHex(r, g, b) {
+            return '#' + [r, g, b].map(x => {
+                const hex = x.toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            }).join('');
+        }
+        
+        // Преобразование RGB в HSL
+        function rgbToHsl(r, g, b) {
+            r /= 255, g /= 255, b /= 255;
+            
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h, s, l = (max + min) / 2;
+            
+            if (max === min) {
+                h = s = 0; // achromatic
+            } else {
+                const d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                
+                h /= 6;
+            }
+            
+            return {
+                h: Math.round(h * 360),
+                s: Math.round(s * 100),
+                l: Math.round(l * 100)
+            };
+        }
+        
+        // Генератор паролей
+        async function generatePassword() {
+            const length = parseInt(document.getElementById('pass-length').value);
+            const complexity = document.getElementById('pass-complexity').value;
+            const passwordDisplay = document.getElementById('password-display');
+            
+            if (length < 4 || length > 64) {
+                passwordDisplay.textContent = "Длина пароля должна быть от 4 до 64 символов";
+                return;
+            }
+            
+            let chars = '';
+            if (complexity === 'simple') {
+                chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            } else if (complexity === 'medium') {
+                chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            } else {
+                chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
+            }
+            
+            try {
+                // Получаем случайные индексы для выбора символов
+                const response = await fetch("https://api.random.org/json-rpc/4/invoke", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        "jsonrpc": "2.0",
+                        "method": "generateIntegers",
+                        "params": {
+                            "apiKey": API_KEY,
+                            "n": length,
+                            "min": 0,
+                            "max": chars.length - 1,
+                            "replacement": true,
+                            "base": 10
+                        },
+                        "id": 1
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error.message);
+                }
+                
+                const indices = data.result.random.data;
+                let password = '';
+                
+                for (let i = 0; i < length; i++) {
+                    password += chars[indices[i]];
+                }
+                
+                passwordDisplay.innerHTML = password + 
+                    '<button class="password-copy" onclick="copyPassword()" title="Копировать пароль">' +
+                    '<i class="far fa-copy"></i></button>';
+                
+                // Сохраняем в историю (без самого пароля для безопасности)
+                addToHistory({
+                    type: 'password',
+                    timestamp: new Date().toISOString(),
+                    params: { length, complexity },
+                    result: 'Сгенерирован пароль'
+                });
+            } catch (error) {
+                passwordDisplay.textContent = `Ошибка: ${error.message}`;
+            }
+        }
+        
+        // Копирование пароля
+        function copyPassword() {
+            const passwordDisplay = document.getElementById('password-display');
+            const password = passwordDisplay.textContent;
+            
+            navigator.clipboard.writeText(password).then(() => {
+                alert('Пароль скопирован в буфер обмена!');
+            }).catch(err => {
+                alert('Не удалось скопировать пароль: ' + err);
+            });
+        }
+        
+        // Случайный выбор
+        async function randomChoice() {
+            const optionsInput = document.getElementById('options').value.trim();
+            const resultDiv = document.getElementById('choice-result');
+            
+            if (!optionsInput) {
+                resultDiv.textContent = "Введите варианты для выбора";
+                return;
+            }
+            
+            const options = optionsInput.split(',').map(opt => opt.trim()).filter(opt => opt);
+            
+            if (options.length < 2) {
+                resultDiv.textContent = "Нужно как минимум 2 варианта";
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div style="text-align: center;"><i class="fas fa-spinner fa-spin"></i> Делаем выбор...</div>';
+            
+            try {
+                const response = await fetch("https://api.random.org/json-rpc/4/invoke", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        "jsonrpc": "2.0",
+                        "method": "generateIntegers",
+                        "params": {
+                            "apiKey": API_KEY,
+                            "n": 1,
+                            "min": 0,
+                            "max": options.length - 1,
+                            "replacement": true,
+                            "base": 10
+                        },
+                        "id": 1
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error.message);
+                }
+                
+                const choiceIndex = data.result.random.data[0];
+                const choice = options[choiceIndex];
+                
+                // Анимация выбора
+                let counter = 0;
+                const maxIterations = 20;
+                const delay = 100;
+                
+                function animateSelection() {
+                    if (counter < maxIterations) {
+                        const randomIndex = Math.floor(Math.random() * options.length);
+                        resultDiv.innerHTML = `<strong>Выбираем...</strong> ${options[randomIndex]}`;
+                        counter++;
+                        setTimeout(animateSelection, delay);
+                    } else {
+                        resultDiv.innerHTML = `<strong>Выбрано:</strong> ${choice}`;
+                    }
+                }
+                
+                animateSelection();
+                
+                // Сохраняем в историю
+                addToHistory({
+                    type: 'choice',
+                    timestamp: new Date().toISOString(),
+                    params: { options },
+                    result: choice
+                });
+            } catch (error) {
+                resultDiv.textContent = `Ошибка: ${error.message}`;
+            }
+        }
+        
+        // ========== Тест случайности ==========
+        async function runRandomnessTest() {
+            const min = parseInt(document.getElementById("test-min").value);
+            const max = parseInt(document.getElementById("test-max").value);
+            const testCount = 100;
+            
+            const testResultDiv = document.getElementById("test-result");
+            const testErrorDiv = document.getElementById("test-error");
+            const progressBar = document.getElementById("progress-bar");
+            const statsDiv = document.getElementById("stats");
+            const testBtn = document.getElementById('test-btn');
+            
+            testResultDiv.innerHTML = '<div style="text-align: center;"><i class="fas fa-spinner fa-spin"></i> Подготовка теста...</div>';
+            testErrorDiv.textContent = "";
+            progressBar.style.width = "0%";
+            statsDiv.innerHTML = "";
+            testData = [];
+            
+            if (min >= max) {
+                testErrorDiv.textContent = "Минимальное значение должно быть меньше максимального";
+                return;
+            }
+            
+            if (max - min + 1 > 100) {
+                testErrorDiv.textContent = "Для теста разница между min и max должна быть не более 100";
+                return;
+            }
+            
+            // Проверяем лимит
+            const today = new Date().toDateString();
+            if (lastTestDate !== today) {
+                testCountToday = 0;
+                localStorage.setItem('lastTestDate', today);
+            }
+            
+            if (testCountToday >= TEST_LIMIT_PER_DAY) {
+                testErrorDiv.textContent = "Вы уже выполнили максимальное количество тестов на сегодня";
+                testBtn.disabled = true;
+                return;
+            }
+            
+            testBtn.disabled = true;
+            testBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Тестирование...';
+            
+            try {
+                testResultDiv.innerHTML = '<div style="text-align: center;"><i class="fas fa-spinner fa-spin"></i> Выполняем тест...</div>';
+                
+                // Один запрос для 100 чисел
+                const response = await fetch("https://api.random.org/json-rpc/4/invoke", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        "jsonrpc": "2.0",
+                        "method": "generateIntegers",
+                        "params": {
+                            "apiKey": API_KEY,
+                            "n": testCount,
+                            "min": min,
+                            "max": max,
+                            "replacement": true,
+                            "base": 10
+                        },
+                        "id": 1
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error.message);
+                }
+                
+                testData = data.result.random.data;
+                progressBar.style.width = "100%";
+                
+                // Обновляем счетчик тестов
+                testCountToday++;
+                localStorage.setItem('testCountToday', testCountToday.toString());
+                
+                // Анализ результатов
+                analyzeTestResults(min, max);
+                
+                // Сохраняем в историю
+                addToHistory({
+                    type: 'randomness_test',
+                    timestamp: new Date().toISOString(),
+                    params: { min, max, count: testCount },
+                    result: testData
+                });
+                
+                testResultDiv.innerHTML += `<div class="success"><i class="fas fa-check-circle"></i> Тест успешно завершен! Осталось тестов на сегодня: ${TEST_LIMIT_PER_DAY - testCountToday}</div>`;
+                
+            } catch (error) {
+                testErrorDiv.textContent = `Ошибка при тестировании: ${error.message}`;
+                testResultDiv.textContent = "";
+            } finally {
+                testBtn.disabled = testCountToday >= TEST_LIMIT_PER_DAY;
+                testBtn.innerHTML = '<i class="fas fa-play"></i> Запустить тест';
+            }
+        }
+        
+        function analyzeTestResults(min, max) {
+            const testResultDiv = document.getElementById("test-result");
+            const statsDiv = document.getElementById("stats");
+            
+            // Подсчет частоты каждого числа
+            const frequency = {};
+            const range = max - min + 1;
+            
+            for (let i = min; i <= max; i++) {
+                frequency[i] = 0;
+            }
+            
+            testData.forEach(num => {
+                frequency[num]++;
+            });
+            
+            // Статистика
+            const expectedFrequency = testData.length / range;
+            let chiSquare = 0;
+            let sum = 0;
+            
+            for (let i = min; i <= max; i++) {
+                chiSquare += Math.pow(frequency[i] - expectedFrequency, 2) / expectedFrequency;
+                sum += i * frequency[i];
+            }
+            
+            const mean = sum / testData.length;
+            const sortedData = [...testData].sort((a, b) => a - b);
+            const median = sortedData.length % 2 === 0 ? 
+                (sortedData[sortedData.length/2 - 1] + sortedData[sortedData.length/2]) / 2 : 
+                sortedData[Math.floor(sortedData.length/2)];
+            
+            // Отображаем результаты
+            testResultDiv.innerHTML = `
+                <strong><i class="fas fa-chart-bar"></i> Результаты теста случайности</strong><br>
+                Сгенерировано ${testData.length} чисел в диапазоне от ${min} до ${max}.<br>
+                Ожидаемая частота каждого числа: ${expectedFrequency.toFixed(2)}<br>
+                Статистика хи-квадрат: ${chiSquare.toFixed(2)}<br>
+                ${chiSquare < range * 1.5 ? 
+                    '<span class="success"><i class="fas fa-check-circle"></i> Распределение выглядит случайным</span>' : 
+                    '<span class="error"><i class="fas fa-exclamation-circle"></i> Возможны отклонения от случайности</span>'}
+            `;
+            
+            // Статистические блоки
+            statsDiv.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-calculator"></i> Среднее</div>
+                    <div class="stat-value">${mean.toFixed(2)}</div>
+                    <div>Теор.: ${(min + max) / 2}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-sort-numeric-down"></i> Медиана</div>
+                    <div class="stat-value">${median.toFixed(2)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-arrow-down"></i> Минимум</div>
+                    <div class="stat-value">${Math.min(...testData)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-arrow-up"></i> Максимум</div>
+                    <div class="stat-value">${Math.max(...testData)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-star"></i> Уникальных</div>
+                    <div class="stat-value">${Object.keys(frequency).filter(k => frequency[k] > 0).length}</div>
+                    <div>из ${range}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-chi-square"></i> Хи-квадрат</div>
+                    <div class="stat-value">${chiSquare.toFixed(2)}</div>
+                    <div>${chiSquare < range * 1.5 ? 
+                        '<span style="color: var(--success);"><i class="fas fa-check"></i> Норма</span>' : 
+                        '<span style="color: var(--danger);"><i class="fas fa-exclamation"></i> Аномалия</span>'}
+                    </div>
+                </div>
+            `;
+            
+            // Гистограмма
+            updateHistogramChart();
+        }
+        
+        function updateHistogramChart() {
+            const ctx = document.getElementById('histogram-chart').getContext('2d');
+            
+            // Подсчет частот
+            const min = parseInt(document.getElementById("test-min").value);
+            const max = parseInt(document.getElementById("test-max").value);
+            
+            const labels = [];
+            const data = [];
+            
+            for (let i = min; i <= max; i++) {
+                labels.push(i);
+                data.push(testData.filter(x => x === i).length);
+            }
+            
+            const expectedValue = testData.length / (max - min + 1);
+            
+            if (histogramChart) {
+                histogramChart.destroy();
+            }
+            
+            histogramChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Фактическая частота',
+                            data: data,
+                            backgroundColor: 'rgba(108, 92, 231, 0.7)',
+                            borderColor: 'rgba(108, 92, 231, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Ожидаемая частота',
+                            data: Array(labels.length).fill(expectedValue),
+                            type: 'line',
+                            borderColor: 'rgba(220, 53, 69, 1)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Количество'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Значение'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Распределение случайных чисел',
+                            font: {
+                                size: 16
+                            }
+                        },
+                        legend: {
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+        
+        function downloadTestData() {
+            if (testData.length === 0) {
+                alert("Нет данных для скачивания. Сначала выполните тест.");
+                return;
+            }
+            
+            const min = parseInt(document.getElementById("test-min").value);
+            const max = parseInt(document.getElementById("test-max").value);
+            
+            // Создаем CSV
+            let csv = "Значение,Количество,Ожидаемое,Отклонение\n";
+            
+            // Подсчет частот
+            const frequency = {};
+            for (let i = min; i <= max; i++) {
+                frequency[i] = 0;
+            }
+            
+            testData.forEach(num => {
+                frequency[num]++;
+            });
+            
+            const expected = testData.length / (max - min + 1);
+            
+            for (let i = min; i <= max; i++) {
+                const deviation = frequency[i] - expected;
+                csv += `${i},${frequency[i]},${expected.toFixed(2)},${deviation.toFixed(2)}\n`;
+            }
+            
+            // Добавляем общую статистику
+            csv += "\nОбщая статистика\n";
+            csv += `Всего чисел,${testData.length}\n`;
+            csv += `Диапазон,${min} - ${max}\n`;
+            csv += `Уникальных значений,${Object.keys(frequency).filter(k => frequency[k] > 0).length}\n`;
+            
+            const sum = testData.reduce((a, b) => a + b, 0);
+            csv += `Среднее значение,${(sum / testData.length).toFixed(2)}\n`;
+            
+            // Скачивание
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `random_test_${min}_${max}_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // ========== История ==========
+        function addToHistory(item) {
+            history.unshift(item);
+            if (history.length > 100) {
+                history = history.slice(0, 100);
+            }
+            localStorage.setItem('randomHistory', JSON.stringify(history));
+            updateHistoryDisplay();
+            updateHistoryStats();
+        }
+        
+        function updateHistoryDisplay() {
+            const historyItemsDiv = document.getElementById('history-items');
+            const filter = document.getElementById('history-filter').value;
+            
+            let filteredHistory = history;
+            if (filter !== 'all') {
+                filteredHistory = history.filter(item => item.type === filter);
+            }
+            
+            if (filteredHistory.length === 0) {
+                historyItemsDiv.innerHTML = '<p style="text-align: center; color: var(--gray);"><i class="fas fa-history"></i> История пуста</p>';
+                return;
+            }
+            
+            historyItemsDiv.innerHTML = '';
+            
+            filteredHistory.forEach((item, index) => {
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+                
+                let content = '';
+                let details = '';
+                const date = new Date(item.timestamp).toLocaleString();
+                let icon = '';
+                
+                switch (item.type) {
+                    case 'numbers':
+                        icon = '<i class="fas fa-random"></i>';
+                        content = `Числа (${item.params.min}-${item.params.max})`;
+                        details = item.result.length > 5 ? 
+                            `${item.result.slice(0, 5).join(', ')}... (${item.result.length} чисел)` : 
+                            item.result.join(', ');
+                        break;
+                    case 'coin':
+                        icon = '<i class="fas fa-coins"></i>';
+                        content = 'Орёл или решка';
+                        details = item.result;
+                        break;
+                    case 'dice':
+                        icon = '<i class="fas fa-dice"></i>';
+                        content = `Кубик (${item.params.count} шт)`;
+                        details = item.result.join(', ');
+                        break;
+                    case 'color':
+                        icon = '<i class="fas fa-palette"></i>';
+                        content = 'Случайный цвет';
+                        details = `RGB(${item.result.r}, ${item.result.g}, ${item.result.b})`;
+                        break;
+                    case 'password':
+                        icon = '<i class="fas fa-key"></i>';
+                        content = 'Пароль';
+                        details = `${item.params.length} символов, ${item.params.complexity}`;
+                        break;
+                    case 'choice':
+                        icon = '<i class="fas fa-random"></i>';
+                        content = 'Случайный выбор';
+                        details = `Из ${item.params.options.length} вариантов: ${item.result}`;
+                        break;
+                    case 'randomness_test':
+                        icon = '<i class="fas fa-check-double"></i>';
+                        content = `Тест случайности (${item.params.min}-${item.params.max})`;
+                        details = `${item.result.length} чисел`;
+                        break;
+                    default:
+                        content = 'Неизвестный тип';
+                        icon = '<i class="fas fa-question"></i>';
+                }
+                
+                historyItem.innerHTML = `
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            ${icon}
+                            <div>
+                                <strong>${content}</strong><br>
+                                <small>${date}</small>
+                            </div>
+                        </div>
+                        <div style="margin-top: 5px;">${details}</div>
+                    </div>
+                    <div class="history-actions">
+                        <button class="btn-secondary btn-small" onclick="viewHistoryItem(${index})" title="Просмотр">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn-danger btn-small" onclick="removeHistoryItem(${index})" title="Удалить">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                
+                historyItemsDiv.appendChild(historyItem);
+            });
+        }
+        
+        function updateHistoryStats() {
+            const statsDiv = document.getElementById('history-stats');
+            
+            const counts = {
+                all: history.length,
+                numbers: history.filter(item => item.type === 'numbers').length,
+                coin: history.filter(item => item.type === 'coin').length,
+                dice: history.filter(item => item.type === 'dice').length,
+                color: history.filter(item => item.type === 'color').length,
+                password: history.filter(item => item.type === 'password').length,
+                choice: history.filter(item => item.type === 'choice').length,
+                randomness_test: history.filter(item => item.type === 'randomness_test').length
+            };
+            
+            statsDiv.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-history"></i> Всего</div>
+                    <div class="stat-value">${counts.all}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-random"></i> Числа</div>
+                    <div class="stat-value">${counts.numbers}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-coins"></i> Монета</div>
+                    <div class="stat-value">${counts.coin}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-dice"></i> Кубик</div>
+                    <div class="stat-value">${counts.dice}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-palette"></i> Цвета</div>
+                    <div class="stat-value">${counts.color}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-key"></i> Пароли</div>
+                    <div class="stat-value">${counts.password}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-random"></i> Выбор</div>
+                    <div class="stat-value">${counts.choice}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label"><i class="fas fa-check-double"></i> Тесты</div>
+                    <div class="stat-value">${counts.randomness_test}</div>
+                </div>
+            `;
+        }
+        
+        function filterHistory() {
+            updateHistoryDisplay();
+        }
+        
+        function viewHistoryItem(index) {
+            const item = history[index];
+            let message = '';
+            const date = new Date(item.timestamp).toLocaleString();
+            let icon = '';
+            
+            switch (item.type) {
+                case 'numbers':
+                    icon = '<i class="fas fa-random"></i>';
+                    message = `
+                        <strong>Генерация чисел</strong><br>
+                        Дата: ${date}<br>
+                        Диапазон: от ${item.params.min} до ${item.params.max}<br>
+                        Количество: ${item.params.count}<br>
+                        Результат: ${item.result.join(', ')}
+                    `;
+                    break;
+                case 'coin':
+                    icon = '<i class="fas fa-coins"></i>';
+                    message = `
+                        <strong>Орёл или решка</strong><br>
+                        Дата: ${date}<br>
+                        Результат: ${item.result}
+                    `;
+                    break;
+                case 'dice':
+                    icon = '<i class="fas fa-dice"></i>';
+                    message = `
+                        <strong>Бросок кубика</strong><br>
+                        Дата: ${date}<br>
+                        Количество кубиков: ${item.params.count}<br>
+                        Результат: ${item.result.join(', ')}<br>
+                        Сумма: ${item.result.reduce((a, b) => a + b, 0)}
+                    `;
+                    break;
+                case 'color':
+                    icon = '<i class="fas fa-palette"></i>';
+                    message = `
+                        <strong>Случайный цвет</strong><br>
+                        Дата: ${date}<br>
+                        RGB: (${item.result.r}, ${item.result.g}, ${item.result.b})<br>
+                        HEX: ${item.result.hex}<br>
+                        HSL: (${item.result.hsl.h}, ${item.result.hsl.s}%, ${item.result.hsl.l}%)
+                    `;
+                    break;
+                case 'password':
+                    icon = '<i class="fas fa-key"></i>';
+                    message = `
+                        <strong>Генератор паролей</strong><br>
+                        Дата: ${date}<br>
+                        Длина: ${item.params.length}<br>
+                        Сложность: ${item.params.complexity}
+                    `;
+                    break;
+                case 'choice':
+                    icon = '<i class="fas fa-random"></i>';
+                    message = `
+                        <strong>Случайный выбор</strong><br>
+                        Дата: ${date}<br>
+                        Варианты: ${item.params.options.join(', ')}<br>
+                        Выбрано: ${item.result}
+                    `;
+                    break;
+                case 'randomness_test':
+                    icon = '<i class="fas fa-check-double"></i>';
+                    message = `
+                        <strong>Тест случайности</strong><br>
+                        Дата: ${date}<br>
+                        Диапазон: от ${item.params.min} до ${item.params.max}<br>
+                        Количество чисел: ${item.params.count}<br>
+                        Первые 10 чисел: ${item.result.slice(0, 10).join(', ')}...
+                    `;
+                    break;
+                default:
+                    message = 'Неизвестный тип записи';
+                    icon = '<i class="fas fa-question"></i>';
+            }
+            
+            // Создаем модальное окно
+            const modal = document.createElement('div');
+            modal.style.position = 'fixed';
+            modal.style.top = '0';
+            modal.style.left = '0';
+            modal.style.width = '100%';
+            modal.style.height = '100%';
+            modal.style.backgroundColor = 'rgba(0,0,0,0.5)';
+            modal.style.display = 'flex';
+            modal.style.justifyContent = 'center';
+            modal.style.alignItems = 'center';
+            modal.style.zIndex = '1000';
+            
+            modal.innerHTML = `
+                <div style="background: white; padding: 2rem; border-radius: 10px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 1rem;">
+                        ${icon}
+                        <h3 style="margin: 0;">Детали записи</h3>
+                        <button onclick="this.parentElement.parentElement.parentElement.remove()" style="margin-left: auto; background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+                    </div>
+                    <div style="margin-bottom: 1rem;">${message}</div>
+                    <button onclick="this.parentElement.parentElement.remove()" style="width: 100%;">Закрыть</button>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+        
+        function removeHistoryItem(index) {
+            if (confirm('Удалить эту запись из истории?')) {
+                history.splice(index, 1);
+                localStorage.setItem('randomHistory', JSON.stringify(history));
+                updateHistoryDisplay();
+                updateHistoryStats();
+            }
+        }
+        
+        function clearHistory() {
+            if (confirm('Вы уверены, что хотите полностью очистить историю?')) {
+                history = [];
+                localStorage.setItem('randomHistory', JSON.stringify(history));
+                updateHistoryDisplay();
+                updateHistoryStats();
+            }
+        }
+        
+        function downloadHistory() {
+            if (history.length === 0) {
+                alert("История пуста. Нет данных для скачивания.");
+                return;
+            }
+            
+            // Создаем CSV
+            let csv = "Тип,Дата,Параметры,Результат\n";
+            
+            history.forEach(item => {
+                let params = '';
+                let result = '';
+                
+                switch (item.type) {
+                    case 'numbers':
+                        params = `min=${item.params.min}, max=${item.params.max}, count=${item.params.count}`;
+                        result = item.result.length > 10 ? 
+                            `${item.result.slice(0, 10).join(',')}... (${item.result.length} чисел)` : 
+                            item.result.join(',');
+                        break;
+                    case 'coin':
+                        result = item.result;
+                        break;
+                    case 'dice':
+                        params = `count=${item.params.count}`;
+                        result = item.result.join(',');
+                        break;
+                    case 'color':
+                        result = `RGB(${item.result.r},${item.result.g},${item.result.b}) HEX:${item.result.hex}`;
+                        break;
+                    case 'password':
+                        params = `length=${item.params.length}, complexity=${item.params.complexity}`;
+                        result = 'скрыто';
+                        break;
+                    case 'choice':
+                        params = `options: ${item.params.options.join(';')}`;
+                        result = item.result;
+                        break;
+                    case 'randomness_test':
+                        params = `min=${item.params.min}, max=${item.params.max}, count=${item.params.count}`;
+                        result = `${item.result.length} чисел`;
+                        break;
+                }
+                
+                csv += `"${item.type}","${new Date(item.timestamp).toLocaleString()}","${params}","${result}"\n`;
+            });
+            
+            // Скачивание
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `random_history_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
