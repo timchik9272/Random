@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Supabase Таблица q</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <h1>Таблица q — Supabase</h1>
+
+  <h2>Добавить запись</h2>
+  <form id="insertForm">
+    <label>
+      Name:
+      <input type="text" id="name" required />
+    </label>
+    <br><br>
+    <label>
+      Age:
+      <input type="number" id="age" required />
+    </label>
+    <br><br>
+    <button type="submit">Добавить</button>
+  </form>
+
+  <h2>Данные таблицы</h2>
+  <button id="loadData">Загрузить данные</button>
+  <pre id="output"></pre>
+
+  <script>
+    // Твои данные подключения
+    const SUPABASE_URL = "https://jkjahrrewfrcnfojpetn.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpramFocnJld2ZyY25mb2pwZXRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxODE3MDEsImV4cCI6MjA3MDc1NzcwMX0.fisOkohi_LFNOj0j0iMMrZey8O_bPnQwhPcWhhTRqWY";
+
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Загрузка данных
+    document.getElementById("loadData").addEventListener("click", async () => {
+      const { data, error } = await supabase
+        .from("q")
+        .select("*");
+
+      if (error) {
+        document.getElementById("output").textContent = "Ошибка: " + error.message;
+      } else {
+        document.getElementById("output").textContent = JSON.stringify(data, null, 2);
+      }
+    });
+
+    // Добавление данных
+    document.getElementById("insertForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const name = document.getElementById("name").value;
+      const age = parseInt(document.getElementById("age").value, 10);
+
+      const { error } = await supabase
+        .from("q")
+        .insert([{ name, age }]);
+
+      if (error) {
+        alert("Ошибка: " + error.message);
+      } else {
+        alert("Запись добавлена!");
+        document.getElementById("insertForm").reset();
+      }
+    });
+  </script>
+</body>
+</html>
