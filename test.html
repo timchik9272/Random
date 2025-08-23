@@ -5,6 +5,7 @@
   <title>MiniMessenger</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     :root {
       --bg: #0e0e0e;
@@ -36,13 +37,13 @@
       background: var(--accent); color: white; font-weight: bold;
     }
     button:active { opacity: 0.7; }
-    .chat-list, .messages, .user-list { flex:1; overflow-y:auto; }
-    .chat-item, .user-item {
+    .chat-list, .messages { flex:1; overflow-y:auto; }
+    .chat-item {
       padding: 14px; border-bottom: 1px solid #222;
       display:flex; align-items:center; justify-content:space-between;
       cursor:pointer;
     }
-    .chat-item span, .user-item span { font-weight:bold; }
+    .chat-item span { font-weight:bold; }
     .msg {
       margin:6px 0; padding:10px 14px;
       border-radius: var(--radius);
@@ -91,39 +92,40 @@
     <nav>
       <h2>Чаты</h2>
       <div>
-        <button onclick="showUsers()">➕</button>
-        <button onclick="openSettings()">⚙</button>
+        <button onclick="showSearch()"> <i data-lucide="plus"></i> </button>
+        <button onclick="openSettings()"> <i data-lucide="settings"></i> </button>
       </div>
     </nav>
     <div class="chat-list" id="chat-list"></div>
   </div>
 
-  <!-- СПИСОК ПОЛЬЗОВАТЕЛЕЙ -->
-  <div id="users-screen" class="screen">
+  <!-- ПОИСК -->
+  <div id="search-screen" class="screen">
     <nav>
-      <button onclick="backToMain()">←</button>
-      <h2>Пользователи</h2>
+      <button onclick="backToMain()"> <i data-lucide="arrow-left"></i> </button>
+      <h2>Новый чат</h2>
     </nav>
-    <div class="user-list" id="user-list"></div>
+    <input id="search-username" placeholder="Введите username">
+    <button onclick="searchUser()">Найти</button>
   </div>
 
   <!-- ЧАТ -->
   <div id="chat-screen" class="screen">
     <nav>
-      <button onclick="backToMain()">←</button>
+      <button onclick="backToMain()"> <i data-lucide="arrow-left"></i> </button>
       <h2 id="chat-username">Чат</h2>
     </nav>
     <div class="messages" id="messages"></div>
     <div class="input-box">
       <input id="msg-input" placeholder="Сообщение...">
-      <button onclick="sendMessage()">➤</button>
+      <button onclick="sendMessage()"> <i data-lucide="send"></i> </button>
     </div>
   </div>
 
   <!-- НАСТРОЙКИ -->
   <div id="settings-screen" class="screen">
     <nav>
-      <button onclick="backToMain()">←</button>
+      <button onclick="backToMain()"> <i data-lucide="arrow-left"></i> </button>
       <h2>Настройки</h2>
     </nav>
     <div id="profile-info"></div>
@@ -141,14 +143,17 @@ let currentUser = null;
 let currentChat = null;
 let msgSubscription = null;
 
+lucide.createIcons();
+
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  lucide.createIcons();
 }
 function showLogin(){ showScreen('login-screen'); }
 function showRegister(){ showScreen('register-screen'); }
 function showMain(){ loadChats(); showScreen('main-screen'); }
-function showUsers(){ loadUsers(); showScreen('users-screen'); }
+function showSearch(){ showScreen('search-screen'); }
 function openSettings(){ loadProfile(); showScreen('settings-screen'); }
 function backToMain(){ if(msgSubscription) supabase.removeChannel(msgSubscription); showMain(); }
 
@@ -212,25 +217,17 @@ async function loadChats(){
   });
 }
 
-async function loadUsers(){
-  const { data, error } = await supabase.from('profiles').select('id,username');
-  if(error){ console.error(error); return; }
-  const list = document.getElementById('user-list');
-  list.innerHTML = '';
-  data.filter(u=>u.id!==currentUser.id).forEach(user=>{
-    const div = document.createElement('div');
-    div.className = 'user-item';
-    div.innerHTML = `<span>${user.username}</span>`;
-    div.onclick = ()=>createOrOpenChat(user);
-    list.appendChild(div);
-  });
-}
+async function searchUser(){
+  const uname = document.getElementById('search-username').value.trim();
+  if(!uname) return;
+  const { data: user } = await supabase.from('profiles').select('*').eq('username', uname).maybeSingle();
+  if(!user){ alert("Пользователь не найден"); return; }
 
-async function createOrOpenChat(user){
   const { data: existing } = await supabase.from('chats')
     .select('*')
     .or(`and(user1.eq.${currentUser.id},user2.eq.${user.id}),and(user1.eq.${user.id},user2.eq.${currentUser.id})`)
     .maybeSingle();
+
   let chatId;
   if(existing){ chatId = existing.id; }
   else {
@@ -251,6 +248,9 @@ async function openChat(chatId, otherName){
   if(msgSubscription) supabase.removeChannel(msgSubscription);
   msgSubscription = supabase.channel('room-'+chatId)
     .on('postgres_changes',{event:'INSERT', schema:'public', table:'messages', filter:`chat_id=eq.${chatId}`}, payload=>{
+      renderMessage(payload.new);
+    })
+    .on('postgres_changes',{event:'UPDATE', schema:'public', table:'messages', filter:`chat_id=eq.${chatId}`}, payload=>{
       renderMessage(payload.new);
     })
     .subscribe();
@@ -286,15 +286,29 @@ function renderMessage(msg){
 }
 
 async function sendMessage(){
-  const text = document.getElementById('msg-input').value;
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
   if(!text) return;
+  input.value = '';
   await supabase.from('messages').insert([{ chat_id: currentChat, sender: currentUser.id, content: text }]);
-  document.getElementById('msg-input').value='';
 }
 
 async function deleteMessage(id){
   await supabase.from('messages').update({ is_deleted:true }).eq('id', id);
 }
+
+// Автовход
+(async ()=>{
+  const { data } = await supabase.auth.getSession();
+  if(data.session){
+    currentUser = data.session.user;
+    showMain();
+  }
+})();
+supabase.auth.onAuthStateChange((_event, session)=>{
+  if(session){ currentUser = session.user; showMain(); }
+  else showLogin();
+});
 </script>
 </body>
 </html>
