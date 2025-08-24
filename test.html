@@ -49,6 +49,7 @@
       border-radius: var(--radius);
       max-width:75%;
       word-wrap: break-word;
+      position: relative;
     }
     .msg.me { background: var(--accent); margin-left:auto; }
     .msg.other { background: var(--bg-light); }
@@ -65,6 +66,17 @@
       width:auto; padding:10px 16px; font-size:18px;
       background: none; color: var(--text);
     }
+    /* Меню для удаления */
+    .context-menu {
+      position: absolute;
+      bottom: -40px; right: 0;
+      background: var(--bg-light);
+      border-radius: var(--radius);
+      padding: 6px 12px;
+      font-size: 14px;
+      display: none;
+    }
+    .msg.show-menu .context-menu { display: block; }
   </style>
 </head>
 <body>
@@ -142,7 +154,6 @@ const supabase = window.supabase.createClient(
 let currentUser = null;
 let currentChat = null;
 let msgSubscription = null;
-
 lucide.createIcons();
 
 function showScreen(id){
@@ -236,6 +247,8 @@ async function searchUser(){
       .select().single();
     chatId = newChat.id;
   }
+  // сразу обновим список чатов
+  loadChats();
   openChat(chatId, user.username);
 }
 
@@ -273,14 +286,32 @@ function renderMessage(msg){
     div = document.createElement('div');
     div.id = 'msg-'+msg.id;
     div.className = 'msg '+(msg.sender===currentUser.id?'me':'other');
-    div.onclick = ()=>{ if(msg.sender===currentUser.id && !msg.is_deleted) deleteMessage(msg.id); };
+
+    // долгое нажатие для удаления
+    let pressTimer;
+    div.addEventListener("mousedown", ()=>{
+      if(msg.sender===currentUser.id && !msg.is_deleted){
+        pressTimer = setTimeout(()=>{
+          div.classList.toggle("show-menu");
+        }, 600);
+      }
+    });
+    div.addEventListener("mouseup", ()=> clearTimeout(pressTimer));
+
+    // меню удаления
+    const menu = document.createElement("div");
+    menu.className = "context-menu";
+    menu.innerText = "Удалить";
+    menu.onclick = ()=>deleteMessage(msg.id);
+    div.appendChild(menu);
+
     box.appendChild(div);
   }
   if(msg.is_deleted){
     div.className='msg deleted';
     div.innerText='Сообщение удалено';
   } else {
-    div.innerText = msg.content;
+    div.firstChild.nodeValue = msg.content;
   }
   box.scrollTop = box.scrollHeight;
 }
