@@ -69,12 +69,13 @@
     /* Меню для удаления */
     .context-menu {
       position: absolute;
-      bottom: -40px; right: 0;
+      bottom: -35px; right: 0;
       background: var(--bg-light);
       border-radius: var(--radius);
       padding: 6px 12px;
       font-size: 14px;
       display: none;
+      cursor: pointer;
     }
     .msg.show-menu .context-menu { display: block; }
   </style>
@@ -175,6 +176,8 @@ async function signUp(){
   const { data, error } = await supabase.auth.signUp({ email, password });
   if(error){ alert(error.message); return; }
   await supabase.from('profiles').insert([{ id:data.user.id, email, username }]);
+  // создаём "Избранное"
+  await supabase.from('chats').insert([{ user1: data.user.id, user2: data.user.id }]);
   alert("Подтверди почту, затем войди.");
   showLogin();
 }
@@ -216,14 +219,19 @@ async function loadChats(){
   const list = document.getElementById('chat-list');
   list.innerHTML = '';
   data.forEach(chat=>{
-    const otherId = chat.user1 === currentUser.id ? chat.user2 : chat.user1;
-    const users = chat.profiles;
-    const otherProfile = users.find(u => u.id === otherId);
-    const otherName = otherProfile ? otherProfile.username : "Неизвестно";
+    let chatName = "Неизвестно";
+    if(chat.user1 === chat.user2 && chat.user1 === currentUser.id){
+      chatName = "Избранное";
+    } else {
+      const otherId = chat.user1 === currentUser.id ? chat.user2 : chat.user1;
+      const users = chat.profiles;
+      const otherProfile = users.find(u => u.id === otherId);
+      chatName = otherProfile ? otherProfile.username : "Неизвестно";
+    }
     const div = document.createElement('div');
     div.className = 'chat-item';
-    div.innerHTML = `<span>${otherName}</span>`;
-    div.onclick = ()=>openChat(chat.id, otherName);
+    div.innerHTML = `<span>${chatName}</span>`;
+    div.onclick = ()=>openChat(chat.id, chatName);
     list.appendChild(div);
   });
 }
@@ -247,9 +255,8 @@ async function searchUser(){
       .select().single();
     chatId = newChat.id;
   }
-  // сразу обновим список чатов
   loadChats();
-  openChat(chatId, user.username);
+  showMain();
 }
 
 async function openChat(chatId, otherName){
@@ -287,7 +294,11 @@ function renderMessage(msg){
     div.id = 'msg-'+msg.id;
     div.className = 'msg '+(msg.sender===currentUser.id?'me':'other');
 
-    // долгое нажатие для удаления
+    const textSpan = document.createElement("span");
+    textSpan.className = "text";
+    div.appendChild(textSpan);
+
+    // долгое нажатие
     let pressTimer;
     div.addEventListener("mousedown", ()=>{
       if(msg.sender===currentUser.id && !msg.is_deleted){
@@ -298,7 +309,6 @@ function renderMessage(msg){
     });
     div.addEventListener("mouseup", ()=> clearTimeout(pressTimer));
 
-    // меню удаления
     const menu = document.createElement("div");
     menu.className = "context-menu";
     menu.innerText = "Удалить";
@@ -309,9 +319,9 @@ function renderMessage(msg){
   }
   if(msg.is_deleted){
     div.className='msg deleted';
-    div.innerText='Сообщение удалено';
+    div.innerHTML='Сообщение удалено';
   } else {
-    div.firstChild.nodeValue = msg.content;
+    div.querySelector(".text").innerText = msg.content;
   }
   box.scrollTop = box.scrollHeight;
 }
