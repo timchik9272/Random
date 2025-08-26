@@ -17,16 +17,12 @@
       --radius: 14px;
     }
     * { box-sizing: border-box; }
-    body {
-      margin:0; font-family: system-ui, sans-serif;
-      background: var(--bg); color: var(--text);
-    }
+    body { margin:0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
     .screen { display:none; flex-direction:column; height:100vh; padding:16px; }
     .active { display:flex; }
     h2 { margin:0 0 16px; }
     input, button, textarea {
-      border-radius: var(--radius); border:none; font-size:16px;
-      padding:16px;
+      border-radius: var(--radius); border:none; font-size:16px; padding:16px;
     }
     input, textarea { background: var(--bg-light); color: var(--text); }
     textarea { resize:none; line-height:1.4; width:100%; }
@@ -42,6 +38,7 @@
       margin:6px 0; padding:10px 14px;
       border-radius: var(--radius);
       max-width:75%; word-wrap: break-word;
+      position:relative;
     }
     .msg.me { background: var(--accent); margin-left:auto; }
     .msg.other { background: var(--bg-light); }
@@ -49,52 +46,35 @@
     nav { display:flex; justify-content:space-between; align-items:center; padding:10px 0; }
     nav button { width:auto; padding:14px 20px; font-size:15px; }
 
-    /* Ввод сообщения */
-    .input-box {
-      display:flex; align-items:flex-end; gap:8px; padding:8px 0;
-    }
+    /* Ввод */
+    .input-box { display:flex; align-items:flex-end; gap:8px; padding:8px 0; }
     .input-box textarea {
-      flex:1;
-      min-height:48px;
-      max-height:140px;
-      overflow-y:auto;
-      padding:12px;
+      flex:1; min-height:48px; max-height:140px;
+      overflow-y:auto; padding:12px;
     }
     .send-btn, .img-btn {
-      background: var(--accent);
-      border:none;
-      width:46px;
-      height:46px;
-      border-radius:50%;
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      font-size:18px;
-      cursor:pointer;
+      background: var(--accent); border:none; width:46px; height:46px;
+      border-radius:50%; display:flex; justify-content:center; align-items:center;
+      font-size:18px; cursor:pointer;
     }
-    .send-btn i, .img-btn i { margin:0; }
 
-    /* Меню */
+    /* Контекстное меню */
     .context-menu {
-      position:absolute;
-      background:var(--bg-light);
-      border:1px solid #333;
-      border-radius:8px;
-      display:none;
-      flex-direction:column;
-      z-index:1000;
-      min-width:140px;
+      position:absolute; background:var(--bg-light);
+      border:1px solid #333; border-radius:8px;
+      display:none; flex-direction:column; z-index:1000; min-width:140px;
     }
     .context-menu button {
       background:none; border:none; color:var(--text);
-      padding:10px 14px; text-align:left; width:100%;
-      font-size:15px;
+      padding:10px 14px; text-align:left; width:100%; font-size:15px;
     }
     .context-menu button:hover { background:#222; }
-    img.msg-img {
-      max-width:100%;
-      border-radius: var(--radius);
-      margin-top:4px;
+
+    img.msg-img { max-width:100%; border-radius: var(--radius); margin-top:4px; }
+
+    .time {
+      display:block; font-size:12px; color:var(--gray);
+      margin-top:4px; text-align:right;
     }
   </style>
 </head>
@@ -149,7 +129,8 @@
     <div class="messages" id="messages"></div>
     <div class="input-box">
       <textarea id="msg-input" placeholder="Сообщение..."></textarea>
-      <button class="img-btn" onclick="sendImage()"><i class="fa fa-image"></i></button>
+      <input type="hidden" role="uploadcare-uploader" id="file-uploader" data-public-key="c12f2c3e134f56024db8">
+      <button class="img-btn" onclick="openUploader()"><i class="fa fa-image"></i></button>
       <button class="send-btn" onclick="sendMessage()"><i class="fa fa-paper-plane"></i></button>
     </div>
   </div>
@@ -174,10 +155,8 @@
 <script>
 const supabase = window.supabase.createClient(
   "https://zmewwzlzujsrhstjehrp.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 );
-
-uploadcare.start({publicKey: "c12f2c3e134f56024db8"});
 
 let currentUser=null;
 let currentChat=null;
@@ -185,20 +164,15 @@ let msgSubscription=null;
 let chatSubscription=null;
 let selectedMessageId=null;
 let selectedSender=null;
+let selectedImageUrl=null;
 
-function showScreen(id){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-}
+function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
 function showLogin(){ showScreen('login-screen'); }
 function showRegister(){ showScreen('register-screen'); }
 function showMain(){ loadChats(); showScreen('main-screen'); }
 function openSettings(){ loadProfile(); showScreen('settings-screen'); }
 function openSearch(){ showScreen('search-screen'); }
-function backToMain(){
-  if(msgSubscription) supabase.removeChannel(msgSubscription);
-  showMain();
-}
+function backToMain(){ if(msgSubscription) supabase.removeChannel(msgSubscription); showMain(); }
 
 async function signUp(){
   const email=document.getElementById('reg-email').value;
@@ -219,162 +193,107 @@ async function signIn(){
   if(error){ alert(error.message); return; }
   if(!data.user.email_confirmed_at){ alert("Сначала подтвердите email!"); return; }
   currentUser=data.user;
-  showMain();
-  subscribeChats();
+  showMain(); subscribeChats();
 }
 
-async function logout(){
-  await supabase.auth.signOut();
-  currentUser=null;
-  showLogin();
-}
+async function logout(){ await supabase.auth.signOut(); currentUser=null; showLogin(); }
 
 async function loadProfile(){
   const { data }=await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
   document.getElementById('profile-info').innerText=`Username: ${data.username}\nEmail: ${data.email}`;
 }
 
-async function deleteAccount(){
-  await supabase.from('profiles').delete().eq('id', currentUser.id);
-  logout();
-}
+async function deleteAccount(){ await supabase.from('profiles').delete().eq('id', currentUser.id); logout(); }
 
 async function loadChats(){
-  const { data: chats }=await supabase.from('chats')
-    .select('*')
-    .or(`user1.eq.${currentUser.id},user2.eq.${currentUser.id}`);
-  const list=document.getElementById('chat-list');
-  list.innerHTML='';
+  const { data: chats }=await supabase.from('chats').select('*').or(`user1.eq.${currentUser.id},user2.eq.${currentUser.id}`);
+  const list=document.getElementById('chat-list'); list.innerHTML='';
   for(const chat of chats){
     let chatName="Неизвестно";
-    if(chat.user1===chat.user2 && chat.user1===currentUser.id){
-      chatName="Избранное";
-    } else {
+    if(chat.user1===chat.user2 && chat.user1===currentUser.id){ chatName="Избранное"; }
+    else {
       const otherId=chat.user1===currentUser.id?chat.user2:chat.user1;
       const { data: profile }=await supabase.from('profiles').select('username').eq('id', otherId).single();
       if(profile) chatName=profile.username;
     }
-    const div=document.createElement('div');
-    div.className='chat-item';
-    div.innerHTML=`<span>${chatName}</span>`;
-    div.onclick=()=>openChat(chat.id, chatName);
-    list.appendChild(div);
+    const div=document.createElement('div'); div.className='chat-item'; div.innerHTML=`<span>${chatName}</span>`;
+    div.onclick=()=>openChat(chat.id, chatName); list.appendChild(div);
   }
 }
 
-function subscribeChats(){
-  if(chatSubscription) supabase.removeChannel(chatSubscription);
+function subscribeChats(){ if(chatSubscription) supabase.removeChannel(chatSubscription);
   chatSubscription=supabase.channel('chats-realtime')
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'chats'},()=>loadChats())
-    .subscribe();
-}
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'chats'},()=>loadChats()).subscribe(); }
 
 async function searchUser(){
-  const uname=document.getElementById('search-username').value.trim();
-  if(!uname) return;
+  const uname=document.getElementById('search-username').value.trim(); if(!uname) return;
   const { data:user }=await supabase.from('profiles').select('*').eq('username', uname).single();
   if(!user){ alert("Не найден"); return; }
   if(user.id===currentUser.id){ alert("Нельзя создать чат с самим собой"); return; }
-  const { data:existing }=await supabase.from('chats')
-    .select('*')
+  const { data:existing }=await supabase.from('chats').select('*')
     .or(`and(user1.eq.${currentUser.id},user2.eq.${user.id}),and(user1.eq.${user.id},user2.eq.${currentUser.id})`)
     .maybeSingle();
-  let chatId;
-  if(existing){ chatId=existing.id; }
-  else {
-    const { data:newChat }=await supabase.from('chats').insert([{ user1:currentUser.id, user2:user.id }]).select().single();
-    chatId=newChat.id;
-  }
+  let chatId; if(existing){ chatId=existing.id; }
+  else { const { data:newChat }=await supabase.from('chats').insert([{ user1:currentUser.id, user2:user.id }]).select().single(); chatId=newChat.id; }
   backToMain();
 }
 
 async function openChat(chatId, otherName){
-  currentChat=chatId;
-  document.getElementById('chat-username').innerText=otherName;
-  showScreen('chat-screen');
-  loadMessages();
+  currentChat=chatId; document.getElementById('chat-username').innerText=otherName;
+  showScreen('chat-screen'); loadMessages();
   if(msgSubscription) supabase.removeChannel(msgSubscription);
   msgSubscription=supabase.channel('room-'+chatId)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`chat_id=eq.${chatId}`},payload=>renderMessage(payload.new))
-    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'messages',filter:`chat_id=eq.${chatId}`},payload=>renderMessage(payload.new))
-    .subscribe();
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'messages',filter:`chat_id=eq.${chatId}`},payload=>renderMessage(payload.new)).subscribe();
 }
 
-async function loadMessages(){
-  const { data }=await supabase.from('messages').select('*').eq('chat_id', currentChat).order('created_at',{ascending:true});
-  const box=document.getElementById('messages');
-  box.innerHTML='';
-  data.forEach(renderMessage);
-}
+async function loadMessages(){ const { data }=await supabase.from('messages').select('*').eq('chat_id', currentChat).order('created_at',{ascending:true});
+  const box=document.getElementById('messages'); box.innerHTML=''; data.forEach(renderMessage); }
+
+function formatTime(ts){ return new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
 
 function renderMessage(msg){
   const box=document.getElementById('messages');
   let div=document.getElementById('msg-'+msg.id);
-  if(!div){
-    div=document.createElement('div');
-    div.id='msg-'+msg.id;
-    div.className='msg '+(msg.sender===currentUser.id?'me':'other');
-    div.oncontextmenu=(e)=>{ e.preventDefault(); showContextMenu(e,msg.id,msg.sender); };
-    box.appendChild(div);
-  }
-  if(msg.is_deleted){
-    div.className='msg deleted';
-    div.innerText='Сообщение удалено';
-  } else {
-    if(msg.image_url){
-      div.innerHTML=`<img src="${msg.image_url}" class="msg-img">`;
-    } else {
-      div.innerText=msg.content;
-    }
+  if(!div){ div=document.createElement('div'); div.id='msg-'+msg.id; div.className='msg '+(msg.sender===currentUser.id?'me':'other');
+    div.oncontextmenu=(e)=>{ e.preventDefault(); showContextMenu(e,msg.id,msg.sender); }; box.appendChild(div); }
+  if(msg.is_deleted){ div.className='msg deleted'; div.innerText='Сообщение удалено'; }
+  else {
+    let html=""; if(msg.content) html+=`<div>${msg.content}</div>`; if(msg.image_url) html+=`<img src="${msg.image_url}" class="msg-img">`;
+    html+=`<span class="time">${formatTime(msg.created_at)}</span>`; div.innerHTML=html;
   }
   box.scrollTop=box.scrollHeight;
 }
 
 async function sendMessage(){
-  const input=document.getElementById('msg-input');
-  const text=input.value.trim();
-  if(!text) return;
-  await supabase.from('messages').insert([{ chat_id:currentChat, sender:currentUser.id, content:text }]);
-  input.value='';
+  const input=document.getElementById('msg-input'); const text=input.value.trim();
+  if(!text && !selectedImageUrl) return;
+  await supabase.from('messages').insert([{ chat_id:currentChat, sender:currentUser.id, content:text||null, image_url:selectedImageUrl }]);
+  input.value=''; selectedImageUrl=null;
 }
 
-function sendImage(){
-  const widget=uploadcare.Widget(null);
-  widget.openDialog(null, { imagesOnly: true }).done(file=>{
-    file.done(async info=>{
-      await supabase.from('messages').insert([{ chat_id:currentChat, sender:currentUser.id, image_url:info.cdnUrl }]);
-    });
+function openUploader(){
+  const uploader=uploadcare.Widget('[role=uploadcare-uploader]');
+  uploader.openDialog(null,{imagesOnly:true}).done(file=>{
+    file.done(info=>{ selectedImageUrl=info.cdnUrl; alert("Фото выбрано, теперь можно отправить"); });
   });
 }
 
 function showContextMenu(e,msgId,senderId){
-  selectedMessageId=msgId;
-  selectedSender=senderId;
-  const menu=document.getElementById('context-menu');
-  const delBtn=document.getElementById('delete-btn');
-  if(senderId!==currentUser.id){
-    delBtn.style.display='none';
-  } else {
-    delBtn.style.display='block';
-  }
-  menu.style.left=e.pageX+'px';
-  menu.style.top=e.pageY+'px';
-  menu.style.display='flex';
+  selectedMessageId=msgId; selectedSender=senderId;
+  const menu=document.getElementById('context-menu'); const delBtn=document.getElementById('delete-btn');
+  if(senderId!==currentUser.id){ delBtn.style.display='none'; } else { delBtn.style.display='block'; }
+  menu.style.left=e.pageX+'px'; menu.style.top=e.pageY+'px'; menu.style.display='flex';
 }
 window.onclick=()=>{ document.getElementById('context-menu').style.display='none'; };
 
-async function confirmDelete(){
-  if(!selectedMessageId) return;
+async function confirmDelete(){ if(!selectedMessageId) return;
   await supabase.from('messages').update({ is_deleted:true }).eq('id', selectedMessageId).eq('sender', currentUser.id);
-  selectedMessageId=null;
-}
+  selectedMessageId=null; }
 
-function copyMessage(){
-  if(!selectedMessageId) return;
-  const el=document.getElementById('msg-'+selectedMessageId);
-  if(el) navigator.clipboard.writeText(el.innerText);
-  selectedMessageId=null;
-}
+function copyMessage(){ if(!selectedMessageId) return;
+  const el=document.getElementById('msg-'+selectedMessageId); if(el) navigator.clipboard.writeText(el.innerText);
+  selectedMessageId=null; }
 </script>
 </body>
 </html>
