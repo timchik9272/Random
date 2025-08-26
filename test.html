@@ -26,10 +26,23 @@
     input, button, textarea {
       border-radius: var(--radius); border:none; font-size:16px;
     }
-    input, textarea { background: var(--bg-light); color: var(--text); }
-    textarea { resize:none; padding:10px; line-height:1.4; width:100%; }
-    button { background: var(--accent); color:white; font-weight:bold; cursor:pointer; }
+    input, textarea {
+      background: var(--bg-light);
+      color: var(--text);
+      padding:14px;
+    }
+    textarea { resize:none; line-height:1.4; width:100%; }
+    button {
+      background: var(--accent);
+      color:white;
+      font-weight:bold;
+      cursor:pointer;
+      padding:14px 20px;   /* выше кнопки */
+      font-size:16px;
+      border-radius: var(--radius);
+    }
     button:active { opacity:0.7; }
+
     .chat-list, .messages { flex:1; overflow-y:auto; }
     .chat-item {
       padding:14px; border-bottom:1px solid #222;
@@ -47,7 +60,7 @@
     nav { display:flex; justify-content:space-between; align-items:center; padding:10px 0; }
     nav button { width:auto; padding:10px 16px; font-size:14px; }
 
-    /* Ввод сообщения */
+    /* Ввод сообщений */
     .input-box {
       display:flex; align-items:flex-end; gap:8px; padding:8px 0;
     }
@@ -71,7 +84,7 @@
     }
     .send-btn i { margin:0; }
 
-    /* Меню удаления */
+    /* Контекстное меню */
     .context-menu {
       position:absolute;
       background:var(--bg-light);
@@ -80,16 +93,18 @@
       display:none;
       flex-direction:column;
       z-index:1000;
+      min-width:140px;
     }
     .context-menu button {
       background:none; border:none; color:var(--text);
-      padding:8px 12px; text-align:left; width:100%;
+      padding:12px 16px; text-align:left; width:100%;
+      font-size:15px;
     }
     .context-menu button:hover { background:#222; }
   </style>
 </head>
 <body>
-  <!-- Вход -->
+  <!-- ВХОД -->
   <div id="login-screen" class="screen active">
     <h2>Вход</h2>
     <input id="login-email" placeholder="Email">
@@ -98,7 +113,7 @@
     <button style="background:var(--bg-light)" onclick="showRegister()">Создать аккаунт</button>
   </div>
 
-  <!-- Регистрация -->
+  <!-- РЕГИСТРАЦИЯ -->
   <div id="register-screen" class="screen">
     <h2>Регистрация</h2>
     <input id="reg-email" placeholder="Email">
@@ -108,29 +123,19 @@
     <button style="background:var(--bg-light)" onclick="showLogin()">Назад</button>
   </div>
 
-  <!-- Главный экран -->
+  <!-- СПИСОК ЧАТОВ -->
   <div id="main-screen" class="screen">
     <nav>
       <h2>Чаты</h2>
       <div>
-        <button onclick="openSearch()"><i class="fa fa-plus"></i></button>
         <button onclick="openSettings()"><i class="fa fa-gear"></i></button>
+        <button onclick="newChatPrompt()"><i class="fa fa-plus"></i></button>
       </div>
     </nav>
     <div class="chat-list" id="chat-list"></div>
   </div>
 
-  <!-- Новый чат -->
-  <div id="search-screen" class="screen">
-    <nav>
-      <button onclick="backToMain()"><i class="fa fa-arrow-left"></i></button>
-      <h2>Новый чат</h2>
-    </nav>
-    <input id="search-username" placeholder="Введите username">
-    <button onclick="searchUser()">Создать чат</button>
-  </div>
-
-  <!-- Чат -->
+  <!-- ЧАТ -->
   <div id="chat-screen" class="screen">
     <nav>
       <button onclick="backToMain()"><i class="fa fa-arrow-left"></i></button>
@@ -143,7 +148,7 @@
     </div>
   </div>
 
-  <!-- Настройки -->
+  <!-- НАСТРОЙКИ -->
   <div id="settings-screen" class="screen">
     <nav>
       <button onclick="backToMain()"><i class="fa fa-arrow-left"></i></button>
@@ -156,7 +161,8 @@
 
   <!-- Контекстное меню -->
   <div id="context-menu" class="context-menu">
-    <button onclick="confirmDelete()">Удалить сообщение</button>
+    <button id="copy-btn" onclick="copyMessage()">Копировать</button>
+    <button id="delete-btn" onclick="confirmDelete()">Удалить сообщение</button>
   </div>
 
 <script>
@@ -165,11 +171,8 @@ const supabase = window.supabase.createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24"
 );
 
-let currentUser = null;
-let currentChat = null;
-let msgSubscription = null;
-let chatSubscription = null;
-let selectedMessageId = null;
+let currentUser=null, currentChat=null, msgSubscription=null;
+let selectedMessageId=null, selectedMessageSender=null;
 
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -179,92 +182,58 @@ function showLogin(){ showScreen('login-screen'); }
 function showRegister(){ showScreen('register-screen'); }
 function showMain(){ loadChats(); showScreen('main-screen'); }
 function openSettings(){ loadProfile(); showScreen('settings-screen'); }
-function openSearch(){ showScreen('search-screen'); }
-function backToMain(){
-  if(msgSubscription) supabase.removeChannel(msgSubscription);
-  showMain();
-}
+function backToMain(){ if(msgSubscription) supabase.removeChannel(msgSubscription); showMain(); }
 
 async function signUp(){
   const email=document.getElementById('reg-email').value;
   const password=document.getElementById('reg-password').value;
   const username=document.getElementById('reg-username').value;
-  const { data, error } = await supabase.auth.signUp({ email, password, options:{ data:{username} }});
+  const { data, error } = await supabase.auth.signUp({ email, password });
   if(error){ alert(error.message); return; }
   await supabase.from('profiles').insert([{ id:data.user.id, email, username }]);
-  // избранное
-  await supabase.from('chats').insert([{ user1:data.user.id, user2:data.user.id }]);
-  alert("Подтвердите email и войдите");
-  showLogin();
+  currentUser=data.user;
+  showMain();
 }
-
 async function signIn(){
   const email=document.getElementById('login-email').value;
   const password=document.getElementById('login-password').value;
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if(error){ alert(error.message); return; }
-  if(!data.user.email_confirmed_at){ alert("Сначала подтвердите email!"); return; }
   currentUser=data.user;
   showMain();
-  subscribeChats();
 }
-
-async function logout(){
-  await supabase.auth.signOut();
-  currentUser=null;
-  showLogin();
-}
-
+async function logout(){ await supabase.auth.signOut(); currentUser=null; showLogin(); }
 async function loadProfile(){
   const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
   document.getElementById('profile-info').innerText=`Username: ${data.username}\nEmail: ${data.email}`;
 }
-
-async function deleteAccount(){
-  await supabase.from('profiles').delete().eq('id', currentUser.id);
-  logout();
-}
+async function deleteAccount(){ await supabase.from('profiles').delete().eq('id', currentUser.id); logout(); }
 
 async function loadChats(){
-  const { data: chats, error } = await supabase
+  const { data, error } = await supabase
     .from('chats')
-    .select('*')
+    .select('id, user1, user2, profiles!chats_user1_fkey(username,id), profiles!chats_user2_fkey(username,id)')
     .or(`user1.eq.${currentUser.id},user2.eq.${currentUser.id}`);
-  if(error) return console.error(error);
-
-  const list=document.getElementById('chat-list');
-  list.innerHTML='';
-  for(const chat of chats){
-    let chatName="Неизвестно";
-    if(chat.user1===chat.user2 && chat.user1===currentUser.id){
-      chatName="Избранное";
-    } else {
-      const otherId = chat.user1===currentUser.id?chat.user2:chat.user1;
-      const { data: profile } = await supabase.from('profiles').select('username').eq('id', otherId).single();
-      if(profile) chatName=profile.username;
-    }
+  if(error){ console.error(error); return; }
+  const list=document.getElementById('chat-list'); list.innerHTML='';
+  data.forEach(chat=>{
+    const otherId=chat.user1===currentUser.id?chat.user2:chat.user1;
+    const otherName=chat.profiles.find(p=>p.id===otherId)?.username||"Unknown";
     const div=document.createElement('div');
     div.className='chat-item';
-    div.innerHTML=`<span>${chatName}</span>`;
-    div.onclick=()=>openChat(chat.id, chatName);
+    div.innerHTML=`<span>${otherName}</span>`;
+    div.onclick=()=>openChat(chat.id, otherName);
     list.appendChild(div);
-  }
+  });
 }
-
-function subscribeChats(){
-  if(chatSubscription) supabase.removeChannel(chatSubscription);
-  chatSubscription=supabase.channel('chats-realtime')
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'chats'},()=>loadChats())
-    .subscribe();
-}
-
-async function searchUser(){
-  const uname=document.getElementById('search-username').value.trim();
+async function newChatPrompt(){
+  const uname=prompt("Введите username");
   if(!uname) return;
-  const { data: user } = await supabase.from('profiles').select('*').eq('username', uname).single();
-  if(!user){ alert("Не найден"); return; }
-  if(user.id===currentUser.id){ alert("Нельзя создать чат с самим собой"); return; }
-  const { data: existing } = await supabase.from('chats')
+  if(!currentUser) return;
+  const { data:user } = await supabase.from('profiles').select('*').eq('username',uname).single();
+  if(!user){ alert("Пользователь не найден"); return; }
+  if(user.id===currentUser.id){ alert("Это вы!"); return; }
+  const { data:existing } = await supabase.from('chats')
     .select('*')
     .or(`and(user1.eq.${currentUser.id},user2.eq.${user.id}),and(user1.eq.${user.id},user2.eq.${currentUser.id})`)
     .maybeSingle();
@@ -274,29 +243,28 @@ async function searchUser(){
     const { data:newChat } = await supabase.from('chats').insert([{ user1:currentUser.id, user2:user.id }]).select().single();
     chatId=newChat.id;
   }
-  backToMain();
+  loadChats(); // обновим список
+  openChat(chatId, user.username);
 }
-
 async function openChat(chatId, otherName){
   currentChat=chatId;
   document.getElementById('chat-username').innerText=otherName;
   showScreen('chat-screen');
   loadMessages();
-
   if(msgSubscription) supabase.removeChannel(msgSubscription);
-  msgSubscription=supabase.channel('room-'+chatId)
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`chat_id=eq.${chatId}`},payload=>renderMessage(payload.new))
-    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'messages',filter:`chat_id=eq.${chatId}`},payload=>renderMessage(payload.new))
+  msgSubscription = supabase.channel('room-'+chatId)
+    .on('postgres_changes',{event:'INSERT', schema:'public', table:'messages', filter:`chat_id=eq.${chatId}`}, payload=>renderMessage(payload.new))
+    .on('postgres_changes',{event:'UPDATE', schema:'public', table:'messages', filter:`chat_id=eq.${chatId}`}, payload=>renderMessage(payload.new))
     .subscribe();
 }
-
 async function loadMessages(){
-  const { data } = await supabase.from('messages').select('*').eq('chat_id', currentChat).order('created_at',{ascending:true});
-  const box=document.getElementById('messages');
-  box.innerHTML='';
+  const { data } = await supabase.from('messages')
+    .select('*')
+    .eq('chat_id', currentChat)
+    .order('created_at',{ascending:true});
+  const box=document.getElementById('messages'); box.innerHTML='';
   data.forEach(renderMessage);
 }
-
 function renderMessage(msg){
   const box=document.getElementById('messages');
   let div=document.getElementById('msg-'+msg.id);
@@ -304,40 +272,44 @@ function renderMessage(msg){
     div=document.createElement('div');
     div.id='msg-'+msg.id;
     div.className='msg '+(msg.sender===currentUser.id?'me':'other');
-    if(msg.sender===currentUser.id) {
-      div.oncontextmenu=(e)=>{ e.preventDefault(); showContextMenu(e,msg.id); };
-    }
+    div.oncontextmenu=(e)=>{ e.preventDefault(); showContextMenu(e,msg.id,msg.sender); };
+    let pressTimer;
+    div.addEventListener("touchstart", e=>{
+      pressTimer=setTimeout(()=>showContextMenu(e.touches[0], msg.id, msg.sender),600);
+    });
+    div.addEventListener("touchend", ()=>clearTimeout(pressTimer));
     box.appendChild(div);
   }
-  if(msg.is_deleted){
-    div.className='msg deleted';
-    div.innerText='Сообщение удалено';
-  } else {
-    div.innerText=msg.content;
-  }
+  if(msg.is_deleted){ div.className='msg deleted'; div.innerText='Сообщение удалено'; }
+  else { div.innerText=msg.content; }
   box.scrollTop=box.scrollHeight;
 }
-
+document.addEventListener("keydown", function(e){
+  if(e.target.id==="msg-input"){ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); sendMessage(); } }
+});
 async function sendMessage(){
-  const input=document.getElementById('msg-input');
-  const text=input.value.trim();
+  const input=document.getElementById('msg-input'); const text=input.value.trim();
   if(!text) return;
   await supabase.from('messages').insert([{ chat_id:currentChat, sender:currentUser.id, content:text }]);
   input.value='';
 }
-
-function showContextMenu(e,msgId){
-  selectedMessageId=msgId;
+function showContextMenu(e,msgId,senderId){
+  selectedMessageId=msgId; selectedMessageSender=senderId;
   const menu=document.getElementById('context-menu');
-  menu.style.left=e.pageX+'px';
-  menu.style.top=e.pageY+'px';
-  menu.style.display='flex';
+  const deleteBtn=document.getElementById('delete-btn');
+  if(senderId!==currentUser.id){ deleteBtn.style.display="none"; } else { deleteBtn.style.display="block"; }
+  menu.style.left=e.pageX+'px'; menu.style.top=e.pageY+'px'; menu.style.display='flex';
 }
-window.onclick=()=>{ document.getElementById('context-menu').style.display='none'; }
-
+window.onclick=()=>{ document.getElementById('context-menu').style.display='none'; };
 async function confirmDelete(){
   if(!selectedMessageId) return;
-  await supabase.from('messages').update({ is_deleted:true }).eq('id', selectedMessageId).eq('sender', currentUser.id);
+  await supabase.from('messages').update({is_deleted:true}).eq('id',selectedMessageId).eq('sender',currentUser.id);
+  selectedMessageId=null;
+}
+function copyMessage(){
+  if(!selectedMessageId) return;
+  const el=document.getElementById('msg-'+selectedMessageId);
+  if(el){ navigator.clipboard.writeText(el.innerText); }
   selectedMessageId=null;
 }
 </script>
