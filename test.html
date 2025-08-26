@@ -5,7 +5,7 @@
   <title>MiniMessenger</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
     :root {
       --bg: #0e0e0e;
@@ -16,27 +16,63 @@
       --radius: 14px;
     }
     * { box-sizing: border-box; }
-    body { margin:0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text);}
-    .screen { display: none; flex-direction: column; height: 100vh; width: 100%; padding: 16px;}
+    body {
+      margin:0; font-family: system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+    }
+    .screen {
+      display: none; flex-direction: column;
+      height: 100vh; width: 100%;
+      padding: 16px;
+    }
     .active { display: flex; }
     h2 { margin: 0 0 16px; }
-    input, button { width: 100%; padding: 14px; margin: 8px 0; border-radius: var(--radius); border: none; font-size: 16px;}
+    input, button {
+      width: 100%; padding: 14px; margin: 8px 0;
+      border-radius: var(--radius); border: none;
+      font-size: 16px;
+    }
     input { background: var(--bg-light); color: var(--text); }
-    button { background: var(--accent); color: white; font-weight: bold; }
+    button {
+      background: var(--accent); color: white; font-weight: bold;
+    }
     button:active { opacity: 0.7; }
     .chat-list, .messages { flex:1; overflow-y:auto; }
-    .chat-item { padding: 14px; border-bottom: 1px solid #222; display:flex; align-items:center; justify-content:space-between; cursor:pointer; }
+    .chat-item {
+      padding: 14px; border-bottom: 1px solid #222;
+      display:flex; align-items:center; justify-content:space-between;
+      cursor:pointer;
+    }
     .chat-item span { font-weight:bold; }
-    .msg { margin:6px 0; padding:10px 14px; border-radius: var(--radius); max-width:75%; word-wrap: break-word; position: relative;}
+    .msg {
+      margin:6px 0; padding:10px 14px;
+      border-radius: var(--radius);
+      max-width:75%;
+      word-wrap: break-word;
+    }
     .msg.me { background: var(--accent); margin-left:auto; }
     .msg.other { background: var(--bg-light); }
     .msg.deleted { font-style: italic; color: var(--gray); background:none; }
-    .input-box { display:flex; gap:8px; padding:8px 0;}
+    .input-box {
+      display:flex; gap:8px; padding:8px 0;
+    }
     .input-box input { flex:1; }
-    nav { display:flex; justify-content:space-between; align-items:center; padding: 10px 0;}
-    nav button { width:auto; padding:10px 16px; font-size:18px; background: none; color: var(--text);}
-    .context-menu { position: absolute; bottom: -35px; right: 0; background: var(--bg-light); border-radius: var(--radius); padding: 6px 12px; font-size: 14px; display: none; cursor: pointer;}
-    .msg.show-menu .context-menu { display: block; }
+    nav {
+      display:flex; justify-content:space-between; align-items:center;
+      padding: 10px 0;
+    }
+    nav button {
+      width:auto; padding:10px 16px; font-size:14px;
+    }
+    .context-menu {
+      position:absolute; background:var(--bg-light);
+      border-radius: var(--radius); padding:8px;
+      display:none; z-index:10;
+    }
+    .context-menu button {
+      width:100%; background:none; color:var(--text);
+      padding:8px; text-align:left;
+    }
   </style>
 </head>
 <body>
@@ -63,46 +99,40 @@
   <div id="main-screen" class="screen">
     <nav>
       <h2>Чаты</h2>
-      <div>
-        <button onclick="showSearch()"> <i data-lucide="plus"></i> </button>
-        <button onclick="openSettings()"> <i data-lucide="settings"></i> </button>
-      </div>
+      <button onclick="openSettings()"><i class="fa fa-gear"></i></button>
     </nav>
     <div class="chat-list" id="chat-list"></div>
-  </div>
-
-  <!-- ПОИСК -->
-  <div id="search-screen" class="screen">
-    <nav>
-      <button onclick="backToMain()"> <i data-lucide="arrow-left"></i> </button>
-      <h2>Новый чат</h2>
-    </nav>
-    <input id="search-username" placeholder="Введите username">
-    <button onclick="searchUser()">Найти</button>
+    <input id="search-username" placeholder="Поиск по username">
+    <button onclick="searchUser()"><i class="fa fa-plus"></i> Новый чат</button>
   </div>
 
   <!-- ЧАТ -->
   <div id="chat-screen" class="screen">
     <nav>
-      <button onclick="backToMain()"> <i data-lucide="arrow-left"></i> </button>
+      <button onclick="backToMain()"><i class="fa fa-arrow-left"></i></button>
       <h2 id="chat-username">Чат</h2>
     </nav>
     <div class="messages" id="messages"></div>
     <div class="input-box">
       <input id="msg-input" placeholder="Сообщение...">
-      <button onclick="sendMessage()"> <i data-lucide="send"></i> </button>
+      <button onclick="sendMessage()"><i class="fa fa-paper-plane"></i></button>
     </div>
   </div>
 
   <!-- НАСТРОЙКИ -->
   <div id="settings-screen" class="screen">
     <nav>
-      <button onclick="backToMain()"> <i data-lucide="arrow-left"></i> </button>
+      <button onclick="backToMain()"><i class="fa fa-arrow-left"></i></button>
       <h2>Настройки</h2>
     </nav>
     <div id="profile-info"></div>
     <button onclick="deleteAccount()" style="background:#c00">Удалить аккаунт</button>
     <button onclick="logout()" style="background:var(--bg-light)">Выйти</button>
+  </div>
+
+  <!-- Контекстное меню -->
+  <div id="context-menu" class="context-menu">
+    <button onclick="confirmDelete()">Удалить</button>
   </div>
 
 <script>
@@ -114,17 +144,16 @@ const supabase = window.supabase.createClient(
 let currentUser = null;
 let currentChat = null;
 let msgSubscription = null;
-lucide.createIcons();
+let chatSubscription = null;
+let contextMsgId = null;
 
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  lucide.createIcons();
 }
 function showLogin(){ showScreen('login-screen'); }
 function showRegister(){ showScreen('register-screen'); }
 function showMain(){ loadChats(); showScreen('main-screen'); }
-function showSearch(){ showScreen('search-screen'); }
 function openSettings(){ loadProfile(); showScreen('settings-screen'); }
 function backToMain(){ if(msgSubscription) supabase.removeChannel(msgSubscription); showMain(); }
 
@@ -135,10 +164,10 @@ async function signUp(){
   const { data, error } = await supabase.auth.signUp({ email, password });
   if(error){ alert(error.message); return; }
   await supabase.from('profiles').insert([{ id:data.user.id, email, username }]);
-  // создаём чат "Избранное"
+  // создаем чат "Избранное"
   await supabase.from('chats').insert([{ user1: data.user.id, user2: data.user.id }]);
-  alert("Подтверди почту, затем войди.");
-  showLogin();
+  currentUser = data.user;
+  showMain();
 }
 
 async function signIn(){
@@ -146,10 +175,8 @@ async function signIn(){
   const password = document.getElementById('login-password').value;
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if(error){ alert(error.message); return; }
-  if(!data.user.confirmed_at){ alert("Подтверди email перед входом"); await supabase.auth.signOut(); return; }
   currentUser = data.user;
   showMain();
-  subscribeChats();
 }
 
 async function logout(){
@@ -170,49 +197,47 @@ async function deleteAccount(){
 }
 
 async function loadChats(){
-  const { data, error } = await supabase
+  const { data: chats } = await supabase
     .from('chats')
-    .select('id, user1, user2, profiles!chats_user1_fkey(id,username), profiles!chats_user2_fkey(id,username)')
+    .select('*')
     .or(`user1.eq.${currentUser.id},user2.eq.${currentUser.id}`);
-  if(error){ console.error(error); return; }
-
   const list = document.getElementById('chat-list');
   list.innerHTML = '';
-  data.forEach(chat=>{
+
+  for(const chat of chats){
     let chatName = "Неизвестно";
     if(chat.user1 === chat.user2 && chat.user1 === currentUser.id){
       chatName = "Избранное";
     } else {
       const otherId = chat.user1 === currentUser.id ? chat.user2 : chat.user1;
-      const users = chat.profiles;
-      const otherProfile = users.find(u => u.id === otherId);
-      chatName = otherProfile ? otherProfile.username : "Неизвестно";
+      const { data: profile } = await supabase.from('profiles').select('username').eq('id', otherId).single();
+      if(profile) chatName = profile.username;
     }
     const div = document.createElement('div');
     div.className = 'chat-item';
     div.innerHTML = `<span>${chatName}</span>`;
     div.onclick = ()=>openChat(chat.id, chatName);
     list.appendChild(div);
-  });
+  }
 }
 
 async function searchUser(){
-  const uname = document.getElementById('search-username').value.trim();
+  const uname = document.getElementById('search-username').value;
   if(!uname) return;
-  const { data: user } = await supabase.from('profiles').select('*').eq('username', uname).maybeSingle();
+  const { data: user } = await supabase.from('profiles').select('*').eq('username', uname).single();
   if(!user){ alert("Пользователь не найден"); return; }
-
   const { data: existing } = await supabase.from('chats')
     .select('*')
     .or(`and(user1.eq.${currentUser.id},user2.eq.${user.id}),and(user1.eq.${user.id},user2.eq.${currentUser.id})`)
     .maybeSingle();
-
-  if(existing){ 
-    loadChats(); showMain();
-  } else {
-    await supabase.from('chats').insert([{ user1: currentUser.id, user2: user.id }]);
-    loadChats(); showMain();
+  let chatId;
+  if(existing){ chatId = existing.id; }
+  else {
+    const { data: newChat } = await supabase.from('chats').insert([{ user1: currentUser.id, user2: user.id }]).select().single();
+    chatId = newChat.id;
   }
+  loadChats();
+  showMain();
 }
 
 async function openChat(chatId, otherName){
@@ -249,68 +274,52 @@ function renderMessage(msg){
     div = document.createElement('div');
     div.id = 'msg-'+msg.id;
     div.className = 'msg '+(msg.sender===currentUser.id?'me':'other');
-
-    const textSpan = document.createElement("span");
-    textSpan.className = "text";
-    div.appendChild(textSpan);
-
-    let pressTimer;
-    div.addEventListener("mousedown", ()=>{
-      if(msg.sender===currentUser.id && !msg.is_deleted){
-        pressTimer = setTimeout(()=>{ div.classList.toggle("show-menu"); }, 600);
-      }
-    });
-    div.addEventListener("mouseup", ()=> clearTimeout(pressTimer));
-
-    const menu = document.createElement("div");
-    menu.className = "context-menu";
-    menu.innerText = "Удалить";
-    menu.onclick = ()=>deleteMessage(msg.id);
-    div.appendChild(menu);
-
+    div.oncontextmenu = (e)=>{ e.preventDefault(); showContextMenu(e, msg.id); };
     box.appendChild(div);
   }
   if(msg.is_deleted){
     div.className='msg deleted';
-    div.innerHTML='Сообщение удалено';
+    div.innerText='Сообщение удалено';
   } else {
-    div.querySelector(".text").innerText = msg.content;
+    div.innerText = msg.content;
   }
   box.scrollTop = box.scrollHeight;
 }
 
 async function sendMessage(){
-  const input = document.getElementById('msg-input');
-  const text = input.value.trim();
+  const text = document.getElementById('msg-input').value;
   if(!text) return;
-  input.value = '';
   await supabase.from('messages').insert([{ chat_id: currentChat, sender: currentUser.id, content: text }]);
+  document.getElementById('msg-input').value='';
 }
 
-async function deleteMessage(id){
-  await supabase.from('messages').update({ is_deleted:true }).eq('id', id);
+function showContextMenu(e, msgId){
+  contextMsgId = msgId;
+  const menu = document.getElementById('context-menu');
+  menu.style.display='block';
+  menu.style.left=e.pageX+'px';
+  menu.style.top=e.pageY+'px';
+}
+window.onclick = ()=>{ document.getElementById('context-menu').style.display='none'; };
+async function confirmDelete(){
+  if(contextMsgId){
+    await supabase.from('messages').update({ is_deleted:true }).eq('id', contextMsgId);
+    contextMsgId = null;
+  }
 }
 
-// Подписка на новые чаты
+// подписка на список чатов
 function subscribeChats(){
-  supabase.channel('chats')
-    .on('postgres_changes',{event:'INSERT', schema:'public', table:'chats'}, payload=>{
-      loadChats();
-    })
+  if(chatSubscription) supabase.removeChannel(chatSubscription);
+  chatSubscription = supabase.channel('chats-sub')
+    .on('postgres_changes',{event:'INSERT', schema:'public', table:'chats'}, ()=> loadChats())
+    .on('postgres_changes',{event:'DELETE', schema:'public', table:'chats'}, ()=> loadChats())
     .subscribe();
 }
 
-// Автовход
-(async ()=>{
-  const { data } = await supabase.auth.getSession();
-  if(data.session){
-    currentUser = data.session.user;
-    showMain();
-    subscribeChats();
-  }
-})();
-supabase.auth.onAuthStateChange((_event, session)=>{
-  if(session){ currentUser = session.user; showMain(); subscribeChats(); }
+// Автовход при загрузке
+supabase.auth.getSession().then(({ data })=>{
+  if(data.session){ currentUser = data.session.user; showMain(); subscribeChats(); }
   else showLogin();
 });
 </script>
