@@ -5,6 +5,7 @@
   <title>MiniMessenger</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="https://ucarecdn.com/libs/widget/3.x/uploadcare.full.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
     :root {
@@ -25,7 +26,7 @@
     h2 { margin:0 0 16px; }
     input, button, textarea {
       border-radius: var(--radius); border:none; font-size:16px;
-      padding:16px; /* увеличил высоту */
+      padding:16px;
     }
     input, textarea { background: var(--bg-light); color: var(--text); }
     textarea { resize:none; line-height:1.4; width:100%; }
@@ -46,7 +47,7 @@
     .msg.other { background: var(--bg-light); }
     .msg.deleted { font-style:italic; color:var(--gray); background:none; }
     nav { display:flex; justify-content:space-between; align-items:center; padding:10px 0; }
-    nav button { width:auto; padding:14px 20px; font-size:15px; } /* увеличил высоту */
+    nav button { width:auto; padding:14px 20px; font-size:15px; }
 
     /* Ввод сообщения */
     .input-box {
@@ -54,12 +55,12 @@
     }
     .input-box textarea {
       flex:1;
-      min-height:48px; /* увеличил */
+      min-height:48px;
       max-height:140px;
       overflow-y:auto;
       padding:12px;
     }
-    .send-btn {
+    .send-btn, .img-btn {
       background: var(--accent);
       border:none;
       width:46px;
@@ -71,9 +72,9 @@
       font-size:18px;
       cursor:pointer;
     }
-    .send-btn i { margin:0; }
+    .send-btn i, .img-btn i { margin:0; }
 
-    /* Меню удаления/копирования */
+    /* Меню */
     .context-menu {
       position:absolute;
       background:var(--bg-light);
@@ -90,6 +91,11 @@
       font-size:15px;
     }
     .context-menu button:hover { background:#222; }
+    img.msg-img {
+      max-width:100%;
+      border-radius: var(--radius);
+      margin-top:4px;
+    }
   </style>
 </head>
 <body>
@@ -143,6 +149,7 @@
     <div class="messages" id="messages"></div>
     <div class="input-box">
       <textarea id="msg-input" placeholder="Сообщение..."></textarea>
+      <button class="img-btn" onclick="sendImage()"><i class="fa fa-image"></i></button>
       <button class="send-btn" onclick="sendMessage()"><i class="fa fa-paper-plane"></i></button>
     </div>
   </div>
@@ -169,6 +176,8 @@ const supabase = window.supabase.createClient(
   "https://zmewwzlzujsrhstjehrp.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24"
 );
+
+uploadcare.start({publicKey: "c12f2c3e134f56024db8"});
 
 let currentUser=null;
 let currentChat=null;
@@ -305,17 +314,18 @@ function renderMessage(msg){
     div=document.createElement('div');
     div.id='msg-'+msg.id;
     div.className='msg '+(msg.sender===currentUser.id?'me':'other');
-    div.oncontextmenu=(e)=>{
-      e.preventDefault();
-      showContextMenu(e,msg.id,msg.sender);
-    };
+    div.oncontextmenu=(e)=>{ e.preventDefault(); showContextMenu(e,msg.id,msg.sender); };
     box.appendChild(div);
   }
   if(msg.is_deleted){
     div.className='msg deleted';
     div.innerText='Сообщение удалено';
   } else {
-    div.innerText=msg.content;
+    if(msg.image_url){
+      div.innerHTML=`<img src="${msg.image_url}" class="msg-img">`;
+    } else {
+      div.innerText=msg.content;
+    }
   }
   box.scrollTop=box.scrollHeight;
 }
@@ -326,6 +336,15 @@ async function sendMessage(){
   if(!text) return;
   await supabase.from('messages').insert([{ chat_id:currentChat, sender:currentUser.id, content:text }]);
   input.value='';
+}
+
+function sendImage(){
+  const widget=uploadcare.Widget(null);
+  widget.openDialog(null, { imagesOnly: true }).done(file=>{
+    file.done(async info=>{
+      await supabase.from('messages').insert([{ chat_id:currentChat, sender:currentUser.id, image_url:info.cdnUrl }]);
+    });
+  });
 }
 
 function showContextMenu(e,msgId,senderId){
