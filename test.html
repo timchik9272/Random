@@ -2,89 +2,62 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>MiniMessenger</title>
+  <title>Messenger</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
     :root {
-      --bg: #0e0e0e;
-      --bg-light: #1e1e1e;
-      --accent: #0088cc;
-      --text: #fff;
-      --gray: #888;
-      --radius: 14px;
+      --bg-dark: #121212;
+      --bg-light: #1E1E1E;
+      --accent: #3B82F6;
+      --text: #E5E5E5;
+      --radius: 12px;
     }
-    * { box-sizing: border-box; }
     body {
-      margin:0; font-family: system-ui, sans-serif;
-      background: var(--bg); color: var(--text);
+      margin:0; font-family:sans-serif;
+      background:var(--bg-dark); color:var(--text);
+      height:100vh; display:flex; flex-direction:column;
     }
-    .screen { display:none; flex-direction:column; height:100vh; padding:16px; }
+    header {
+      padding:12px; background:var(--bg-light);
+      text-align:center; font-size:20px; font-weight:bold;
+    }
+    .screen { display:none; flex:1; flex-direction:column; }
     .active { display:flex; }
-    h2 { margin:0 0 16px; }
-    input, button, textarea {
-      border-radius: var(--radius); border:none; font-size:16px;
+    input, button {
+      padding:14px 20px; font-size:16px; margin:8px 0;
+      border-radius:var(--radius); border:none;
     }
-    input, textarea {
-      background: var(--bg-light);
-      color: var(--text);
-      padding:14px;
-    }
-    textarea { resize:none; line-height:1.4; width:100%; }
+    input { width:100%; box-sizing:border-box; }
     button {
-      background: var(--accent);
-      color:white;
-      font-weight:bold;
+      background:var(--accent); color:white; font-weight:bold;
       cursor:pointer;
-      padding:14px 20px;   /* выше кнопки */
-      font-size:16px;
-      border-radius: var(--radius);
     }
     button:active { opacity:0.7; }
-
-    .chat-list, .messages { flex:1; overflow-y:auto; }
+    #chat-list, #messages { flex:1; overflow-y:auto; padding:10px; }
     .chat-item {
-      padding:14px; border-bottom:1px solid #222;
-      display:flex; align-items:center; cursor:pointer;
-    }
-    .chat-item span { font-weight:bold; }
-    .msg {
-      margin:6px 0; padding:10px 14px;
-      border-radius: var(--radius);
-      max-width:75%; word-wrap: break-word;
-    }
-    .msg.me { background: var(--accent); margin-left:auto; }
-    .msg.other { background: var(--bg-light); }
-    .msg.deleted { font-style:italic; color:var(--gray); background:none; }
-    nav { display:flex; justify-content:space-between; align-items:center; padding:10px 0; }
-    nav button { width:auto; padding:10px 16px; font-size:14px; }
-
-    /* Ввод сообщений */
-    .input-box {
-      display:flex; align-items:flex-end; gap:8px; padding:8px 0;
-    }
-    .input-box textarea {
-      flex:1;
-      min-height:42px;
-      max-height:120px;
-      overflow-y:auto;
-    }
-    .send-btn {
-      background: var(--accent);
-      border:none;
-      width:42px;
-      height:42px;
-      border-radius:50%;
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      font-size:18px;
+      padding:14px; background:var(--bg-light);
+      margin:6px 0; border-radius:var(--radius);
       cursor:pointer;
     }
-    .send-btn i { margin:0; }
-
-    /* Контекстное меню */
+    .msg {
+      padding:10px; margin:6px 0; border-radius:var(--radius);
+      max-width:70%;
+      word-wrap:break-word;
+    }
+    .me { background:var(--accent); align-self:flex-end; }
+    .other { background:#333; align-self:flex-start; }
+    .deleted { font-style:italic; opacity:0.6; }
+    #msg-input-area {
+      display:flex; padding:10px; background:var(--bg-light);
+    }
+    #msg-input {
+      flex:1; padding:10px; border-radius:var(--radius);
+      border:none; font-size:16px;
+    }
+    #send-btn {
+      margin-left:8px; padding:0 16px; font-size:16px;
+    }
     .context-menu {
       position:absolute;
       background:var(--bg-light);
@@ -104,62 +77,57 @@
   </style>
 </head>
 <body>
-  <!-- ВХОД -->
-  <div id="login-screen" class="screen active">
-    <h2>Вход</h2>
-    <input id="login-email" placeholder="Email">
-    <input id="login-password" type="password" placeholder="Пароль">
-    <button onclick="signIn()">Войти</button>
-    <button style="background:var(--bg-light)" onclick="showRegister()">Создать аккаунт</button>
-  </div>
+  <header id="header">Messenger</header>
 
-  <!-- РЕГИСТРАЦИЯ -->
-  <div id="register-screen" class="screen">
-    <h2>Регистрация</h2>
-    <input id="reg-email" placeholder="Email">
-    <input id="reg-password" type="password" placeholder="Пароль">
-    <input id="reg-username" placeholder="Username (уникальный)">
-    <button onclick="signUp()">Зарегистрироваться</button>
-    <button style="background:var(--bg-light)" onclick="showLogin()">Назад</button>
-  </div>
-
-  <!-- СПИСОК ЧАТОВ -->
-  <div id="main-screen" class="screen">
-    <nav>
-      <h2>Чаты</h2>
-      <div>
-        <button onclick="openSettings()"><i class="fa fa-gear"></i></button>
-        <button onclick="newChatPrompt()"><i class="fa fa-plus"></i></button>
-      </div>
-    </nav>
-    <div class="chat-list" id="chat-list"></div>
-  </div>
-
-  <!-- ЧАТ -->
-  <div id="chat-screen" class="screen">
-    <nav>
-      <button onclick="backToMain()"><i class="fa fa-arrow-left"></i></button>
-      <h2 id="chat-username">Чат</h2>
-    </nav>
-    <div class="messages" id="messages"></div>
-    <div class="input-box">
-      <textarea id="msg-input" placeholder="Сообщение..."></textarea>
-      <button class="send-btn" onclick="sendMessage()"><i class="fa fa-paper-plane"></i></button>
+  <!-- Login/Register -->
+  <div id="auth-screen" class="screen active">
+    <div style="padding:20px; flex:1; display:flex; flex-direction:column; justify-content:center;">
+      <h2>Вход / Регистрация</h2>
+      <input id="email" type="email" placeholder="Email">
+      <input id="password" type="password" placeholder="Пароль">
+      <button onclick="signIn()">Войти</button>
+      <button onclick="signUp()">Регистрация</button>
     </div>
   </div>
 
-  <!-- НАСТРОЙКИ -->
-  <div id="settings-screen" class="screen">
-    <nav>
-      <button onclick="backToMain()"><i class="fa fa-arrow-left"></i></button>
-      <h2>Настройки</h2>
-    </nav>
-    <div id="profile-info"></div>
-    <button onclick="deleteAccount()" style="background:#c00">Удалить аккаунт</button>
-    <button onclick="logout()" style="background:var(--bg-light)">Выйти</button>
+  <!-- Chat list -->
+  <div id="chat-screen" class="screen">
+    <div style="padding:10px;">
+      <button onclick="showNewChat()">+ Новый чат</button>
+      <button onclick="showSettings()">⚙️ Настройки</button>
+    </div>
+    <div id="chat-list"></div>
   </div>
 
-  <!-- Контекстное меню -->
+  <!-- Messages -->
+  <div id="messages-screen" class="screen">
+    <div id="messages"></div>
+    <div id="msg-input-area">
+      <input id="msg-input" placeholder="Введите сообщение...">
+      <button id="send-btn" onclick="sendMessage()">➤</button>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div id="settings-screen" class="screen">
+    <div style="padding:20px;">
+      <h3>Настройки</h3>
+      <p id="user-info"></p>
+      <button onclick="logout()">Выйти</button>
+    </div>
+  </div>
+
+  <!-- New Chat -->
+  <div id="newchat-screen" class="screen">
+    <div style="padding:20px;">
+      <h3>Новый чат</h3>
+      <input id="newchat-username" placeholder="Введите юзернейм">
+      <button onclick="createChat()">Создать</button>
+      <button onclick="backToChats()">Назад</button>
+    </div>
+  </div>
+
+  <!-- Context Menu -->
   <div id="context-menu" class="context-menu">
     <button id="copy-btn" onclick="copyMessage()">Копировать</button>
     <button id="delete-btn" onclick="confirmDelete()">Удалить сообщение</button>
@@ -171,100 +139,106 @@ const supabase = window.supabase.createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24"
 );
 
-let currentUser=null, currentChat=null, msgSubscription=null;
-let selectedMessageId=null, selectedMessageSender=null;
+let currentUser=null;
+let currentChat=null;
+let selectedMessageId=null;
+let selectedMessageSender=null;
 
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 }
-function showLogin(){ showScreen('login-screen'); }
-function showRegister(){ showScreen('register-screen'); }
-function showMain(){ loadChats(); showScreen('main-screen'); }
-function openSettings(){ loadProfile(); showScreen('settings-screen'); }
-function backToMain(){ if(msgSubscription) supabase.removeChannel(msgSubscription); showMain(); }
+
+async function signIn(){
+  const {error, data} = await supabase.auth.signInWithPassword({
+    email:document.getElementById('email').value,
+    password:document.getElementById('password').value
+  });
+  if(error){alert(error.message);return;}
+  currentUser=data.user;
+  afterLogin();
+}
 
 async function signUp(){
-  const email=document.getElementById('reg-email').value;
-  const password=document.getElementById('reg-password').value;
-  const username=document.getElementById('reg-username').value;
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if(error){ alert(error.message); return; }
-  await supabase.from('profiles').insert([{ id:data.user.id, email, username }]);
-  currentUser=data.user;
-  showMain();
+  const {error, data} = await supabase.auth.signUp({
+    email:document.getElementById('email').value,
+    password:document.getElementById('password').value
+  });
+  if(error){alert(error.message);return;}
+  alert("Подтвердите email перед входом");
 }
-async function signIn(){
-  const email=document.getElementById('login-email').value;
-  const password=document.getElementById('login-password').value;
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if(error){ alert(error.message); return; }
-  currentUser=data.user;
-  showMain();
+
+async function afterLogin(){
+  const {data:{user}}=await supabase.auth.getUser();
+  currentUser=user;
+  if(!currentUser){showScreen('auth-screen');return;}
+  loadChats();
+  showScreen('chat-screen');
 }
-async function logout(){ await supabase.auth.signOut(); currentUser=null; showLogin(); }
-async function loadProfile(){
-  const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
-  document.getElementById('profile-info').innerText=`Username: ${data.username}\nEmail: ${data.email}`;
+
+async function logout(){
+  await supabase.auth.signOut();
+  currentUser=null;
+  showScreen('auth-screen');
 }
-async function deleteAccount(){ await supabase.from('profiles').delete().eq('id', currentUser.id); logout(); }
 
 async function loadChats(){
-  const { data, error } = await supabase
-    .from('chats')
-    .select('id, user1, user2, profiles!chats_user1_fkey(username,id), profiles!chats_user2_fkey(username,id)')
+  const {data}=await supabase.from('chats')
+    .select('*')
     .or(`user1.eq.${currentUser.id},user2.eq.${currentUser.id}`);
-  if(error){ console.error(error); return; }
-  const list=document.getElementById('chat-list'); list.innerHTML='';
-  data.forEach(chat=>{
-    const otherId=chat.user1===currentUser.id?chat.user2:chat.user1;
-    const otherName=chat.profiles.find(p=>p.id===otherId)?.username||"Unknown";
-    const div=document.createElement('div');
-    div.className='chat-item';
-    div.innerHTML=`<span>${otherName}</span>`;
-    div.onclick=()=>openChat(chat.id, otherName);
-    list.appendChild(div);
+  renderChatList(data||[]);
+}
+
+function renderChatList(chats){
+  const list=document.getElementById('chat-list');
+  list.innerHTML="";
+  chats.forEach(c=>{
+    let otherId=(c.user1===currentUser.id)?c.user2:c.user1;
+    let item=document.createElement('div');
+    item.className='chat-item';
+    item.innerText=c.id===`fav-${currentUser.id}`?'Избранное':otherId;
+    item.onclick=()=>openChat(c);
+    list.appendChild(item);
   });
 }
-async function newChatPrompt(){
-  const uname=prompt("Введите username");
-  if(!uname) return;
-  if(!currentUser) return;
-  const { data:user } = await supabase.from('profiles').select('*').eq('username',uname).single();
-  if(!user){ alert("Пользователь не найден"); return; }
-  if(user.id===currentUser.id){ alert("Это вы!"); return; }
-  const { data:existing } = await supabase.from('chats')
-    .select('*')
-    .or(`and(user1.eq.${currentUser.id},user2.eq.${user.id}),and(user1.eq.${user.id},user2.eq.${currentUser.id})`)
-    .maybeSingle();
-  let chatId;
-  if(existing){ chatId=existing.id; }
-  else {
-    const { data:newChat } = await supabase.from('chats').insert([{ user1:currentUser.id, user2:user.id }]).select().single();
-    chatId=newChat.id;
-  }
-  loadChats(); // обновим список
-  openChat(chatId, user.username);
+
+function showSettings(){
+  document.getElementById('user-info').innerText="Ваш ID: "+currentUser.id;
+  showScreen('settings-screen');
 }
-async function openChat(chatId, otherName){
-  currentChat=chatId;
-  document.getElementById('chat-username').innerText=otherName;
+function showNewChat(){ showScreen('newchat-screen'); }
+function backToChats(){ showScreen('chat-screen'); }
+
+async function createChat(){
+  const uname=document.getElementById('newchat-username').value.trim();
+  if(!uname)return;
+  if(uname===currentUser.email){alert("Нельзя создать чат с самим собой");return;}
+  // проверка существует ли чат
+  const {data:users}=await supabase.from('profiles').select('id').eq('username',uname);
+  if(!users||users.length===0){alert("Пользователь не найден");return;}
+  const other=users[0].id;
+  let {data:existing}=await supabase.from('chats')
+    .select('*')
+    .or(`and(user1.eq.${currentUser.id},user2.eq.${other}),and(user1.eq.${other},user2.eq.${currentUser.id})`);
+  if(existing&&existing.length){alert("Чат уже существует");return;}
+  await supabase.from('chats').insert([{user1:currentUser.id,user2:other}]);
+  loadChats();
   showScreen('chat-screen');
-  loadMessages();
-  if(msgSubscription) supabase.removeChannel(msgSubscription);
-  msgSubscription = supabase.channel('room-'+chatId)
-    .on('postgres_changes',{event:'INSERT', schema:'public', table:'messages', filter:`chat_id=eq.${chatId}`}, payload=>renderMessage(payload.new))
-    .on('postgres_changes',{event:'UPDATE', schema:'public', table:'messages', filter:`chat_id=eq.${chatId}`}, payload=>renderMessage(payload.new))
-    .subscribe();
 }
-async function loadMessages(){
-  const { data } = await supabase.from('messages')
-    .select('*')
-    .eq('chat_id', currentChat)
-    .order('created_at',{ascending:true});
-  const box=document.getElementById('messages'); box.innerHTML='';
-  data.forEach(renderMessage);
+
+async function openChat(chat){
+  currentChat=chat;
+  document.getElementById('messages').innerHTML="";
+  showScreen('messages-screen');
+  loadMessages(chat.id);
+  subscribeMessages(chat.id);
 }
+
+async function loadMessages(chatId){
+  const {data}=await supabase.from('messages').select('*').eq('chat',chatId).order('created_at',{ascending:true});
+  (data||[]).forEach(renderMessage);
+}
+
 function renderMessage(msg){
   const box=document.getElementById('messages');
   let div=document.getElementById('msg-'+msg.id);
@@ -272,46 +246,74 @@ function renderMessage(msg){
     div=document.createElement('div');
     div.id='msg-'+msg.id;
     div.className='msg '+(msg.sender===currentUser.id?'me':'other');
-    div.oncontextmenu=(e)=>{ e.preventDefault(); showContextMenu(e,msg.id,msg.sender); };
+    div.oncontextmenu=(e)=>{e.preventDefault();showContextMenu(e,msg.id,msg.sender);};
     let pressTimer;
-    div.addEventListener("touchstart", e=>{
-      pressTimer=setTimeout(()=>showContextMenu(e.touches[0], msg.id, msg.sender),600);
+    div.addEventListener("touchstart",(e)=>{
+      pressTimer=setTimeout(()=>showContextMenu(e.touches[0],msg.id,msg.sender),600);
     });
-    div.addEventListener("touchend", ()=>clearTimeout(pressTimer));
+    div.addEventListener("touchend",()=>clearTimeout(pressTimer));
     box.appendChild(div);
   }
-  if(msg.is_deleted){ div.className='msg deleted'; div.innerText='Сообщение удалено'; }
-  else { div.innerText=msg.content; }
+  if(msg.is_deleted){
+    div.className='msg deleted';
+    div.innerText='Сообщение удалено';
+  }else{
+    div.innerText=msg.content;
+  }
   box.scrollTop=box.scrollHeight;
 }
-document.addEventListener("keydown", function(e){
-  if(e.target.id==="msg-input"){ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); sendMessage(); } }
-});
+
 async function sendMessage(){
-  const input=document.getElementById('msg-input'); const text=input.value.trim();
-  if(!text) return;
-  await supabase.from('messages').insert([{ chat_id:currentChat, sender:currentUser.id, content:text }]);
-  input.value='';
+  if(!currentChat)return;
+  const input=document.getElementById('msg-input');
+  let text=input.value.trim();
+  if(!text)return;
+  input.value="";
+  await supabase.from('messages').insert([{chat:currentChat.id,sender:currentUser.id,content:text}]);
 }
+
+function subscribeMessages(chatId){
+  supabase.channel('msgs'+chatId)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`chat=eq.${chatId}`},payload=>renderMessage(payload.new))
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'messages',filter:`chat=eq.${chatId}`},payload=>renderMessage(payload.new))
+    .subscribe();
+}
+
 function showContextMenu(e,msgId,senderId){
-  selectedMessageId=msgId; selectedMessageSender=senderId;
+  selectedMessageId=msgId;
+  selectedMessageSender=senderId;
   const menu=document.getElementById('context-menu');
   const deleteBtn=document.getElementById('delete-btn');
-  if(senderId!==currentUser.id){ deleteBtn.style.display="none"; } else { deleteBtn.style.display="block"; }
-  menu.style.left=e.pageX+'px'; menu.style.top=e.pageY+'px'; menu.style.display='flex';
+  if(senderId!==currentUser.id){
+    deleteBtn.style.display="none";
+  }else{
+    deleteBtn.style.display="block";
+  }
+  menu.style.left=e.pageX+'px';
+  menu.style.top=e.pageY+'px';
+  menu.style.display='flex';
 }
-window.onclick=()=>{ document.getElementById('context-menu').style.display='none'; };
+window.onclick=()=>{document.getElementById('context-menu').style.display='none';};
+
 async function confirmDelete(){
-  if(!selectedMessageId) return;
-  await supabase.from('messages').update({is_deleted:true}).eq('id',selectedMessageId).eq('sender',currentUser.id);
+  if(!selectedMessageId)return;
+  await supabase.from('messages')
+    .update({is_deleted:true})
+    .eq('id',selectedMessageId)
+    .eq('sender',currentUser.id);
   selectedMessageId=null;
 }
+
 function copyMessage(){
-  if(!selectedMessageId) return;
+  if(!selectedMessageId)return;
   const el=document.getElementById('msg-'+selectedMessageId);
-  if(el){ navigator.clipboard.writeText(el.innerText); }
+  if(el){
+    navigator.clipboard.writeText(el.innerText);
+  }
   selectedMessageId=null;
 }
+
+afterLogin();
 </script>
 </body>
 </html>
