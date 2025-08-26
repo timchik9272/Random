@@ -47,7 +47,7 @@
     nav { display:flex; justify-content:space-between; align-items:center; padding:10px 0; }
     nav button { width:auto; padding:10px 16px; font-size:14px; }
 
-    /* Новое оформление ввода */
+    /* Ввод сообщения */
     .input-box {
       display:flex; align-items:flex-end; gap:8px; padding:8px 0;
     }
@@ -70,10 +70,67 @@
       cursor:pointer;
     }
     .send-btn i { margin:0; }
+
+    /* Меню удаления */
+    .context-menu {
+      position:absolute;
+      background:var(--bg-light);
+      border:1px solid #333;
+      border-radius:8px;
+      display:none;
+      flex-direction:column;
+      z-index:1000;
+    }
+    .context-menu button {
+      background:none; border:none; color:var(--text);
+      padding:8px 12px; text-align:left; width:100%;
+    }
+    .context-menu button:hover { background:#222; }
   </style>
 </head>
 <body>
-  <!-- CHAT -->
+  <!-- Вход -->
+  <div id="login-screen" class="screen active">
+    <h2>Вход</h2>
+    <input id="login-email" placeholder="Email">
+    <input id="login-password" type="password" placeholder="Пароль">
+    <button onclick="signIn()">Войти</button>
+    <button style="background:var(--bg-light)" onclick="showRegister()">Создать аккаунт</button>
+  </div>
+
+  <!-- Регистрация -->
+  <div id="register-screen" class="screen">
+    <h2>Регистрация</h2>
+    <input id="reg-email" placeholder="Email">
+    <input id="reg-password" type="password" placeholder="Пароль">
+    <input id="reg-username" placeholder="Username (уникальный)">
+    <button onclick="signUp()">Зарегистрироваться</button>
+    <button style="background:var(--bg-light)" onclick="showLogin()">Назад</button>
+  </div>
+
+  <!-- Главный экран -->
+  <div id="main-screen" class="screen">
+    <nav>
+      <h2>Чаты</h2>
+      <div>
+        <button onclick="openSearch()"><i class="fa fa-plus"></i></button>
+        <button onclick="openSettings()"><i class="fa fa-gear"></i></button>
+      </div>
+    </nav>
+    <div class="chat-list" id="chat-list"></div>
+  </div>
+
+  <!-- Новый чат -->
+  <div id="search-screen" class="screen">
+    <nav>
+      <button onclick="backToMain()"><i class="fa fa-arrow-left"></i></button>
+      <h2>Новый чат</h2>
+    </nav>
+    <input id="search-username" placeholder="Введите username">
+    <button onclick="searchUser()">Создать чат</button>
+  </div>
+
+  <!-- Чат -->
   <div id="chat-screen" class="screen">
     <nav>
       <button onclick="backToMain()"><i class="fa fa-arrow-left"></i></button>
@@ -86,24 +143,203 @@
     </div>
   </div>
 
-<script>
-  // 🎯 Отправка по Enter, новая строка по Shift+Enter
-  document.addEventListener("keydown", function(e){
-    if(e.target.id==="msg-input"){
-      if(e.key==="Enter" && !e.shiftKey){
-        e.preventDefault();
-        sendMessage();
-      }
-    }
-  });
+  <!-- Настройки -->
+  <div id="settings-screen" class="screen">
+    <nav>
+      <button onclick="backToMain()"><i class="fa fa-arrow-left"></i></button>
+      <h2>Настройки</h2>
+    </nav>
+    <div id="profile-info"></div>
+    <button onclick="deleteAccount()" style="background:#c00">Удалить аккаунт</button>
+    <button onclick="logout()" style="background:var(--bg-light)">Выйти</button>
+  </div>
 
-  async function sendMessage(){
-    const input=document.getElementById('msg-input');
-    const text=input.value.trim();
-    if(!text) return;
-    await supabase.from('messages').insert([{ chat_id:currentChat, sender:currentUser.id, content:text }]);
-    input.value='';
+  <!-- Контекстное меню -->
+  <div id="context-menu" class="context-menu">
+    <button onclick="confirmDelete()">Удалить сообщение</button>
+  </div>
+
+<script>
+const supabase = window.supabase.createClient(
+  "https://zmewwzlzujsrhstjehrp.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24"
+);
+
+let currentUser = null;
+let currentChat = null;
+let msgSubscription = null;
+let chatSubscription = null;
+let selectedMessageId = null;
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function showLogin(){ showScreen('login-screen'); }
+function showRegister(){ showScreen('register-screen'); }
+function showMain(){ loadChats(); showScreen('main-screen'); }
+function openSettings(){ loadProfile(); showScreen('settings-screen'); }
+function openSearch(){ showScreen('search-screen'); }
+function backToMain(){
+  if(msgSubscription) supabase.removeChannel(msgSubscription);
+  showMain();
+}
+
+async function signUp(){
+  const email=document.getElementById('reg-email').value;
+  const password=document.getElementById('reg-password').value;
+  const username=document.getElementById('reg-username').value;
+  const { data, error } = await supabase.auth.signUp({ email, password, options:{ data:{username} }});
+  if(error){ alert(error.message); return; }
+  await supabase.from('profiles').insert([{ id:data.user.id, email, username }]);
+  // избранное
+  await supabase.from('chats').insert([{ user1:data.user.id, user2:data.user.id }]);
+  alert("Подтвердите email и войдите");
+  showLogin();
+}
+
+async function signIn(){
+  const email=document.getElementById('login-email').value;
+  const password=document.getElementById('login-password').value;
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if(error){ alert(error.message); return; }
+  if(!data.user.email_confirmed_at){ alert("Сначала подтвердите email!"); return; }
+  currentUser=data.user;
+  showMain();
+  subscribeChats();
+}
+
+async function logout(){
+  await supabase.auth.signOut();
+  currentUser=null;
+  showLogin();
+}
+
+async function loadProfile(){
+  const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+  document.getElementById('profile-info').innerText=`Username: ${data.username}\nEmail: ${data.email}`;
+}
+
+async function deleteAccount(){
+  await supabase.from('profiles').delete().eq('id', currentUser.id);
+  logout();
+}
+
+async function loadChats(){
+  const { data: chats, error } = await supabase
+    .from('chats')
+    .select('*')
+    .or(`user1.eq.${currentUser.id},user2.eq.${currentUser.id}`);
+  if(error) return console.error(error);
+
+  const list=document.getElementById('chat-list');
+  list.innerHTML='';
+  for(const chat of chats){
+    let chatName="Неизвестно";
+    if(chat.user1===chat.user2 && chat.user1===currentUser.id){
+      chatName="Избранное";
+    } else {
+      const otherId = chat.user1===currentUser.id?chat.user2:chat.user1;
+      const { data: profile } = await supabase.from('profiles').select('username').eq('id', otherId).single();
+      if(profile) chatName=profile.username;
+    }
+    const div=document.createElement('div');
+    div.className='chat-item';
+    div.innerHTML=`<span>${chatName}</span>`;
+    div.onclick=()=>openChat(chat.id, chatName);
+    list.appendChild(div);
   }
+}
+
+function subscribeChats(){
+  if(chatSubscription) supabase.removeChannel(chatSubscription);
+  chatSubscription=supabase.channel('chats-realtime')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'chats'},()=>loadChats())
+    .subscribe();
+}
+
+async function searchUser(){
+  const uname=document.getElementById('search-username').value.trim();
+  if(!uname) return;
+  const { data: user } = await supabase.from('profiles').select('*').eq('username', uname).single();
+  if(!user){ alert("Не найден"); return; }
+  if(user.id===currentUser.id){ alert("Нельзя создать чат с самим собой"); return; }
+  const { data: existing } = await supabase.from('chats')
+    .select('*')
+    .or(`and(user1.eq.${currentUser.id},user2.eq.${user.id}),and(user1.eq.${user.id},user2.eq.${currentUser.id})`)
+    .maybeSingle();
+  let chatId;
+  if(existing){ chatId=existing.id; }
+  else {
+    const { data:newChat } = await supabase.from('chats').insert([{ user1:currentUser.id, user2:user.id }]).select().single();
+    chatId=newChat.id;
+  }
+  backToMain();
+}
+
+async function openChat(chatId, otherName){
+  currentChat=chatId;
+  document.getElementById('chat-username').innerText=otherName;
+  showScreen('chat-screen');
+  loadMessages();
+
+  if(msgSubscription) supabase.removeChannel(msgSubscription);
+  msgSubscription=supabase.channel('room-'+chatId)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`chat_id=eq.${chatId}`},payload=>renderMessage(payload.new))
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'messages',filter:`chat_id=eq.${chatId}`},payload=>renderMessage(payload.new))
+    .subscribe();
+}
+
+async function loadMessages(){
+  const { data } = await supabase.from('messages').select('*').eq('chat_id', currentChat).order('created_at',{ascending:true});
+  const box=document.getElementById('messages');
+  box.innerHTML='';
+  data.forEach(renderMessage);
+}
+
+function renderMessage(msg){
+  const box=document.getElementById('messages');
+  let div=document.getElementById('msg-'+msg.id);
+  if(!div){
+    div=document.createElement('div');
+    div.id='msg-'+msg.id;
+    div.className='msg '+(msg.sender===currentUser.id?'me':'other');
+    if(msg.sender===currentUser.id) {
+      div.oncontextmenu=(e)=>{ e.preventDefault(); showContextMenu(e,msg.id); };
+    }
+    box.appendChild(div);
+  }
+  if(msg.is_deleted){
+    div.className='msg deleted';
+    div.innerText='Сообщение удалено';
+  } else {
+    div.innerText=msg.content;
+  }
+  box.scrollTop=box.scrollHeight;
+}
+
+async function sendMessage(){
+  const input=document.getElementById('msg-input');
+  const text=input.value.trim();
+  if(!text) return;
+  await supabase.from('messages').insert([{ chat_id:currentChat, sender:currentUser.id, content:text }]);
+  input.value='';
+}
+
+function showContextMenu(e,msgId){
+  selectedMessageId=msgId;
+  const menu=document.getElementById('context-menu');
+  menu.style.left=e.pageX+'px';
+  menu.style.top=e.pageY+'px';
+  menu.style.display='flex';
+}
+window.onclick=()=>{ document.getElementById('context-menu').style.display='none'; }
+
+async function confirmDelete(){
+  if(!selectedMessageId) return;
+  await supabase.from('messages').update({ is_deleted:true }).eq('id', selectedMessageId).eq('sender', currentUser.id);
+  selectedMessageId=null;
+}
 </script>
 </body>
 </html>
