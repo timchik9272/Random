@@ -2,113 +2,72 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>P2P звонок через текст-коды</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WebRTC P2P звонок</title>
   <style>
-    body { font-family: sans-serif; background:#111; color:#eee; text-align:center; margin:0; padding:10px; }
-    h2 { margin: 15px 0; }
-    video { width:90%; max-width:400px; margin:10px; border-radius:12px; background:#000; }
-    button, select, textarea, input { margin:8px; padding:12px; font-size:14px; border-radius:10px; border:none; }
-    button { background:#444; color:white; cursor:pointer; }
-    button:hover { background:#666; }
-    textarea { width:90%; height:120px; font-family:monospace; }
+    body { font-family: sans-serif; text-align: center; }
+    textarea { width: 90%; height: 100px; margin: 5px; }
+    video { width: 45%; margin: 5px; border-radius: 10px; }
+    #videos { display: flex; justify-content: center; }
   </style>
 </head>
 <body>
-  <h2>📞 P2P звонок через текст-коды</h2>
+  <h2>WebRTC звонок (без сервера)</h2>
 
-  <select id="mode">
-    <option value="videoaudio">Видео + Звук</option>
-    <option value="video">Только видео</option>
-    <option value="audio">Только звук</option>
-  </select>
+  <div id="videos">
+    <video id="localVideo" autoplay playsinline muted></video>
+    <video id="remoteVideo" autoplay playsinline></video>
+  </div>
+
+  <button id="createOffer">Создать оффер</button>
+  <button id="createAnswer">Создать ансуер</button>
   <br>
-  <button id="createOffer">Создать звонок</button>
-
-  <h3>📤 Мой код:</h3>
-  <textarea id="myCode" readonly></textarea>
-  <button onclick="copyCode()">📋 Копировать</button>
-
-  <h3>📥 Вставьте код собеседника:</h3>
-  <textarea id="otherCode"></textarea>
-  <button id="applyCode">✅ Применить</button>
-
-  <video id="localVideo" autoplay playsinline muted></video>
-  <video id="remoteVideo" autoplay playsinline></video>
+  <textarea id="localData" placeholder="Здесь появятся данные"></textarea>
+  <textarea id="remoteData" placeholder="Вставь сюда данные от собеседника"></textarea>
+  <button id="applyRemote">Применить удалённые данные</button>
 
   <script>
-    let pc, localStream;
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+    });
+
     const localVideo = document.getElementById("localVideo");
     const remoteVideo = document.getElementById("remoteVideo");
-    const myCode = document.getElementById("myCode");
-    const otherCode = document.getElementById("otherCode");
+    const localData = document.getElementById("localData");
+    const remoteData = document.getElementById("remoteData");
 
-    function encode(obj) {
-      return btoa(JSON.stringify(obj));
-    }
-    function decode(str) {
-      return JSON.parse(atob(str));
-    }
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      .then(stream => {
+        localVideo.srcObject = stream;
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      });
 
-    async function initConnection() {
-      pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
-      pc.ontrack = e => remoteVideo.srcObject = e.streams[0];
+    pc.ontrack = event => {
+      remoteVideo.srcObject = event.streams[0];
+    };
 
-      const mode = document.getElementById("mode").value;
-      let constraints = {};
-      if (mode === "videoaudio") constraints = { video:true, audio:true };
-      if (mode === "video") constraints = { video:true, audio:false };
-      if (mode === "audio") constraints = { video:false, audio:true };
-
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia(constraints);
-        localVideo.srcObject = localStream;
-        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-      } catch (e) {
-        alert("Ошибка доступа к камере/микрофону: " + e);
-      }
-    }
+    // ICE-кандидаты автоматически добавляем в локальные данные
+    pc.onicecandidate = () => {
+      localData.value = JSON.stringify(pc.localDescription);
+    };
 
     document.getElementById("createOffer").onclick = async () => {
-      await initConnection();
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-
-      pc.onicegatheringstatechange = () => {
-        if (pc.iceGatheringState === "complete") {
-          myCode.value = encode(pc.localDescription);
-        }
-      };
+      localData.value = JSON.stringify(offer);
     };
 
-    document.getElementById("applyCode").onclick = async () => {
-      const dataStr = otherCode.value.trim();
-      if (!dataStr) return;
-      try {
-        const data = decode(dataStr);
-        if (data.type === "offer") {
-          await initConnection();
-          await pc.setRemoteDescription(new RTCSessionDescription(data));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          pc.onicegatheringstatechange = () => {
-            if (pc.iceGatheringState === "complete") {
-              myCode.value = encode(pc.localDescription);
-            }
-          };
-        } else if (data.type === "answer") {
-          await pc.setRemoteDescription(new RTCSessionDescription(data));
-        }
-      } catch(e) {
-        alert("Неверный код: " + e);
-      }
+    document.getElementById("createAnswer").onclick = async () => {
+      const offer = JSON.parse(remoteData.value);
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      localData.value = JSON.stringify(answer);
     };
 
-    function copyCode() {
-      myCode.select();
-      document.execCommand("copy");
-      alert("Код скопирован!");
-    }
+    document.getElementById("applyRemote").onclick = async () => {
+      const answer = JSON.parse(remoteData.value);
+      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+    };
   </script>
 </body>
 </html>
