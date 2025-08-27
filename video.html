@@ -9,7 +9,7 @@
     h2 { margin: 15px 0; }
     video { width:90%; max-width:400px; margin:10px; border-radius:12px; background:#000; }
     button, select { margin:8px; padding:12px 20px; font-size:16px; border:none; border-radius:10px; }
-    button { background:#444; color:white; }
+    button { background:#444; color:white; cursor:pointer; }
     button:hover { background:#666; }
     canvas { margin:10px auto; background:white; padding:10px; border-radius:12px; }
     #qrBox img { max-width: 80%; margin: 10px auto; display:block; }
@@ -67,7 +67,6 @@
     async function initConnection() {
       pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
       pc.ontrack = e => remoteVideo.srcObject = e.streams[0];
-      pc.onicecandidate = () => { if (pc.localDescription) showQR(encode(pc.localDescription)); };
 
       const mode = document.getElementById("mode").value;
       let constraints = {};
@@ -90,6 +89,13 @@
       await initConnection();
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
+
+      // Ждём окончания сбора ICE-кандидатов
+      pc.onicegatheringstatechange = () => {
+        if (pc.iceGatheringState === "complete") {
+          showQR(encode(pc.localDescription));
+        }
+      };
     };
 
     // Запуск сканера
@@ -142,6 +148,13 @@
           await pc.setRemoteDescription(new RTCSessionDescription(data));
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
+
+          pc.onicegatheringstatechange = () => {
+            if (pc.iceGatheringState === "complete") {
+              showQR(encode(pc.localDescription));
+            }
+          };
+
         } else if (data.type === "answer") {
           await pc.setRemoteDescription(new RTCSessionDescription(data));
         }
