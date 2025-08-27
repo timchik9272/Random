@@ -2,72 +2,135 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>WebRTC P2P звонок</title>
+  <title>P2P звонок через QR (онлайн сканер)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: sans-serif; text-align: center; }
-    textarea { width: 90%; height: 100px; margin: 5px; }
-    video { width: 45%; margin: 5px; border-radius: 10px; }
-    #videos { display: flex; justify-content: center; }
+    body { font-family: sans-serif; background:#111; color:#eee; text-align:center; margin:0; }
+    h2 { margin: 15px 0; }
+    video { width:90%; max-width:400px; margin:10px; border-radius:12px; background:#000; }
+    button, select { margin:8px; padding:12px 20px; font-size:16px; border:none; border-radius:10px; }
+    button { background:#444; color:white; }
+    button:hover { background:#666; }
+    canvas { margin:10px auto; background:white; padding:10px; border-radius:12px; }
+    #qrBox img { max-width: 80%; margin: 10px auto; display:block; }
+    #scanView { display:none; }
+    #scanCam { width:100%; max-width:400px; border-radius:12px; }
   </style>
 </head>
 <body>
-  <h2>WebRTC звонок (без сервера)</h2>
+  <h2>📞 P2P звонок через QR</h2>
 
-  <div id="videos">
-    <video id="localVideo" autoplay playsinline muted></video>
-    <video id="remoteVideo" autoplay playsinline></video>
+  <select id="mode">
+    <option value="videoaudio">Видео + Звук</option>
+    <option value="video">Только видео</option>
+    <option value="audio">Только звук</option>
+  </select>
+  <br>
+  <button id="createOffer">Создать звонок</button>
+  <button id="scanQR">Сканировать QR</button>
+
+  <div id="qrBox"></div>
+
+  <div id="scanView">
+    <p>Наведите камеру на QR-код собеседника:</p>
+    <video id="scanCam" autoplay playsinline></video>
+    <canvas id="scanCanvas" hidden></canvas>
   </div>
 
-  <button id="createOffer">Создать оффер</button>
-  <button id="createAnswer">Создать ансуер</button>
-  <br>
-  <textarea id="localData" placeholder="Здесь появятся данные"></textarea>
-  <textarea id="remoteData" placeholder="Вставь сюда данные от собеседника"></textarea>
-  <button id="applyRemote">Применить удалённые данные</button>
+  <video id="localVideo" autoplay playsinline muted></video>
+  <video id="remoteVideo" autoplay playsinline></video>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"></script>
   <script>
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-    });
-
+    let pc, localStream;
     const localVideo = document.getElementById("localVideo");
     const remoteVideo = document.getElementById("remoteVideo");
-    const localData = document.getElementById("localData");
-    const remoteData = document.getElementById("remoteData");
+    const qrBox = document.getElementById("qrBox");
 
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      .then(stream => {
-        localVideo.srcObject = stream;
-        stream.getTracks().forEach(track => pc.addTrack(track, stream));
-      });
+    function encode(obj) {
+      return btoa(JSON.stringify(obj));
+    }
+    function decode(str) {
+      return JSON.parse(atob(str));
+    }
+    function showQR(data) {
+      qrBox.innerHTML = "";
+      const qr = qrcode(0, "M");
+      qr.addData(data);
+      qr.make();
+      qrBox.innerHTML = qr.createImgTag(6);
+    }
 
-    pc.ontrack = event => {
-      remoteVideo.srcObject = event.streams[0];
-    };
+    async function initConnection() {
+      pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+      pc.ontrack = e => remoteVideo.srcObject = e.streams[0];
+      pc.onicecandidate = () => { if (pc.localDescription) showQR(encode(pc.localDescription)); };
 
-    // ICE-кандидаты автоматически добавляем в локальные данные
-    pc.onicecandidate = () => {
-      localData.value = JSON.stringify(pc.localDescription);
-    };
+      const mode = document.getElementById("mode").value;
+      let constraints = {};
+      if (mode === "videoaudio") constraints = { video:true, audio:true };
+      if (mode === "video") constraints = { video:true, audio:false };
+      if (mode === "audio") constraints = { video:false, audio:true };
+
+      localStream = await navigator.mediaDevices.getUserMedia(constraints);
+      localVideo.srcObject = localStream;
+      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    }
 
     document.getElementById("createOffer").onclick = async () => {
+      await initConnection();
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      localData.value = JSON.stringify(offer);
     };
 
-    document.getElementById("createAnswer").onclick = async () => {
-      const offer = JSON.parse(remoteData.value);
-      await pc.setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      localData.value = JSON.stringify(answer);
+    document.getElementById("scanQR").onclick = async () => {
+      document.getElementById("scanView").style.display = "block";
+      const cam = document.getElementById("scanCam");
+      const stream = await navigator.mediaDevices.getUserMedia({ video:{facingMode:"environment"} });
+      cam.srcObject = stream;
+      scanLoop();
     };
 
-    document.getElementById("applyRemote").onclick = async () => {
-      const answer = JSON.parse(remoteData.value);
-      await pc.setRemoteDescription(new RTCSessionDescription(answer));
-    };
+    async function scanLoop() {
+      const video = document.getElementById("scanCam");
+      const canvas = document.getElementById("scanCanvas");
+      const ctx = canvas.getContext("2d");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0,0,canvas.width,canvas.height);
+      const code = jsQR(imageData.data, canvas.width, canvas.height);
+      if (code) {
+        handleQR(code.data);
+        stopScan();
+        return;
+      }
+      requestAnimationFrame(scanLoop);
+    }
+
+    function stopScan() {
+      const video = document.getElementById("scanCam");
+      const stream = video.srcObject;
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      document.getElementById("scanView").style.display = "none";
+    }
+
+    async function handleQR(dataStr) {
+      try {
+        const data = decode(dataStr);
+        if (data.type === "offer") {
+          await initConnection();
+          await pc.setRemoteDescription(new RTCSessionDescription(data));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+        } else if (data.type === "answer") {
+          await pc.setRemoteDescription(new RTCSessionDescription(data));
+        }
+      } catch(e) {
+        alert("Ошибка при разборе QR");
+      }
+    }
   </script>
 </body>
 </html>
