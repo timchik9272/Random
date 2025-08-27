@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>P2P звонок через QR (онлайн сканер)</title>
+  <title>P2P звонок через QR (2 скана)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body { font-family: sans-serif; background:#111; color:#eee; text-align:center; margin:0; }
@@ -40,8 +40,10 @@
   <video id="localVideo" autoplay playsinline muted></video>
   <video id="remoteVideo" autoplay playsinline></video>
 
+  <!-- QR код + сканер -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"></script>
+
   <script>
     let pc, localStream;
     const localVideo = document.getElementById("localVideo");
@@ -73,25 +75,40 @@
       if (mode === "video") constraints = { video:true, audio:false };
       if (mode === "audio") constraints = { video:false, audio:true };
 
-      localStream = await navigator.mediaDevices.getUserMedia(constraints);
-      localVideo.srcObject = localStream;
-      localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        localVideo.srcObject = localStream;
+        await localVideo.play();
+        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+      } catch (e) {
+        alert("Ошибка доступа к камере/микрофону: " + e);
+      }
     }
 
+    // Создание оффера
     document.getElementById("createOffer").onclick = async () => {
       await initConnection();
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
     };
 
+    // Запуск сканера
     document.getElementById("scanQR").onclick = async () => {
       document.getElementById("scanView").style.display = "block";
       const cam = document.getElementById("scanCam");
-      const stream = await navigator.mediaDevices.getUserMedia({ video:{facingMode:"environment"} });
-      cam.srcObject = stream;
-      scanLoop();
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video:{facingMode:"environment"} });
+        cam.srcObject = stream;
+        cam.onloadedmetadata = () => {
+          cam.play();
+          scanLoop();
+        };
+      } catch (e) {
+        alert("Ошибка доступа к камере: " + e);
+      }
     };
 
+    // Сканирование QR
     async function scanLoop() {
       const video = document.getElementById("scanCam");
       const canvas = document.getElementById("scanCanvas");
@@ -116,6 +133,7 @@
       document.getElementById("scanView").style.display = "none";
     }
 
+    // Обработка QR
     async function handleQR(dataStr) {
       try {
         const data = decode(dataStr);
@@ -128,7 +146,7 @@
           await pc.setRemoteDescription(new RTCSessionDescription(data));
         }
       } catch(e) {
-        alert("Ошибка при разборе QR");
+        alert("Ошибка при разборе QR: " + e);
       }
     }
   </script>
