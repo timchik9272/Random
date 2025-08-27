@@ -114,16 +114,13 @@ img.msg-img { max-width:100%; border-radius:var(--radius); margin-top:4px; }
 
 <!-- Контекстное меню -->
 <div id="context-menu" class="context-menu">
-  <button id="copy-btn" onclick="copyMessage()">Копировать</button>
-  <button id="delete-btn" onclick="confirmDelete()">Удалить</button>
-  <button id="reply-btn" onclick="replyMessage()">Ответить</button>
+  <button id="copy-btn" onclick="copyMessage()">Копировать сообщение</button>
+  <button id="delete-btn" onclick="confirmDelete()">Удалить сообщение</button>
+  <button id="reply-btn" onclick="replyMessage()">Ответить на сообщение</button>
 </div>
 
 <script>
-const supabase = window.supabase.createClient(
-  "https://zmewwzlzujsrhstjehrp.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6Ikp..."
-);
+const supabase = window.supabase.createClient( "https://zmewwzlzujsrhstjehrp.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24" );
 uploadcare.start({ publicKey:"c12f2c3e134f56024db8" });
 
 let currentUser=null,currentChat=null,msgSubscription=null,chatSubscription=null;
