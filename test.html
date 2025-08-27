@@ -14,13 +14,13 @@
     .active{display:flex;}
     input,button,textarea{border:none;border-radius:var(--radius);font-size:16px;}
     input,textarea{background:var(--bg-light);color:var(--text);padding:12px;}
-    button{background:var(--accent);color:#fff;padding:10px 14px;font-weight:bold;margin:6px 0;}
+    button{background:var(--accent);color:#fff;padding:12px;font-weight:bold;margin:6px 0;min-width:60px;}
     nav{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--bg);position:sticky;top:0;z-index:10;border-bottom:1px solid #222;}
     nav h2{margin:0;font-size:18px;}
-    nav button{padding:6px 10px;border-radius:10px;font-size:14px;}
+    nav button{padding:6px 10px;border-radius:10px;font-size:13px;}
     .chat-list,.messages{flex:1;overflow-y:auto;}
     .chat-item{padding:14px;border-bottom:1px solid #222;cursor:pointer;display:flex;justify-content:space-between;align-items:center;}
-    .badge{background:red;color:#fff;border-radius:50%;padding:3px 7px;font-size:12px;min-width:20px;text-align:center;}
+    .badge{background:red;color:#fff;border-radius:50%;padding:4px 8px;font-size:12px;min-width:20px;text-align:center;}
     .msg{margin:6px 10px;padding:10px 14px;border-radius:var(--radius);max-width:75%;position:relative;border:1px solid #222;}
     .msg.me{background:var(--accent);margin-left:auto;}
     .msg.other{background:var(--bg-light);}
@@ -114,9 +114,10 @@ const supabase = window.supabase.createClient(
   "https://zmewwzlzujsrhstjehrp.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 );
+
 uploadcare.start({ publicKey:"c12f2c3e134f56024db8" });
 
-let currentUser=null,currentChat=null,msgSubscription=null,chatSubscription=null,selectedMessageId=null,selectedSender=null,selectedImageUrl=null,typingTimer=null;
+let currentUser=null,currentChat=null,msgSubscription=null,chatSubscription=null,selectedMessageId=null,selectedSender=null,selectedImageUrl=null;
 
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
 function showLogin(){showScreen('login-screen');}
@@ -126,80 +127,105 @@ function openSettings(){loadProfile();showScreen('settings-screen');}
 function openSearch(){showScreen('search-screen');}
 function backToMain(){if(msgSubscription)supabase.removeChannel(msgSubscription);showMain();}
 
-async function signUp(){/* ... тот же код ... */}
-async function signIn(){/* ... тот же код ... */}
-async function logout(){/* ... тот же код ... */}
-async function loadProfile(){/* ... тот же код ... */}
-async function deleteAccount(){/* ... тот же код ... */}
-
+async function signUp(){
+  const email=document.getElementById('reg-email').value;
+  const password=document.getElementById('reg-password').value;
+  const username=document.getElementById('reg-username').value;
+  const {data,error}=await supabase.auth.signUp({email,password});
+  if(error){alert(error.message);return;}
+  await supabase.from('profiles').insert([{id:data.user.id,username,status:'онлайн'}]);
+  currentUser=data.user;showMain();
+}
+async function signIn(){
+  const email=document.getElementById('login-email').value;
+  const password=document.getElementById('login-password').value;
+  const {data,error}=await supabase.auth.signInWithPassword({email,password});
+  if(error){alert(error.message);return;}
+  currentUser=data.user;
+  await supabase.from('profiles').update({status:"онлайн"}).eq('id',currentUser.id);
+  showMain();
+}
+async function logout(){
+  await supabase.from('profiles').update({status:`был(а) в ${new Date().toLocaleTimeString()}`}).eq('id',currentUser.id);
+  await supabase.auth.signOut();
+  currentUser=null;showLogin();
+}
+async function loadProfile(){
+  const {data:profile}=await supabase.from('profiles').select('*').eq('id',currentUser.id).single();
+  document.getElementById('profile-info').innerText=`Email: ${currentUser.email}\nUsername: ${profile.username}\nСтатус: ${profile.status}`;
+}
+async function deleteAccount(){
+  if(confirm("Удалить аккаунт?")){await supabase.from('profiles').delete().eq('id',currentUser.id);await supabase.auth.signOut();currentUser=null;showLogin();}
+}
+async function searchUser(){
+  const username=document.getElementById('search-username').value;
+  const {data:user}=await supabase.from('profiles').select('id').eq('username',username).single();
+  if(!user){alert("Не найден");return;}
+  const {data:chat}=await supabase.from('chats').insert([{user1:currentUser.id,user2:user.id}]).select().single();
+  openChat(chat.id,username);
+}
 async function loadChats(){
   const { data:chats }=await supabase.from('chats').select('*').or(`user1.eq.${currentUser.id},user2.eq.${currentUser.id}`);
   const list=document.getElementById('chat-list');list.innerHTML='';
   let enriched=[];
   for(const chat of chats){
-    let chatName="",otherId=null;
+    let chatName="";let otherId=null;
     if(chat.user1===chat.user2){chatName="Избранное";}
-    else{otherId=chat.user1===currentUser.id?chat.user2:chat.user1;
-      const { data:profile }=await supabase.from('profiles').select('username,status').eq('id',otherId).single();if(profile) chatName=profile.username;}
+    else{otherId=chat.user1===currentUser.id?chat.user2:chat.user1;const { data:profile }=await supabase.from('profiles').select('username,status').eq('id',otherId).single();if(profile)chatName=profile.username;}
     const { data:lastMsg }=await supabase.from('messages').select('*').eq('chat_id',chat.id).order('created_at',{ascending:false}).limit(1).maybeSingle();
     const { count:unread }=await supabase.from('messages').select('*',{count:"exact",head:true}).eq('chat_id',chat.id).eq('read',false).neq('sender',currentUser.id);
-    enriched.push({chat,chatName,unread,lastMsg});
+    enriched.push({chat,chatName,lastMsg,unread});
   }
   enriched.sort((a,b)=>new Date(b.lastMsg?.created_at||0)-new Date(a.lastMsg?.created_at||0));
   enriched.forEach(({chat,chatName,unread})=>{
-    const div=document.createElement('div');div.className='chat-item';
-    div.innerHTML=`<span>${chatName}</span>${unread?`<span class="badge">${unread}</span>`:""}`;
-    div.onclick=()=>openChat(chat.id,chatName);list.appendChild(div);
+    const div=document.createElement('div');div.className='chat-item';div.innerHTML=`<span>${chatName}</span>${unread?`<span class="badge">${unread}</span>`:""}`;div.onclick=()=>openChat(chat.id,chatName);list.appendChild(div);
   });
 }
-
 async function openChat(chatId,chatName){
-  currentChat=chatId;
-  document.getElementById('chat-username').innerText=chatName;
-  showScreen('chat-screen');
-  loadMessages();
-  if(msgSubscription)supabase.removeChannel(msgSubscription);
-  msgSubscription=supabase.channel('room-'+chatId)
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`chat_id=eq.${chatId}`},p=>{renderMessage(p.new,true);})
-    .subscribe();
+  currentChat=chatId;showScreen('chat-screen');document.getElementById('chat-username').innerText=chatName;
+  const {data:msgs}=await supabase.from('messages').select('*').eq('chat_id',chatId).order('created_at');
+  const cont=document.getElementById('messages');cont.innerHTML='';
+  let unreadAdded=false;
+  msgs.forEach(m=>{
+    if(!m.read&&m.sender!==currentUser.id&&!unreadAdded){cont.innerHTML+=`<div class="unread-line">Непрочитанные</div>`;unreadAdded=true;}
+    cont.appendChild(renderMessage(m));
+  });
+  cont.scrollTop=cont.scrollHeight;
   await supabase.from('messages').update({read:true}).eq('chat_id',chatId).neq('sender',currentUser.id);
 }
-
-async function loadMessages(){
-  const { data }=await supabase.from('messages').select('*').eq('chat_id',currentChat).order('created_at',{ascending:true});
-  const box=document.getElementById('messages');box.innerHTML='';
-  let firstUnreadIndex=data.findIndex(m=>!m.read&&m.sender!==currentUser.id);
-  data.forEach((m,i)=>{if(i===firstUnreadIndex) box.innerHTML+='<div class="unread-line">Непрочитанные</div>';renderMessage(m);});
-  box.scrollTop=box.scrollHeight;
-}
-function formatTime(ts){return new Date(ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});}
-function renderMessage(msg,scroll=false){
-  const box=document.getElementById('messages');
-  let div=document.getElementById('msg-'+msg.id);
-  if(!div){div=document.createElement('div');div.id='msg-'+msg.id;div.className='msg '+(msg.sender===currentUser.id?'me':'other');box.appendChild(div);}
-  if(msg.is_deleted){div.className='msg deleted';div.innerText='Сообщение удалено';}
-  else{
-    let html="";if(msg.content) html+=`<div>${msg.content}</div>`;if(msg.image_url) html+=`<img src="${msg.image_url}" class="msg-img">`;
-    let ticks="";if(msg.sender===currentUser.id){ticks=(msg.chat_id===currentUser.id?true:msg.read)?'<span class="ticks">✔✔</span>':'<span class="ticks">✔</span>';}
-    if(chatName==="Избранное") ticks='<span class="ticks">✔✔</span>';
-    html+=`<span class="time">${formatTime(msg.created_at)} ${ticks}</span>`;
-    div.innerHTML=html;
+function renderMessage(msg){
+  const div=document.createElement('div');div.className="msg "+(msg.sender===currentUser.id?"me":"other");
+  if(msg.deleted){div.classList.add('deleted');div.innerText="Удалено";return div;}
+  if(msg.text)div.innerText=msg.text;
+  if(msg.image_url){const img=document.createElement('img');img.src=msg.image_url;img.className="msg-img";div.appendChild(img);}
+  const time=document.createElement('span');time.className="time";time.innerText=new Date(msg.created_at).toLocaleTimeString();
+  if(msg.sender===currentUser.id){
+    if(currentChatName==="Избранное")time.innerHTML+=` <span class="ticks">✔✔</span>`;
+    else time.innerHTML+=msg.read?` <span class="ticks">✔✔</span>`:` <span class="ticks">✔</span>`;
   }
-  if(scroll) box.scrollTop=box.scrollHeight;
+  div.appendChild(time);
+  return div;
+}
+function chooseImage(){
+  const dialog=uploadcare.openDialog(null,{imagesOnly:true});
+  dialog.done(file=>{
+    file.done(info=>{
+      selectedImageUrl=info.cdnUrl;
+      const prev=document.getElementById('preview');prev.innerHTML=`<img src="${info.cdnUrl}">`;
+    });
+  });
 }
 async function sendMessage(){
-  const text=document.getElementById('msg-input').value.trim();
-  if(!text && !selectedImageUrl)return;
-  await supabase.from('messages').insert([{ chat_id:currentChat,sender:currentUser.id,content:text||null,image_url:selectedImageUrl }]);
-  document.getElementById('msg-input').value='';
-  selectedImageUrl=null;document.getElementById('preview').innerHTML='';
-  document.getElementById('messages').scrollTop=document.getElementById('messages').scrollHeight;
+  const text=document.getElementById('msg-input').value;
+  if(!text&&!selectedImageUrl)return;
+  const msg={chat_id:currentChat,sender:currentUser.id,text:text||null,image_url:selectedImageUrl,created_at:new Date().toISOString(),read:false};
+  await supabase.from('messages').insert([msg]);
+  document.getElementById('msg-input').value="";document.getElementById('preview').innerHTML="";selectedImageUrl=null;
+  const cont=document.getElementById('messages');cont.scrollTop=cont.scrollHeight;
   await supabase.from('messages').update({read:true}).eq('chat_id',currentChat).neq('sender',currentUser.id);
 }
 function sendTyping(){
-  clearTimeout(typingTimer);
-  supabase.from('profiles').update({typing:true}).eq('id',currentUser.id);
-  typingTimer=setTimeout(()=>supabase.from('profiles').update({typing:false}).eq('id',currentUser.id),1500);
+  supabase.from('messages').insert([{chat_id:currentChat,sender:currentUser.id,typing:true,created_at:new Date().toISOString()}]);
 }
 </script>
 </body>
