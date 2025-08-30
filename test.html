@@ -28,12 +28,12 @@ nav{display:flex;align-items:center;gap:12px;padding:8px;background:var(--bg);po
 .msg .reply-to{font-size:13px;color:var(--gray);margin-bottom:6px;border-left:2px solid var(--gray);padding-left:8px;cursor:pointer;display:block;}
 .time{display:block;font-size:12px;margin-top:6px;text-align:right;}
 .me .time{color:#fff;} .other .time{color:var(--gray);}
-img.msg-img{max-width:100%;border-radius:var(--radius);margin-top:6px;display:block;}
+img.msg-img,video.msg-video{max-width:100%;border-radius:var(--radius);margin-top:6px;display:block;cursor:pointer;}
 .input-box{display:flex;flex-direction:column;gap:6px;padding:8px;background:var(--bg);border-top:1px solid #222;position:sticky;bottom:0;}
 .input-row{display:flex;gap:6px;align-items:flex-end;}
 .input-box textarea{flex:1;min-height:44px;max-height:140px;padding:12px;border-radius:12px;resize:none;}
 .send-btn,.img-btn{width:44px;height:44px;border-radius:50%;display:flex;justify-content:center;align-items:center;font-size:16px;background:var(--accent);color:#fff;border:none;cursor:pointer;}
-#preview img{max-width:140px;border-radius:var(--radius);margin:6px;}
+#preview img,#preview video{max-width:140px;border-radius:var(--radius);margin:6px;cursor:pointer;}
 .context-menu{position:absolute;background:var(--bg-light);border:1px solid #333;border-radius:8px;display:none;flex-direction:column;z-index:1000;}
 .context-menu button{background:none;border:none;color:var(--text);padding:10px 14px;text-align:left;}
 .context-menu button:hover{background:#222;}
@@ -46,10 +46,11 @@ img.msg-img{max-width:100%;border-radius:var(--radius);margin-top:6px;display:bl
 .reply-preview .cancel{cursor:pointer;padding:6px;border-radius:8px;background:#222;}
 .reply-preview .cancel:hover{background:#333;}
 .reply-to:hover{background:rgba(255,255,255,0.02);border-radius:8px;padding:6px;}
-@media (max-width:520px){
-  .msg{max-width:86%;}
-  nav h2{font-size:16px;margin:0;}
-}
+.modal-bg{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:none;justify-content:center;align-items:center;z-index:2000;}
+.modal-content{position:relative;max-width:90%;max-height:90%;display:flex;flex-direction:column;align-items:center;}
+.modal-content img,.modal-content video{max-width:100%;max-height:80vh;border-radius:12px;}
+.modal-close{position:absolute;top:10px;right:10px;font-size:24px;color:#fff;cursor:pointer;}
+.modal-download{position:absolute;bottom:10px;right:10px;font-size:20px;color:#fff;cursor:pointer;background:#222;padding:6px;border-radius:6px;}
 </style>
 </head>
 <body>
@@ -115,7 +116,8 @@ img.msg-img{max-width:100%;border-radius:var(--radius);margin-top:6px;display:bl
   <div class="input-box">
     <div class="input-row">
       <textarea id="msg-input" placeholder="Сообщение..."></textarea>
-      <button class="img-btn" onclick="chooseImage()" title="Отправить картинку"><i class="fa fa-image"></i></button>
+      <button class="img-btn" onclick="chooseFile('image')" title="Отправить картинку"><i class="fa fa-image"></i></button>
+      <button class="img-btn" onclick="chooseFile('video')" title="Отправить видео"><i class="fa fa-video"></i></button>
       <button class="send-btn" onclick="sendMessage()" title="Отправить"><i class="fa fa-paper-plane"></i></button>
     </div>
   </div>
@@ -129,19 +131,32 @@ img.msg-img{max-width:100%;border-radius:var(--radius);margin-top:6px;display:bl
     <button onclick="logout()" style="background:var(--bg-light)">Выйти</button></div>
 </div>
 
+<!-- Контекстное меню -->
 <div id="context-menu" class="context-menu">
   <button onclick="copyMessage()">Копировать</button>
   <button onclick="confirmDelete()">Удалить</button>
   <button onclick="replyMessage()">Ответить</button>
 </div>
 
+<!-- Модальное окно для медиа -->
+<div class="modal-bg" id="media-modal">
+  <div class="modal-content">
+    <span class="modal-close" onclick="closeMediaModal()">&times;</span>
+    <a class="modal-download" id="media-download" href="#" download><i class="fa fa-download"></i></a>
+    <img id="modal-img" style="display:none;">
+    <video id="modal-video" style="display:none;" controls></video>
+  </div>
+</div>
+
 <script>
-// === Supabase / Uploadcare ===
-const supabase = window.supabase.createClient("https://zmewwzlzujsrhstjehrp.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24");
+const supabase = window.supabase.createClient(
+  "https://zmewwzlzujsrhstjehrp.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24"
+);
 uploadcare.start({ publicKey:"c12f2c3e134f56024db8" });
 
 let currentUser=null,currentChat=null,msgSubscription=null,chatSubscription=null;
-let selectedMessageId=null,selectedSender=null,selectedImageUrl=null,replyToMessage=null;
+let selectedMessageId=null,selectedSender=null,selectedMediaUrl=null,replyToMessage=null;
 
 /* --- Экраны --- */
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
@@ -178,10 +193,6 @@ async function loadProfile(){
 }
 async function deleteAccount(){await supabase.from('profiles').delete().eq('id',currentUser.id);logout();}
 
-/* --- Статус --- */
-function formatStatus(profile){if(profile.typing) return 'печатает...';if(!profile.status) return '';return profile.status;}
-async function getUsernameById(id){if(!id) return 'Unknown';const { data } = await supabase.from('profiles').select('username').eq('id',id).single();return data?.username || 'Unknown';}
-
 /* --- Чаты --- */
 async function loadChats(){
   const { data:chats }=await supabase.from('chats').select('*').or(`user1.eq.${currentUser.id},user2.eq.${currentUser.id}`);
@@ -189,16 +200,15 @@ async function loadChats(){
   if(!chats) return;
   let chatData=[];
   for(const chat of chats){
-    let otherId=chat.user1===currentUser.id?chat.user2:chat.user1;
-    const { data:profile }=await supabase.from('profiles').select('username').eq('id',otherId).single();
-    let chatName = profile?.username || 'Unknown';
+    let chatName=""; let otherId=null;
+    if(chat.user1===chat.user2){chatName="Избранное"; otherId=currentUser.id;}
+    else{otherId=chat.user1===currentUser.id?chat.user2:chat.user1; const { data:profile }=await supabase.from('profiles').select('username').eq('id',otherId).single();chatName=profile?.username || 'Unknown';}
     const { data:msgs }=await supabase.from('messages').select('*').eq('chat_id',chat.id).order('created_at',{ascending:false}).limit(1);
     let lastMsgText="",lastMsgImg=false,lastTime="";
     if(msgs && msgs.length>0){
       lastMsgText=msgs[0].content||"";
       lastMsgImg=!!msgs[0].image_url;
-      const d=new Date(msgs[0].created_at);
-      const today=new Date();
+      const d=new Date(msgs[0].created_at); const today=new Date();
       if(d.toDateString()===today.toDateString()){lastTime=d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});}
       else{lastTime=d.toLocaleDateString('ru-RU');}
     }
@@ -222,129 +232,27 @@ async function loadChats(){
 }
 function subscribeChats(){if(chatSubscription) supabase.removeChannel(chatSubscription);chatSubscription=supabase.channel('chats-r').on('postgres_changes',{event:'INSERT',schema:'public',table:'chats'},()=>loadChats()).subscribe();}
 
-/* --- Сообщения --- */
-async function openChat(chatId,otherName,otherId){
-  currentChat=chatId;
-  document.getElementById('chat-username').innerText=otherName;
-  showScreen('chat-screen');
-  await loadMessages();
-  if(msgSubscription) supabase.removeChannel(msgSubscription);
-  msgSubscription=supabase.channel('room-'+chatId)
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`chat_id=eq.${chatId}`},p=>renderMessage(p.new,true))
-    .subscribe();
-  await supabase.from('messages').update({read:true}).eq('chat_id',chatId).neq('sender',currentUser.id);
-  if(otherId){
-    if(window.statusChannelOther) supabase.removeChannel(window.statusChannelOther);
-    window.statusChannelOther = supabase.channel('status-'+otherId).on('postgres_changes',{event:'UPDATE',schema:'public',table:'profiles',filter:`id=eq.${otherId}`},p=>{
-      const st = formatStatus(p.new);
-      document.getElementById('chat-status').innerText=st;
-      document.getElementById('typing-status').innerText = p.new.typing ? 'печатает...' : '';
-    }).subscribe();
-    const { data:profile } = await supabase.from('profiles').select('*').eq('id',otherId).single();
-    if(profile) document.getElementById('chat-status').innerText = formatStatus(profile);
-  }
-}
-
-/* --- Автопрокрутка к первому непрочитанному --- */
-async function loadMessages(){
-  const { data }=await supabase.from('messages').select('*').eq('chat_id',currentChat).order('created_at',{ascending:true});
-  const box=document.getElementById('messages');box.innerHTML='';
-  if(!data) return;
-  let firstUnreadId=null;
-  for(const msg of data){
-    if(!msg.read && msg.sender!==currentUser.id && !firstUnreadId) firstUnreadId=msg.id;
-    await renderMessage(msg,false);
-  }
-  if(firstUnreadId){
-    const el=document.getElementById('msg-'+firstUnreadId);
-    if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.boxShadow='0 0 0 2px rgba(0,136,204,0.12)';setTimeout(()=>{el.style.boxShadow='';},1400);}
-  } else {box.scrollTop=box.scrollHeight;}
-}
-
-/* --- renderMessage --- */
-async function renderMessage(msg,scroll=true){
-  const box=document.getElementById('messages');
-  let div=document.getElementById('msg-'+msg.id);
-  const isMe = (msg.sender===currentUser.id);
-  if(!div){div=document.createElement('div');div.id='msg-'+msg.id;div.className='msg '+(isMe?'me':'other');div.oncontextmenu=(e)=>{e.preventDefault();showContextMenu(e,msg.id,msg.sender);};box.appendChild(div);}
-  else {div.className = 'msg ' + (isMe ? 'me' : 'other');}
-  if(msg.is_deleted){div.className='msg deleted';div.innerText='Сообщение удалено';if(scroll) box.scrollTop=box.scrollHeight;return;}
-  let htmlParts = [];
-  if(msg.reply_to){
-    try{
-      const { data:orig } = await supabase.from('messages').select('*').eq('id',msg.reply_to).single();
-      if(orig){
-        const username = await getUsernameById(orig.sender);
-        let snippet = orig.content && orig.content.trim().length>0 ? orig.content.trim().slice(0,120) : (orig.image_url ? '[изображение]' : '[сообщение]');
-        const headerHTML = `<div class="reply-to" data-reply-id="${orig.id}" style="font-size:13px;color:var(--gray);border-left:2px solid var(--gray);padding-left:6px;">Ответ <strong>@${escapeHtml(username)}</strong>: ${escapeHtml(snippet)}</div>`;
-        htmlParts.push(headerHTML);
-      } else {htmlParts.push(`<div class="reply-to" style="font-size:13px;color:var(--gray)">Ответ: (сообщение удалено)</div>`);}
-    }catch(e){htmlParts.push(`<div class="reply-to" style="font-size:13px;color:var(--gray)">Ответ</div>`);}
-  }
-  if(msg.content) htmlParts.push(`<div>${escapeHtml(msg.content)}</div>`);
-  if(msg.image_url) htmlParts.push(`<img src="${msg.image_url}" class="msg-img">`);
-  const ticks = isMe?'<span class="ticks">✔✔</span>':'';
-  htmlParts.push(`<span class="time">${new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} ${ticks}</span>`);
-  div.innerHTML = htmlParts.join('');
-  const replyElems = div.querySelectorAll('.reply-to');
-  replyElems.forEach(el=>{
-    const rid = el.getAttribute('data-reply-id');
-    el.style.cursor = 'pointer';
-    el.onclick = (ev)=>{
-      ev.stopPropagation();
-      if(rid){
-        const target = document.getElementById('msg-'+rid);
-        if(target){target.scrollIntoView({behavior:'smooth',block:'center'});target.style.boxShadow = '0 0 0 2px rgba(0,136,204,0.12)';setTimeout(()=>{target.style.boxShadow='';},1400);}
-      }
-    };
+/* --- Медиа --- */
+function chooseFile(type){
+  uploadcare.openDialog(null,{publicKey:"c12f2c3e134f56024db8",imagesOnly:type==='image',multiple:false,previewStep:true}).done(file=>{
+    file.done(info=>{
+      selectedMediaUrl=info.cdnUrl;
+      const preview=document.getElementById('preview');
+      preview.innerHTML=type==='image'?`<img src="${selectedMediaUrl}">`:`<video src="${selectedMediaUrl}" controls></video>`;
+    });
   });
-  if(scroll){box.scrollTop = box.scrollHeight;}
 }
-
-/* --- Отправка сообщения --- */
-async function sendMessage(){
-  const text=document.getElementById('msg-input').value.trim();
-  if(!text && !selectedImageUrl) return;
-  const payload = {chat_id:currentChat,sender:currentUser.id,content:text||null,image_url:selectedImageUrl||null,reply_to: replyToMessage ? replyToMessage.id : null,read:false};
-  await supabase.from('messages').insert([payload]);
-  document.getElementById('msg-input').value='';selectedImageUrl=null;replyToMessage=null;document.getElementById('preview').innerHTML='';hideReplyPreview();
-  const box=document.getElementById('messages');box.scrollTop=box.scrollHeight;
+function openMediaModal(url,type){
+  const modal=document.getElementById('media-modal');
+  const img=document.getElementById('modal-img'); const video=document.getElementById('modal-video'); const dl=document.getElementById('media-download');
+  img.style.display='none'; video.style.display='none';
+  if(type==='image'){img.src=url; img.style.display='block';}
+  else{video.src=url; video.style.display='block'; video.play();}
+  dl.href=url;
+  modal.style.display='flex';
 }
-function chooseImage(){uploadcare.openDialog(null,{publicKey:"c12f2c3e134f56024db8"}).done(file=>{file.done(info=>{selectedImageUrl=info.cdnUrl;document.getElementById('preview').innerHTML=`<img src="${selectedImageUrl}">`;});});}
-
-/* --- Контекст --- */
-function showContextMenu(e,msgId,senderId){selectedMessageId=msgId;selectedSender=senderId;const menu=document.getElementById('context-menu');menu.style.left=e.pageX+'px';menu.style.top=e.pageY+'px';menu.style.display='flex';}
-function copyMessage(){if(!selectedMessageId)return;const el=document.getElementById('msg-'+selectedMessageId);if(el)navigator.clipboard.writeText(el.innerText);selectedMessageId=null;document.getElementById('context-menu').style.display='none';}
-function confirmDelete(){if(!selectedMessageId)return;supabase.from('messages').update({is_deleted:true}).eq('id',selectedMessageId).eq('sender',currentUser.id);selectedMessageId=null;document.getElementById('context-menu').style.display='none';}
-async function replyMessage(){if(!selectedMessageId)return;document.getElementById('context-menu').style.display='none';const el=document.getElementById('msg-'+selectedMessageId);if(!el) return;const text = el.innerText.split('\n')[0].slice(0,180);const { data:msg } = await supabase.from('messages').select('*').eq('id',selectedMessageId).single();const uname = await getUsernameById(msg.sender);replyToMessage = { id: selectedMessageId, text: text, username: uname };showReplyPreview(replyToMessage);}
-function showReplyPreview(replyObj){const container = document.getElementById('reply-preview-container');document.getElementById('reply-username').innerText = '@' + (replyObj.username || 'user');document.getElementById('reply-text').innerText = ' ' + (replyObj.text||'');container.style.display = 'block';const preview = document.getElementById('reply-preview');preview.onclick = (e) => {e.stopPropagation();const target = document.getElementById('msg-'+replyObj.id);if(target){target.scrollIntoView({behavior:'smooth',block:'center'});target.style.boxShadow = '0 0 0 2px rgba(0,136,204,0.12)';setTimeout(()=>{target.style.boxShadow='';},1400);} else {alert('Исходное сообщение не на этой странице.');}};}
-function hideReplyPreview(){document.getElementById('reply-preview-container').style.display='none';document.getElementById('reply-preview').onclick = null;}
-function cancelReply(){replyToMessage=null;hideReplyPreview();}
-
-/* --- Печатает --- */
-document.getElementById('msg-input').addEventListener('input',async()=>{
-  if(!currentUser) return;
-  await supabase.from('profiles').update({typing:true,status:'печатает...'}).eq('id',currentUser.id);
-  clearTimeout(window.typingTimeout);
-  window.typingTimeout=setTimeout(async()=>{await supabase.from('profiles').update({typing:false,status:'онлайн'}).eq('id',currentUser.id);},1500);
-});
-
-/* --- Отправка по Enter --- */
-document.getElementById('msg-input').addEventListener('keydown',async (e)=>{
-  if(e.key==='Enter' && !e.shiftKey){e.preventDefault();sendMessage();}
-});
-
-/* --- Сессия --- */
-window.addEventListener('load',async()=>{
-  const { data:{session}}=await supabase.auth.getSession();
-  if(session){currentUser=session.user;showMain();subscribeChats();}
-});
-window.addEventListener('beforeunload',()=>{if(currentUser)supabase.from('profiles').update({status:`был(а) в ${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} ${new Date().toLocaleDateString('ru-RU')}`,typing:false}).eq('id',currentUser.id);});
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&currentUser)supabase.from('profiles').update({status:`был(а) в ${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} ${new Date().toLocaleDateString('ru-RU')}`,typing:false}).eq('id',currentUser.id);});
-window.onclick=()=>{document.getElementById('context-menu').style.display='none';};
-
-/* --- Хелпер --- */
-function escapeHtml(text){const div=document.createElement('div');div.textContent=text;return div.innerHTML;}
+function closeMediaModal(){const modal=document.getElementById('media-modal'); modal.style.display='none'; const video=document.getElementById('modal-video'); video.pause();}
 </script>
+
 </body>
 </html>
