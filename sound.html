@@ -2,136 +2,180 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Музыка и звуки между телефонами</title>
+  <title>🎵 Музыкальная Комната</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { font-family: system-ui, sans-serif; background: #f2f4f8; margin: 0; padding: 1em; }
-    h2 { text-align: center; margin-bottom: 1em; }
+    body { margin:0; font-family:system-ui, sans-serif; background:#f0f2f7; overflow-x:hidden; }
+    h1,h2 { text-align:center; }
+    .screen { display:none; height:100vh; padding:1em; box-sizing:border-box; }
+    .active { display:block; animation:fadeIn 0.6s ease; }
+    @keyframes fadeIn { from{opacity:0; transform:translateY(20px);} to{opacity:1; transform:translateY(0);} }
+
     button {
-      display: block; width: 100%; margin: 0.5em 0; padding: 1em;
-      font-size: 16px; font-weight: 600; color: white;
-      background: linear-gradient(135deg, #4a90e2, #357ABD);
-      border: none; border-radius: 12px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-      transition: transform 0.2s ease, opacity 0.2s ease;
+      display:block; width:100%; margin:0.5em 0; padding:1em;
+      font-size:18px; font-weight:600; color:white;
+      background:linear-gradient(135deg,#6a5acd,#483d8b);
+      border:none; border-radius:14px; box-shadow:0 4px 14px rgba(0,0,0,0.2);
+      transition:all 0.25s ease;
     }
-    button:active { transform: scale(0.97); opacity: 0.8; }
-    textarea { width: 100%; height: 70px; margin: 0.5em 0; padding: 0.5em; border-radius: 8px; border: 1px solid #ccc; }
-    #qrcode { display: flex; justify-content: center; margin: 1em 0; }
-    .library { margin-top: 1em; }
+    button:hover { transform:translateY(-3px) scale(1.02); }
+    button:active { transform:scale(0.96); opacity:0.85; }
+
+    textarea, input[type=text] {
+      width:100%; padding:0.8em; border:1px solid #ccc; border-radius:10px; margin:0.5em 0;
+      font-size:15px; transition:all 0.2s;
+    }
+    textarea:focus, input:focus { border-color:#6a5acd; box-shadow:0 0 6px rgba(106,90,205,0.4); outline:none; }
+
+    .library { margin-top:1em; max-height:45vh; overflow:auto; }
     .sound-item {
-      background: white; border-radius: 14px; padding: 1em;
-      margin: 0.5em 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      cursor: pointer; transition: transform 0.2s ease, background 0.3s;
+      background:white; border-radius:14px; padding:1em;
+      margin:0.5em 0; box-shadow:0 2px 8px rgba(0,0,0,0.1);
+      cursor:pointer; transform:scale(1); transition:transform 0.2s, background 0.3s;
+      animation:slideIn 0.5s ease;
     }
-    .sound-item:hover { transform: translateY(-2px); background: #eef5ff; }
-    .sound-title { font-weight: 600; }
-    input[type=text] {
-      width: 100%; padding: 0.8em; margin: 0.5em 0;
-      border: 1px solid #ccc; border-radius: 8px;
-    }
-    audio { width: 100%; margin-top: 1em; }
+    .sound-item:hover { background:#eef2ff; transform:scale(1.03); }
+    @keyframes slideIn { from{opacity:0; transform:translateX(-40px);} to{opacity:1; transform:translateX(0);} }
+
+    #qrcode { display:flex; justify-content:center; margin:1em 0; }
+
+    #reader { width:100%; max-width:320px; margin:0 auto; }
   </style>
 </head>
 <body>
-  <h2>🎵 Отправка звуков</h2>
 
-  <button id="startBtn">Создать соединение</button>
-  <textarea id="offer" placeholder="Код для передачи"></textarea>
-  <div id="qrcode"></div>
+  <!-- Экран выбора -->
+  <div id="screen-home" class="screen active">
+    <h1>🎶 Музыкальная Комната</h1>
+    <button onclick="goTo('screen-create')">Создать комнату</button>
+    <button onclick="goTo('screen-join')">Войти в комнату</button>
+  </div>
 
-  <button id="answerBtn">Подключиться</button>
-  <textarea id="remote" placeholder="Вставьте код от другого телефона"></textarea>
+  <!-- Экран создания -->
+  <div id="screen-create" class="screen">
+    <h2>Создать комнату</h2>
+    <button id="startBtn">Создать соединение</button>
+    <textarea id="offer" placeholder="Код для передачи вручную"></textarea>
+    <div id="qrcode"></div>
+    <textarea id="answer" placeholder="Вставьте сюда ответ"></textarea>
+    <button id="setAnswerBtn">Подтвердить ответ</button>
+    <button onclick="goTo('screen-home')">⬅ Назад</button>
+  </div>
 
-  <button id="setAnswerBtn">Вставить ответ</button>
-  <textarea id="answer" placeholder="Ответ для отправки обратно"></textarea>
+  <!-- Экран подключения -->
+  <div id="screen-join" class="screen">
+    <h2>Войти в комнату</h2>
+    <textarea id="remote" placeholder="Вставьте код от создателя"></textarea>
+    <button id="answerBtn">Создать ответ</button>
+    <textarea id="answerOut" placeholder="Код-ответ"></textarea>
+    <div id="reader"></div>
+    <button onclick="startScan()">📷 Сканировать QR</button>
+    <button onclick="stopScan()">⏹ Остановить сканер</button>
+    <button onclick="goTo('screen-home')">⬅ Назад</button>
+  </div>
 
-  <h3>📚 Библиотека</h3>
-  <input type="text" id="search" placeholder="Поиск звука..." />
-  <div class="library" id="library"></div>
+  <!-- Экран библиотеки -->
+  <div id="screen-library" class="screen">
+    <h2>📚 Библиотека</h2>
+    <input type="text" id="search" placeholder="Поиск звука...">
+    <div class="library" id="library"></div>
+    <audio id="remoteAudio" autoplay controls></audio>
+  </div>
 
-  <audio id="remoteAudio" autoplay controls></audio>
-
-  <!-- QR код -->
+  <!-- QR и WebRTC -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
 
   <script>
+    // Звуки с Pixabay
     const sounds = [
-      { name: "👏 Аплодисменты", url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_7e7f6898d5.mp3?filename=clapping-86112.mp3" },
-      { name: "😂 Смех", url: "https://cdn.pixabay.com/download/audio/2021/08/04/audio_91b66a0413.mp3?filename=laugh-46306.mp3" },
-      { name: "📞 Звонок", url: "https://cdn.pixabay.com/download/audio/2021/08/04/audio_1c2ac1699d.mp3?filename=classic-phone-ring-41691.mp3" },
-      { name: "🔔 Колокольчик", url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_929927d0a2.mp3?filename=bell-86114.mp3" },
-      { name: "🎶 Мелодия", url: "https://cdn.pixabay.com/download/audio/2021/08/09/audio_9a7d6d5c34.mp3?filename=soft-background-music-46542.mp3" }
+      { name:"👏 Аплодисменты", url:"https://cdn.pixabay.com/download/audio/2022/03/15/audio_7e7f6898d5.mp3?filename=clapping-86112.mp3" },
+      { name:"😂 Смех", url:"https://cdn.pixabay.com/download/audio/2021/08/04/audio_91b66a0413.mp3?filename=laugh-46306.mp3" },
+      { name:"📞 Телефонный звонок", url:"https://cdn.pixabay.com/download/audio/2021/08/04/audio_1c2ac1699d.mp3?filename=classic-phone-ring-41691.mp3" },
+      { name:"🔔 Колокольчик", url:"https://cdn.pixabay.com/download/audio/2022/03/15/audio_929927d0a2.mp3?filename=bell-86114.mp3" },
+      { name:"🎶 Спокойная мелодия", url:"https://cdn.pixabay.com/download/audio/2021/08/09/audio_9a7d6d5c34.mp3?filename=soft-background-music-46542.mp3" },
+      { name:"🚨 Сирена", url:"https://cdn.pixabay.com/download/audio/2021/08/04/audio_c09e1dc8c5.mp3?filename=police-siren-46307.mp3" },
+      { name:"🔊 Уведомление", url:"https://cdn.pixabay.com/download/audio/2022/03/15/audio_23b5cbfef3.mp3?filename=notification-86111.mp3" },
+      { name:"🎵 Гитара", url:"https://cdn.pixabay.com/download/audio/2021/09/01/audio_01a2e7a37c.mp3?filename=relaxing-guitar-loop-4475.mp3" }
     ];
 
-    let pc, dataChannel, audio = new Audio();
+    let pc, dataChannel, audio=new Audio(), scanner;
 
-    function renderLibrary(filter="") {
-      const lib = document.getElementById("library");
-      lib.innerHTML = "";
-      sounds.filter(s => s.name.toLowerCase().includes(filter.toLowerCase()))
-        .forEach(sound => {
-          const div = document.createElement("div");
-          div.className = "sound-item";
-          div.innerHTML = `<div class="sound-title">${sound.name}</div>`;
-          div.onclick = () => {
-            audio.src = sound.url;
-            audio.play();
-            if (dataChannel && dataChannel.readyState === "open") {
-              dataChannel.send(sound.url);
-            }
+    // Экраны
+    function goTo(id){
+      document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    // Рендер библиотеки
+    function renderLibrary(filter=""){
+      const lib=document.getElementById("library");
+      lib.innerHTML="";
+      sounds.filter(s=>s.name.toLowerCase().includes(filter.toLowerCase()))
+        .forEach(sound=>{
+          const div=document.createElement("div");
+          div.className="sound-item";
+          div.innerHTML=`<div>${sound.name}</div>`;
+          div.onclick=()=>{
+            audio.src=sound.url; audio.play();
+            if(dataChannel&&dataChannel.readyState==="open"){ dataChannel.send(sound.url); }
           };
           lib.appendChild(div);
         });
     }
-
-    document.getElementById("search").oninput = e => renderLibrary(e.target.value);
+    document.getElementById("search").oninput=e=>renderLibrary(e.target.value);
     renderLibrary();
 
-    async function initPeer() {
-      pc = new RTCPeerConnection();
-      dataChannel = pc.createDataChannel("sound");
-      dataChannel.onmessage = (event) => {
-        document.getElementById("remoteAudio").src = event.data;
-      };
-      pc.ondatachannel = (event) => {
-        event.channel.onmessage = (ev) => {
-          document.getElementById("remoteAudio").src = ev.data;
-        };
-      };
+    // WebRTC
+    async function initPeer(){
+      pc=new RTCPeerConnection();
+      dataChannel=pc.createDataChannel("sound");
+      dataChannel.onmessage=(event)=>{ document.getElementById("remoteAudio").src=event.data; goTo("screen-library"); };
+      pc.ondatachannel=(event)=>{ event.channel.onmessage=(ev)=>{ document.getElementById("remoteAudio").src=ev.data; goTo("screen-library"); }; };
     }
 
-    function toShort(obj) {
-      return btoa(JSON.stringify(obj));
-    }
-    function fromShort(str) {
-      return JSON.parse(atob(str));
-    }
+    function toShort(obj){ return btoa(JSON.stringify(obj)); }
+    function fromShort(str){ return JSON.parse(atob(str)); }
 
-    document.getElementById("startBtn").onclick = async () => {
+    document.getElementById("startBtn").onclick=async()=>{
       await initPeer();
-      const offer = await pc.createOffer();
+      const offer=await pc.createOffer();
       await pc.setLocalDescription(offer);
-      const short = toShort(offer);
-      document.getElementById("offer").value = short;
-      document.getElementById("qrcode").innerHTML = "";
-      new QRCode(document.getElementById("qrcode"), { text: short, width: 150, height: 150 });
+      const short=toShort(offer);
+      document.getElementById("offer").value=short;
+      document.getElementById("qrcode").innerHTML="";
+      new QRCode(document.getElementById("qrcode"),{text:short,width:160,height:160});
     };
 
-    document.getElementById("answerBtn").onclick = async () => {
+    document.getElementById("answerBtn").onclick=async()=>{
       await initPeer();
-      const offer = fromShort(document.getElementById("remote").value.trim());
+      const offer=fromShort(document.getElementById("remote").value.trim());
       await pc.setRemoteDescription(offer);
-      const answer = await pc.createAnswer();
+      const answer=await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      document.getElementById("answer").value = toShort(answer);
+      document.getElementById("answerOut").value=toShort(answer);
     };
 
-    document.getElementById("setAnswerBtn").onclick = async () => {
-      const answer = fromShort(document.getElementById("remote").value.trim());
+    document.getElementById("setAnswerBtn").onclick=async()=>{
+      const answer=fromShort(document.getElementById("answer").value.trim());
       await pc.setRemoteDescription(answer);
-      alert("✅ Соединение установлено!");
+      alert("✅ Комната создана, можно отправлять звуки!");
+      goTo("screen-library");
     };
+
+    // QR-сканер
+    function startScan(){
+      scanner=new Html5Qrcode("reader");
+      scanner.start({facingMode:"environment"},{fps:10,qrbox:250},
+        (decoded)=>{
+          document.getElementById("remote").value=decoded;
+          stopScan();
+          alert("📥 Код считан, теперь нажмите «Создать ответ»");
+        },
+        (err)=>{}
+      );
+    }
+    function stopScan(){ if(scanner){ scanner.stop().then(()=>{scanner.clear();}); } }
   </script>
 </body>
 </html>
