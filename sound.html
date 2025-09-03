@@ -1,473 +1,111 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Передача звука через Wi-Fi (ручной обмен)</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-            color: #333;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #4a5568;
-        }
-        .section {
-            margin-bottom: 25px;
-            padding: 20px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            background: #f7fafc;
-        }
-        h2 {
-            color: #4a5568;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #e2e8f0;
-        }
-        .btn {
-            background: #4299e1;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            margin: 5px;
-            transition: all 0.3s ease;
-        }
-        .btn:hover {
-            background: #3182ce;
-            transform: translateY(-2px);
-        }
-        .btn:disabled {
-            background: #a0aec0;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .btn-success {
-            background: #48bb78;
-        }
-        .btn-success:hover {
-            background: #38a169;
-        }
-        .btn-danger {
-            background: #f56565;
-        }
-        .btn-danger:hover {
-            background: #e53e3e;
-        }
-        textarea {
-            width: 100%;
-            height: 120px;
-            padding: 12px;
-            border: 2px solid #cbd5e0;
-            border-radius: 8px;
-            font-family: monospace;
-            font-size: 14px;
-            resize: vertical;
-            margin: 10px 0;
-        }
-        input {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #cbd5e0;
-            border-radius: 8px;
-            margin: 10px 0;
-            font-size: 16px;
-        }
-        .status {
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
-            font-weight: 500;
-        }
-        .status-connecting {
-            background: #fffaf0;
-            color: #d69e2e;
-            border: 2px solid #faf089;
-        }
-        .status-connected {
-            background: #f0fff4;
-            color: #38a169;
-            border: 2px solid #9ae6b4;
-        }
-        .status-error {
-            background: #fff5f5;
-            color: #e53e3e;
-            border: 2px solid #fc8181;
-        }
-        .code-block {
-            background: #2d3748;
-            color: #e2e8f0;
-            padding: 15px;
-            border-radius: 8px;
-            font-family: monospace;
-            word-break: break-all;
-            margin: 10px 0;
-        }
-        .controls {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-        .sound-btn {
-            background: #9f7aea;
-            padding: 20px;
-            border-radius: 50%;
-            width: 80px;
-            height: 80px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: none;
-            color: white;
-        }
-        .sound-btn:hover {
-            background: #805ad5;
-            transform: scale(1.1);
-        }
-        .instructions {
-            background: #ebf8ff;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
-            border-left: 4px solid #4299e1;
-        }
-        .instructions ol {
-            margin-left: 20px;
-        }
-        .instructions li {
-            margin-bottom: 8px;
-        }
-        @media (max-width: 600px) {
-            .container {
-                padding: 15px;
-            }
-            .btn {
-                width: 100%;
-                margin: 5px 0;
-            }
-            .controls {
-                flex-direction: column;
-                align-items: center;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Передача звуков между телефонами</title>
+  <style>
+    body { font-family: sans-serif; padding: 1em; background: #f7f7f7; }
+    textarea { width: 100%; height: 80px; }
+    button { margin: 0.5em 0; padding: 0.6em 1.2em; border: none; border-radius: 8px; background: #4a90e2; color: white; font-size: 16px; cursor: pointer; transition: transform 0.2s ease, background 0.2s; }
+    button:hover { transform: scale(1.05); background: #357ABD; }
+    .library { margin-top: 1em; }
+    .sound-item { background: white; border-radius: 10px; padding: 0.8em; margin: 0.5em 0; box-shadow: 0 2px 6px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s ease, background 0.2s; }
+    .sound-item:hover { transform: translateY(-2px); background: #eef5ff; }
+    #remoteAudio { width: 100%; margin-top: 1em; }
+    #qrcode { margin: 1em 0; }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🎵 Передача звука через Wi-Fi</h1>
-        
-        <div class="instructions">
-            <h3>Инструкция по использованию:</h3>
-            <ol>
-                <li>Откройте эту страницу на двух устройствах в одной Wi-Fi сети</li>
-                <li>На первом устройстве нажмите "Создать соединение"</li>
-                <li>Скопируйте предложение (Offer) с первого устройства</li>
-                <li>Вставьте предложение во второе устройство и нажмите "Принять предложение"</li>
-                <li>Скопируйте ответ (Answer) со второго устройства</li>
-                <li>Вставьте ответ в первое устройство и нажмите "Принять ответ"</li>
-                <li>После соединения используйте кнопки для передачи звука</li>
-            </ol>
-        </div>
+  <h2>Передача звуков между телефонами (WebRTC + QR)</h2>
 
-        <div class="section">
-            <h2>1. Управление соединением</h2>
-            <div class="controls">
-                <button id="createBtn" class="btn">Создать соединение</button>
-                <button id="disconnectBtn" class="btn btn-danger" disabled>Разорвать соединение</button>
-            </div>
-        </div>
+  <button id="startBtn">🎤 Создать соединение</button>
+  <textarea id="offer" placeholder="Код для передачи"></textarea>
+  <div id="qrcode"></div>
 
-        <div class="section">
-            <h2>2. Обмен данными соединения</h2>
-            
-            <div id="offerSection" style="display: none;">
-                <h3>Предложение (Offer) - скопируйте и передайте другому устройству:</h3>
-                <textarea id="offerOutput" readonly placeholder="Здесь появится предложение..."></textarea>
-                
-                <h3>Ответ (Answer) - вставьте полученный ответ:</h3>
-                <textarea id="answerInput" placeholder="Вставьте ответ от другого устройства здесь..."></textarea>
-                <button id="acceptAnswerBtn" class="btn btn-success">Принять ответ</button>
-            </div>
+  <button id="answerBtn">🔗 Подключиться</button>
+  <textarea id="remote" placeholder="Вставьте сюда код"></textarea>
 
-            <div id="answerSection" style="display: none;">
-                <h3>Предложение (Offer) - вставьте полученное предложение:</h3>
-                <textarea id="offerInput" placeholder="Вставьте предложение от другого устройства здесь..."></textarea>
-                <button id="acceptOfferBtn" class="btn btn-success">Принять предложение</button>
-                
-                <h3>Ответ (Answer) - скопируйте и передайте обратно:</h3>
-                <textarea id="answerOutput" readonly placeholder="Здесь появится ответ..."></textarea>
-            </div>
-        </div>
+  <button id="setAnswerBtn">✅ Вставить ответ</button>
+  <textarea id="answer" placeholder="Ответ для передачи обратно"></textarea>
 
-        <div class="section">
-            <h2>3. Статус соединения</h2>
-            <div id="status" class="status">Не подключено</div>
-        </div>
+  <h3>🎵 Библиотека звуков</h3>
+  <input type="text" id="search" placeholder="Поиск звука..." />
+  <div class="library" id="library"></div>
 
-        <div class="section">
-            <h2>4. Управление звуком</h2>
-            <div class="controls">
-                <button class="sound-btn" data-sound="beep">🔊</button>
-                <button class="sound-btn" data-sound="alert">⚠️</button>
-                <button class="sound-btn" data-sound="chime">🔔</button>
-                <button class="sound-btn" data-sound="success">✅</button>
-            </div>
-        </div>
-    </div>
+  <audio id="remoteAudio" autoplay controls></audio>
 
-    <script>
-        // Элементы DOM
-        const createBtn = document.getElementById('createBtn');
-        const disconnectBtn = document.getElementById('disconnectBtn');
-        const offerSection = document.getElementById('offerSection');
-        const answerSection = document.getElementById('answerSection');
-        const offerOutput = document.getElementById('offerOutput');
-        const offerInput = document.getElementById('offerInput');
-        const answerOutput = document.getElementById('answerOutput');
-        const answerInput = document.getElementById('answerInput');
-        const acceptOfferBtn = document.getElementById('acceptOfferBtn');
-        const acceptAnswerBtn = document.getElementById('acceptAnswerBtn');
-        const status = document.getElementById('status');
-        const soundButtons = document.querySelectorAll('.sound-btn');
+  <!-- Подключаем библиотеки -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
 
-        // Переменные WebRTC
-        let peerConnection = null;
-        let dataChannel = null;
-        let isOfferer = false;
+  <script>
+    const sounds = [
+      { name: "Аплодисменты", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+      { name: "Смех", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
+      { name: "Звонок", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
+    ];
 
-        // Конфигурация ICE серверов (публичные STUN серверы)
-        const configuration = {
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' },
-                { urls: 'stun:stun3.l.google.com:19302' },
-                { urls: 'stun:stun4.l.google.com:19302' }
-            ]
+    let pc, dataChannel, audio = new Audio();
+
+    function renderLibrary(filter="") {
+      const lib = document.getElementById("library");
+      lib.innerHTML = "";
+      sounds.filter(s => s.name.toLowerCase().includes(filter.toLowerCase()))
+        .forEach(sound => {
+          const div = document.createElement("div");
+          div.className = "sound-item";
+          div.textContent = sound.name;
+          div.onclick = () => {
+            audio.src = sound.url;
+            audio.play();
+            if (dataChannel && dataChannel.readyState === "open") {
+              dataChannel.send(sound.url);
+            }
+          };
+          lib.appendChild(div);
+        });
+    }
+
+    document.getElementById("search").oninput = e => renderLibrary(e.target.value);
+    renderLibrary();
+
+    async function initPeer() {
+      pc = new RTCPeerConnection();
+      dataChannel = pc.createDataChannel("sound");
+      dataChannel.onmessage = (event) => {
+        document.getElementById("remoteAudio").src = event.data;
+      };
+      pc.ondatachannel = (event) => {
+        event.channel.onmessage = (ev) => {
+          document.getElementById("remoteAudio").src = ev.data;
         };
+      };
+    }
 
-        // Обновление статуса
-        function updateStatus(message, type = '') {
-            status.textContent = message;
-            status.className = `status ${type}`;
-        }
+    document.getElementById("startBtn").onclick = async () => {
+      await initPeer();
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      const sdp = JSON.stringify(offer);
+      document.getElementById("offer").value = sdp;
+      document.getElementById("qrcode").innerHTML = "";
+      new QRCode(document.getElementById("qrcode"), sdp);
+    };
 
-        // Инициализация соединения
-        createBtn.addEventListener('click', async () => {
-            try {
-                isOfferer = true;
-                peerConnection = new RTCPeerConnection(configuration);
-                setupDataChannel();
-                
-                // Создаем канал данных
-                dataChannel = peerConnection.createDataChannel('soundChannel');
-                setupDataChannelEvents();
-                
-                // Создаем предложение
-                const offer = await peerConnection.createOffer();
-                await peerConnection.setLocalDescription(offer);
-                
-                // Показываем предложение для копирования
-                offerOutput.value = JSON.stringify(offer);
-                offerSection.style.display = 'block';
-                answerSection.style.display = 'none';
-                
-                updateStatus('Создано предложение. Скопируйте и отправьте другому устройству.', 'status-connecting');
-                createBtn.disabled = true;
-                disconnectBtn.disabled = false;
-                
-            } catch (error) {
-                console.error('Ошибка создания предложения:', error);
-                updateStatus('Ошибка создания предложения: ' + error.message, 'status-error');
-            }
-        });
+    document.getElementById("answerBtn").onclick = async () => {
+      await initPeer();
+      const offer = JSON.parse(document.getElementById("remote").value);
+      await pc.setRemoteDescription(offer);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      document.getElementById("answer").value = JSON.stringify(answer);
+    };
 
-        // Принятие предложения
-        acceptOfferBtn.addEventListener('click', async () => {
-            try {
-                if (!peerConnection) {
-                    peerConnection = new RTCPeerConnection(configuration);
-                    setupDataChannel();
-                    
-                    // Ожидаем канал данных от инициатора
-                    peerConnection.ondatachannel = (event) => {
-                        dataChannel = event.channel;
-                        setupDataChannelEvents();
-                    };
-                }
-                
-                const offer = JSON.parse(offerInput.value);
-                await peerConnection.setRemoteDescription(offer);
-                
-                // Создаем ответ
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                
-                // Показываем ответ для копирования
-                answerOutput.value = JSON.stringify(answer);
-                
-                updateStatus('Создан ответ. Скопируйте и отправьте обратно инициатору.', 'status-connecting');
-                acceptOfferBtn.disabled = true;
-                disconnectBtn.disabled = false;
-                
-            } catch (error) {
-                console.error('Ошибка принятия предложения:', error);
-                updateStatus('Ошибка принятия предложения: ' + error.message, 'status-error');
-            }
-        });
-
-        // Принятие ответа
-        acceptAnswerBtn.addEventListener('click', async () => {
-            try {
-                const answer = JSON.parse(answerInput.value);
-                await peerConnection.setRemoteDescription(answer);
-                
-                updateStatus('Ответ принят. Соединение установлено!', 'status-connected');
-                acceptAnswerBtn.disabled = true;
-                
-            } catch (error) {
-                console.error('Ошибка принятия ответа:', error);
-                updateStatus('Ошибка принятия ответа: ' + error.message, 'status-error');
-            }
-        });
-
-        // Настройка обработчиков ICE кандидатов
-        function setupDataChannel() {
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    console.log('Новый ICE кандидат:', event.candidate);
-                }
-            };
-            
-            peerConnection.onconnectionstatechange = () => {
-                console.log('Состояние соединения:', peerConnection.connectionState);
-                if (peerConnection.connectionState === 'connected') {
-                    updateStatus('Соединение установлено!', 'status-connected');
-                } else if (peerConnection.connectionState === 'disconnected' || 
-                          peerConnection.connectionState === 'failed') {
-                    updateStatus('Соединение разорвано', 'status-error');
-                }
-            };
-        }
-
-        // Настройка событий канала данных
-        function setupDataChannelEvents() {
-            dataChannel.onopen = () => {
-                console.log('Канал данных открыт');
-                updateStatus('Канал данных готов. Можно передавать звук!', 'status-connected');
-            };
-            
-            dataChannel.onmessage = (event) => {
-                playSound(event.data);
-            };
-            
-            dataChannel.onclose = () => {
-                console.log('Канал данных закрыт');
-                updateStatus('Канал данных закрыт', 'status-error');
-            };
-        }
-
-        // Воспроизведение звука
-        function playSound(soundType) {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            
-            // Настройка звука в зависимости от типа
-            switch(soundType) {
-                case 'beep':
-                    oscillator.type = 'sine';
-                    oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
-                    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-                    break;
-                case 'alert':
-                    oscillator.type = 'square';
-                    oscillator.frequency.setValueAtTime(330, audioContext.currentTime);
-                    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-                    break;
-                case 'chime':
-                    oscillator.type = 'sine';
-                    oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // Нота До
-                    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-                    break;
-                case 'success':
-                    oscillator.type = 'sine';
-                    oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime); // Нота Ми
-                    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-                    break;
-            }
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.start();
-            setTimeout(() => {
-                oscillator.stop();
-                audioContext.close();
-            }, 500);
-        }
-
-        // Отправка команды на воспроизведение звука
-        soundButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                if (dataChannel && dataChannel.readyState === 'open') {
-                    const soundType = button.getAttribute('data-sound');
-                    dataChannel.send(soundType);
-                    playSound(soundType); // Также воспроизводим локально
-                } else {
-                    alert('Канал данных не готов. Сначала установите соединение.');
-                }
-            });
-        });
-
-        // Разрыв соединения
-        disconnectBtn.addEventListener('click', () => {
-            if (dataChannel) {
-                dataChannel.close();
-            }
-            if (peerConnection) {
-                peerConnection.close();
-            }
-            peerConnection = null;
-            dataChannel = null;
-            
-            offerSection.style.display = 'none';
-            answerSection.style.display = 'none';
-            createBtn.disabled = false;
-            disconnectBtn.disabled = true;
-            acceptOfferBtn.disabled = false;
-            acceptAnswerBtn.disabled = false;
-            
-            updateStatus('Соединение разорвано');
-        });
-
-        // Инициализация
-        updateStatus('Готов к созданию соединения');
-    </script>
+    document.getElementById("setAnswerBtn").onclick = async () => {
+      const answer = JSON.parse(document.getElementById("remote").value);
+      await pc.setRemoteDescription(answer);
+      alert("Соединение установлено!");
+    };
+  </script>
 </body>
-    </html>
+</html>
