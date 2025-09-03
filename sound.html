@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Звук через Wi-Fi</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 10px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #status {
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .waiting {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .code {
+            font-family: monospace;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Передача звука через Wi-Fi</h1>
+        <p>Это приложение позволяет передавать звук на другое устройство в той же Wi-Fi сети.</p>
+        
+        <div id="setup">
+            <h2>1. Создайте соединение</h2>
+            <button id="createBtn">Создать комнату</button>
+            <div id="roomIdContainer" style="display: none;">
+                <p>Код комнаты:</p>
+                <div id="roomId" class="code"></div>
+                <p>Введите этот код на другом устройстве</p>
+            </div>
+            
+            <h2>2. Или присоединитесь к существующей комнате</h2>
+            <input type="text" id="joinInput" placeholder="Введите код комнаты">
+            <button id="joinBtn">Присоединиться</button>
+        </div>
+        
+        <div id="connectionStatus">
+            <div id="status">Ожидание подключения...</div>
+        </div>
+        
+        <div id="controls" style="display: none;">
+            <h2>Управление звуком</h2>
+            <button id="playSoundBtn">Воспроизвести звук</button>
+        </div>
+    </div>
+
+    <script>
+        // Элементы DOM
+        const createBtn = document.getElementById('createBtn');
+        const joinBtn = document.getElementById('joinBtn');
+        const joinInput = document.getElementById('joinInput');
+        const roomIdContainer = document.getElementById('roomIdContainer');
+        const roomIdElement = document.getElementById('roomId');
+        const statusElement = document.getElementById('status');
+        const controls = document.getElementById('controls');
+        const playSoundBtn = document.getElementById('playSoundBtn');
+        
+        // Переменные для WebRTC
+        let peerConnection = null;
+        let dataChannel = null;
+        let isInitiator = false;
+        let roomId = null;
+        
+        // Используем публичные STUN-серверы Google
+        const configuration = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+        
+        // Генерация случайного ID комнаты
+        function generateRoomId() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+        
+        // Обновление статуса подключения
+        function updateStatus(message, className) {
+            statusElement.textContent = message;
+            statusElement.className = className || '';
+        }
+        
+        // Создание комнаты
+        createBtn.addEventListener('click', () => {
+            roomId = generateRoomId();
+            roomIdElement.textContent = roomId;
+            roomIdContainer.style.display = 'block';
+            isInitiator = true;
+            createConnection();
+            updateStatus('Ожидание подключения второго устройства...', 'waiting');
+            createBtn.disabled = true;
+        });
+        
+        // Присоединение к комнате
+        joinBtn.addEventListener('click', () => {
+            roomId = joinInput.value.trim();
+            if (!roomId) {
+                alert('Пожалуйста, введите код комнаты');
+                return;
+            }
+            isInitiator = false;
+            createConnection();
+            updateStatus('Подключение к комнате...', 'waiting');
+            joinBtn.disabled = true;
+        });
+        
+        // Создание PeerConnection
+        function createConnection() {
+            peerConnection = new RTCPeerConnection(configuration);
+            
+            // Обработка получения кандидатов ICE
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    // В реальном приложении здесь нужно отправить кандидата другому устройству
+                    // Но так как у нас нет сервера, мы просто сохраняем его для демонстрации
+                    console.log('Новый ICE кандидат:', event.candidate);
+                }
+            };
+            
+            // Если мы инициатор, создаем канал данных
+            if (isInitiator) {
+                dataChannel = peerConnection.createDataChannel('soundChannel');
+                setupDataChannel();
+                createOffer();
+            } else {
+                // Если мы присоединяемся, ожидаем канал данных
+                peerConnection.ondatachannel = (event) => {
+                    dataChannel = event.channel;
+                    setupDataChannel();
+                };
+                
+                // В реальном приложении здесь нужно было бы получить оффер от инициатора
+                // Но для демонстрации мы просто создадим оффер и ответ
+                simulateOfferAnswer();
+            }
+            
+            // Обработка изменения состояния соединения
+            peerConnection.onconnectionstatechange = () => {
+                console.log('Состояние соединения:', peerConnection.connectionState);
+                if (peerConnection.connectionState === 'connected') {
+                    updateStatus('Подключение установлено!', 'connected');
+                    controls.style.display = 'block';
+                }
+            };
+        }
+        
+        // Настройка канала данных
+        function setupDataChannel() {
+            dataChannel.onopen = () => {
+                console.log('Канал данных открыт');
+                updateStatus('Канал данных готов к передаче', 'connected');
+            };
+            
+            dataChannel.onmessage = (event) => {
+                if (event.data === 'playSound') {
+                    playSound();
+                }
+            };
+            
+            dataChannel.onclose = () => {
+                console.log('Канал данных закрыт');
+                updateStatus('Соединение закрыто', 'error');
+            };
+        }
+        
+        // Создание оффера (для инициатора)
+        async function createOffer() {
+            try {
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                console.log('Оффер создан:', offer);
+                
+                // В реальном приложении оффер нужно отправить другому устройству
+                // Для демонстрации мы просто сохраняем его
+            } catch (error) {
+                console.error('Ошибка создания оффера:', error);
+            }
+        }
+        
+        // Для демонстрации: симуляция обмена оффером/ответом
+        async function simulateOfferAnswer() {
+            try {
+                // Создаем оффер (как если бы мы были инициатором)
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                
+                // Создаем ответ (как если бы мы были отвечающей стороной)
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                console.log('Симуляция обмена SDP завершена');
+            } catch (error) {
+                console.error('Ошибка симуляции:', error);
+            }
+        }
+        
+        // Воспроизведение звука
+        function playSound() {
+            // Создаем аудио контекст
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(440, audioContext.currentTime); // Нота Ля
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime); // Тихая громкость
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.start();
+            
+            // Останавливаем через 500 мс
+            setTimeout(() => {
+                oscillator.stop();
+                audioContext.close();
+            }, 500);
+        }
+        
+        // Отправка команды на воспроизведение звука
+        playSoundBtn.addEventListener('click', () => {
+            if (dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send('playSound');
+            } else {
+                alert('Канал данных не готов. Проверьте подключение.');
+            }
+        });
+        
+        // Информация для пользователя
+        updateStatus('Для начала создайте комнату или присоединитесь к существующей');
+    </script>
+</body>
+  </html>
