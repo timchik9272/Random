@@ -183,23 +183,20 @@
           }
         };
 
-        // Создание звонка в таблице
+        // Создание звонка в таблице с offer
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
         const { data: callData } = await supabase.from('calls').insert({
           caller_id: currentUser.id,
           receiver_id: otherUserId,
           chat_id: chatId,
           status: 'initiated',
-          offer: null,
+          offer: offer,
           answer: null,
           ice_candidates: []
         }).select('id').single();
         callId = callData.id;
         isCaller = true;
-
-        // Создание и отправка offer
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        await supabase.from('calls').update({ offer: offer }).eq('id', callId);
 
         statusEl.innerText = 'Ожидание ответа...';
         startCallBtn.disabled = true;
@@ -244,6 +241,11 @@
     async function handleCallInsert(payload) {
       const call = payload.new;
       if (call.receiver_id === currentUser.id && call.status === 'initiated' && !callId) {
+        if (!call.offer || !call.offer.type || !call.offer.sdp) {
+          // Ждём обновления offer
+          statusEl.innerText = 'Ожидание предложения для звонка...';
+          return;
+        }
         callId = call.id;
         isCaller = false;
         statusEl.innerText = 'Входящий звонок...';
@@ -255,10 +257,10 @@
 
     async function handleCallUpdate(payload) {
       const call = payload.new;
-      if (call.id === callId && peerConnection) {
+      if (call.id === callId) {
         if (call.status === 'ended') {
           endCall();
-        } else if (call.answer && isCaller) {
+        } else if (call.answer && isCaller && peerConnection) {
           // Для инициатора звонка устанавливаем answer
           if (call.answer && call.answer.type === 'answer' && call.answer.sdp) {
             try {
@@ -270,20 +272,20 @@
           } else {
             errorEl.innerText = 'Некорректный формат ответа';
           }
-        } else if (call.offer && !isCaller) {
-          // Для получателя звонка устанавливаем offer
+        } else if (call.offer && !isCaller && !callId) {
+          // Для получателя: обрабатываем offer, если звонок ещё не принят
           if (call.offer && call.offer.type === 'offer' && call.offer.sdp) {
-            try {
-              await peerConnection.setRemoteDescription(new RTCSessionDescription(call.offer));
-              statusEl.innerText = 'Соединение устанавливается...';
-            } catch (err) {
-              errorEl.innerText = 'Ошибка установки предложения: ' + err.message;
-            }
+            callId = call.id;
+            isCaller = false;
+            statusEl.innerText = 'Входящий звонок...';
+            startCallBtn.disabled = false;
+            endCallBtn.disabled = false;
+            await answerCall(call);
           } else {
             errorEl.innerText = 'Некорректный формат предложения';
           }
         }
-        if (call.ice_candidates && call.ice_candidates.length > 0) {
+        if (call.ice_candidates && call.ice_candidates.length > 0 && peerConnection) {
           for (const candidate of call.ice_candidates) {
             try {
               await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
