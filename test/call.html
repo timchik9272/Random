@@ -258,12 +258,30 @@
       if (call.id === callId) {
         if (call.status === 'ended') {
           endCall();
-        } else if (call.answer && !isCaller && peerConnection.signalingState === 'have-local-offer') {
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(call.answer));
-          statusEl.innerText = 'Соединение установлено';
-        } else if (call.offer && isCaller && call.status === 'answered') {
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(call.offer));
-          statusEl.innerText = 'Соединение установлено';
+        } else if (call.answer && isCaller) {
+          // Для инициатора звонка устанавливаем answer
+          if (call.answer && call.answer.type === 'answer' && call.answer.sdp) {
+            try {
+              await peerConnection.setRemoteDescription(new RTCSessionDescription(call.answer));
+              statusEl.innerText = 'Соединение установлено';
+            } catch (err) {
+              errorEl.innerText = 'Ошибка установки ответа: ' + err.message;
+            }
+          } else {
+            errorEl.innerText = 'Некорректный формат ответа';
+          }
+        } else if (call.offer && !isCaller) {
+          // Для получателя звонка устанавливаем offer (это уже делается в answerCall)
+          if (call.offer && call.offer.type === 'offer' && call.offer.sdp) {
+            try {
+              await peerConnection.setRemoteDescription(new RTCSessionDescription(call.offer));
+              statusEl.innerText = 'Соединение устанавливается...';
+            } catch (err) {
+              errorEl.innerText = 'Ошибка установки предложения: ' + err.message;
+            }
+          } else {
+            errorEl.innerText = 'Некорректный формат предложения';
+          }
         }
         if (call.ice_candidates && call.ice_candidates.length > 0) {
           for (const candidate of call.ice_candidates) {
@@ -285,6 +303,11 @@
 
     async function answerCall(call) {
       try {
+        if (!call.offer || !call.offer.type || !call.offer.sdp) {
+          errorEl.innerText = 'Некорректное предложение для звонка';
+          return;
+        }
+
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         localVideo.srcObject = localStream;
 
@@ -314,7 +337,7 @@
         startCallBtn.disabled = true;
         endCallBtn.disabled = false;
       } catch (err) {
-        errorEl.innerText = 'Ошибка: ' + err.message;
+        errorEl.innerText = 'Ошибка ответа на звонок: ' + err.message;
       }
     }
 
