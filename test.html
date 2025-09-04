@@ -443,7 +443,7 @@ async function openChat(chatId, otherName, otherId, otherAvatar = null){
   document.getElementById('typing-status').innerText = '';
   const callLink = document.getElementById('call-link');
   if(!isSelf){
-    callLink.href = `https://super-random.netlify.app/test/call?username=${encodeURIComponent(otherName)}`;
+    callLink.href = `https://super-random.netlify.app/test/call?chat_id=${encodeURIComponent(chatId)}`;
     callLink.style.display = 'block';
   } else {
     callLink.style.display = 'none';
