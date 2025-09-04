@@ -85,6 +85,7 @@
     let remoteStream = null;
     let callSubscription = null;
     let otherUserId = null;
+    let chatId = null;
     let callId = null;
     let isCaller = false;
 
@@ -104,9 +105,9 @@
       ]
     };
 
-    // Получение username из URL
+    // Получение chat_id из URL
     const urlParams = new URLSearchParams(window.location.search);
-    const otherUsername = urlParams.get('username');
+    const urlChatId = urlParams.get('chat_id');
 
     async function init() {
       // Проверка авторизации
@@ -119,7 +120,7 @@
       currentUser = session.user;
 
       // Проверка бана
-      const { data: profile } = await supabase.from('profiles').select('ban').eq('id', currentUser.id).single();
+      const { data: profile } = await supabase.from('profiles').select('ban, username').eq('id', currentUser.id).single();
       if (profile.ban) {
         await supabase.auth.signOut();
         errorEl.innerText = 'Вы забанены';
@@ -127,22 +128,27 @@
         return;
       }
 
-      // Поиск ID собеседника по username
-      if (otherUsername) {
-        const { data: userProfile } = await supabase.from('profiles')
-          .select('id, username')
-          .ilike('username', otherUsername)
+      // Получение chat_id и otherUserId из таблицы chats
+      if (urlChatId) {
+        const { data: chat } = await supabase.from('chats')
+          .select('id, user1, user2')
+          .eq('id', urlChatId)
           .single();
-        if (userProfile) {
-          otherUserId = userProfile.id;
-          callTitle.innerText = `Звонок с ${userProfile.username}`;
+        if (chat) {
+          chatId = chat.id;
+          otherUserId = chat.user1 === currentUser.id ? chat.user2 : chat.user1;
+          const { data: otherProfile } = await supabase.from('profiles')
+            .select('username')
+            .eq('id', otherUserId)
+            .single();
+          callTitle.innerText = `Звонок с ${otherProfile?.username || 'Пользователь'}`;
         } else {
-          errorEl.innerText = 'Пользователь не найден';
+          errorEl.innerText = 'Чат не найден';
           startCallBtn.disabled = true;
           return;
         }
       } else {
-        errorEl.innerText = 'Не указан пользователь для звонка';
+        errorEl.innerText = 'Не указан чат для звонка';
         startCallBtn.disabled = true;
         return;
       }
@@ -178,19 +184,10 @@
         };
 
         // Создание звонка в таблице
-        const { data: chat } = await supabase.from('chats')
-          .select('id')
-          .or(`and(user1.eq.${currentUser.id},user2.eq.${otherUserId}),and(user1.eq.${otherUserId},user2.eq.${currentUser.id})`)
-          .single();
-        if (!chat) {
-          errorEl.innerText = 'Чат с пользователем не найден';
-          return;
-        }
-
         const { data: callData } = await supabase.from('calls').insert({
           caller_id: currentUser.id,
           receiver_id: otherUserId,
-          chat_id: chat.id,
+          chat_id: chatId,
           status: 'initiated',
           offer: null,
           answer: null,
