@@ -1,1 +1,252 @@
 
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Звонок - MiniMessenger</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    :root {
+      --bg: #0e0e0e;
+      --bg-light: #1e1e1e;
+      --accent: #0088cc;
+      --text: #fff;
+      --gray: #888;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    #call-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      width: 100%;
+      max-width: 800px;
+      padding: 20px;
+    }
+    #video-grid {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    video {
+      width: 100%;
+      max-width: 360px;
+      border-radius: var(--radius);
+      border: 1px solid #222;
+      background: #000;
+      object-fit: cover;
+    }
+    #controls {
+      display: flex;
+      gap: 12px;
+    }
+    button {
+      background: var(--accent);
+      color: #fff;
+      padding: 12px;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+    }
+    button:disabled {
+      background: var(--gray);
+      cursor: not-allowed;
+    }
+    button:hover {
+      background: #0099e6;
+    }
+    button.end-call {
+      background: #c00;
+    }
+    button.end-call:hover {
+      background: #e00;
+    }
+    #status {
+      font-size: 16px;
+      color: var(--gray);
+      text-align: center;
+    }
+    #remote-username {
+      font-size: 20px;
+      font-weight: bold;
+      color: var(--text);
+    }
+    @media (max-width: 520px) {
+      video {
+        max-width: 100%;
+      }
+      #call-container {
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="call-container">
+    <div id="remote-username">Звонок...</div>
+    <div id="status">Ожидание соединения...</div>
+    <div id="video-grid">
+      <video id="local-video" autoplay playsinline muted></video>
+      <video id="remote-video" autoplay playsinline></video>
+    </div>
+    <div id="controls">
+      <button id="mute-btn" title="Выключить микрофон"><i class="fa fa-microphone"></i></button>
+      <button id="video-btn" title="Выключить камеру"><i class="fa fa-video"></i></button>
+      <button id="end-call-btn" class="end-call" title="Завершить звонок"><i class="fa fa-phone-slash"></i></button>
+    </div>
+  </div>
+
+  <script>
+    // Получение имени пользователя из URL
+    const params = new URLSearchParams(window.location.search);
+    const remoteUsername = params.get('username') || 'Собеседник';
+    document.getElementById('remote-username').innerText = `Звонок с ${remoteUsername}`;
+
+    // Инициализация PeerJS
+    const peer = new Peer({
+      host: 'peerjs-server.herokuapp.com',
+      secure: true,
+      port: 443
+    });
+    let localStream = null;
+    let call = null;
+
+    // Получение медиа (видео и аудио)
+    async function startMedia() {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        document.getElementById('local-video').srcObject = localStream;
+        document.getElementById('status').innerText = 'Ожидание ответа собеседника...';
+      } catch (err) {
+        console.error('Ошибка доступа к медиа:', err);
+        document.getElementById('status').innerText = 'Ошибка: нет доступа к камере или микрофону';
+      }
+    }
+
+    // При открытии соединения PeerJS
+    peer.on('open', (id) => {
+      document.getElementById('status').innerText = `Ваш ID: ${id}. Ожидание соединения...`;
+      // Формируем ссылку для приглашения (для упрощения, это можно передать собеседнику вручную)
+      console.log(`Поделитесь этой ссылкой: ${window.location.href}&peerId=${id}`);
+    });
+
+    // Обработка входящего звонка
+    peer.on('call', (incomingCall) => {
+      if (call) return; // Игнорируем, если звонок уже активен
+      call = incomingCall;
+      call.answer(localStream);
+      call.on('stream', (remoteStream) => {
+        document.getElementById('remote-video').srcObject = remoteStream;
+        document.getElementById('status').innerText = 'Соединение установлено';
+      });
+      call.on('close', endCall);
+      call.on('error', (err) => {
+        console.error('Ошибка звонка:', err);
+        document.getElementById('status').innerText = 'Ошибка звонка';
+      });
+    });
+
+    // Инициализация звонка
+    function initiateCall() {
+      const peerId = prompt('Введите ID собеседника (получите у него):');
+      if (!peerId) {
+        document.getElementById('status').innerText = 'ID собеседника не введен';
+        return;
+      }
+      if (localStream) {
+        call = peer.call(peerId, localStream);
+        if (call) {
+          call.on('stream', (remoteStream) => {
+            document.getElementById('remote-video').srcObject = remoteStream;
+            document.getElementById('status').innerText = 'Соединение установлено';
+          });
+          call.on('close', endCall);
+          call.on('error', (err) => {
+            console.error('Ошибка звонка:', err);
+            document.getElementById('status').innerText = 'Ошибка звонка';
+          });
+        } else {
+          document.getElementById('status').innerText = 'Не удалось начать звонок';
+        }
+      }
+    }
+
+    // Завершение звонка
+    function endCall() {
+      if (call) {
+        call.close();
+        call = null;
+      }
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+      document.getElementById('local-video').srcObject = null;
+      document.getElementById('remote-video').srcObject = null;
+      document.getElementById('status').innerText = 'Звонок завершен';
+      document.getElementById('mute-btn').innerHTML = '<i class="fa fa-microphone"></i>';
+      document.getElementById('video-btn').innerHTML = '<i class="fa fa-video"></i>';
+    }
+
+    // Управление микрофоном
+    document.getElementById('mute-btn').onclick = () => {
+      if (localStream) {
+        const audioTrack = localStream.getAudioTracks()[0];
+        audioTrack.enabled = !audioTrack.enabled;
+        document.getElementById('mute-btn').innerHTML = audioTrack.enabled
+          ? '<i class="fa fa-microphone"></i>'
+          : '<i class="fa fa-microphone-slash"></i>';
+      }
+    };
+
+    // Управление видео
+    document.getElementById('video-btn').onclick = () => {
+      if (localStream) {
+        const videoTrack = localStream.getVideoTracks()[0];
+        videoTrack.enabled = !videoTrack.enabled;
+        document.getElementById('video-btn').innerHTML = videoTrack.enabled
+          ? '<i class="fa fa-video"></i>'
+          : '<i class="fa fa-video-slash"></i>';
+      }
+    };
+
+    // Завершение звонка
+    document.getElementById('end-call-btn').onclick = endCall;
+
+    // Запуск медиа при загрузке страницы
+    window.onload = () => {
+      startMedia();
+      setTimeout(initiateCall, 1000); // Даем время на инициализацию PeerJS
+    };
+
+    // Очистка при закрытии страницы
+    window.onbeforeunload = () => {
+      endCall();
+      peer.destroy();
+    };
+  </script>
+</body>
+</html>
