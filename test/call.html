@@ -38,36 +38,86 @@
       background: var(--bg-light);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      max-width: 800px;
-      width: 90%;
+      max-width: 100%;
+      width: 100%;
+      height: 100%;
       position: relative;
     }
     .video-grid {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
       gap: 10px;
       justify-content: center;
       width: 100%;
+      height: 100%;
+      position: relative;
     }
-    video {
+    #remote-video {
       width: 100%;
-      max-width: 360px;
-      height: 200px;
+      height: 100%;
       border-radius: var(--radius);
       background: #000;
       object-fit: cover;
       box-shadow: var(--shadow);
     }
+    #local-video {
+      width: 120px;
+      height: 160px;
+      border-radius: var(--radius);
+      background: #000;
+      object-fit: cover;
+      position: absolute;
+      bottom: 80px;
+      right: 10px;
+      z-index: 10;
+      box-shadow: var(--shadow);
+    }
+    .fullscreen-remote #remote-video {
+      width: 100vw;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 5;
+    }
+    .fullscreen-remote #local-video {
+      bottom: 100px;
+      right: 20px;
+    }
     @media (max-width: 600px) {
-      video {
-        max-width: 100%;
-        height: 150px;
+      .call-container {
+        padding: 10px;
+      }
+      #local-video {
+        width: 90px;
+        height: 120px;
+        bottom: 70px;
+        right: 5px;
+      }
+      .fullscreen-remote #local-video {
+        bottom: 80px;
+        right: 10px;
+      }
+      .controls {
+        gap: 10px;
+      }
+      button {
+        width: 40px;
+        height: 40px;
+      }
+      .fa {
+        font-size: 18px;
       }
     }
     .controls {
       display: flex;
       gap: 15px;
       margin-top: 10px;
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
     }
     button {
       background: var(--accent);
@@ -100,17 +150,17 @@
       font-size: 14px;
       color: var(--gray);
       margin-bottom: 10px;
-    }
-    #error {
-      color: var(--error);
-      font-size: 14px;
-      max-width: 90%;
-      text-align: center;
+      position: absolute;
+      top: 10px;
+      z-index: 10;
     }
     #call-title {
       font-size: 20px;
       font-weight: 500;
       color: var(--text);
+      position: absolute;
+      top: 40px;
+      z-index: 10;
     }
     .fa {
       font-size: 20px;
@@ -120,16 +170,16 @@
 <body>
   <div class="call-container">
     <h2 id="call-title">Звонок</h2>
-    <div class="video-grid">
-      <video id="local-video" autoplay playsinline muted></video>
+    <div class="video-grid" id="video-grid">
       <video id="remote-video" autoplay playsinline></video>
+      <video id="local-video" autoplay playsinline muted></video>
     </div>
     <div id="status">Ожидание соединения...</div>
-    <div id="error"></div>
     <div class="controls">
       <button id="toggle-mic" title="Вкл/выкл микрофон"><i class="fa fa-microphone"></i></button>
       <button id="toggle-camera" title="Вкл/выкл камеру"><i class="fa fa-video"></i></button>
-      <button id="end-call" class="end-call-btn" onclick="endCall()" disabled><i class="fa fa-phone-slash"></i></button>
+      <button id="switch-camera" title="Переключить камеру"><i class="fa fa-sync-alt"></i></button>
+      <button id="end-call" class="end-call-btn" onclick="endCall()"><i class="fa fa-phone-slash"></i></button>
     </div>
   </div>
 
@@ -150,14 +200,16 @@
     let isCaller = false;
     let micEnabled = true;
     let cameraEnabled = true;
+    let facingMode = 'user'; // Фронтальная камера по умолчанию
 
     const localVideo = document.getElementById('local-video');
     const remoteVideo = document.getElementById('remote-video');
     const toggleMicBtn = document.getElementById('toggle-mic');
     const toggleCameraBtn = document.getElementById('toggle-camera');
+    const switchCameraBtn = document.getElementById('switch-camera');
     const endCallBtn = document.getElementById('end-call');
     const statusEl = document.getElementById('status');
-    const errorEl = document.getElementById('error');
+    const videoGrid = document.getElementById('video-grid');
     const callTitle = document.getElementById('call-title');
 
     // WebRTC configuration with STUN and TURN servers
@@ -185,7 +237,6 @@
         // Проверка авторизации
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
-          errorEl.innerText = 'Пожалуйста, войдите в систему';
           console.error('No session found');
           return;
         }
@@ -195,7 +246,6 @@
         const { data: profile } = await supabase.from('profiles').select('ban, username').eq('id', currentUser.id).single();
         if (profile.ban) {
           await supabase.auth.signOut();
-          errorEl.innerText = 'Вы забанены';
           console.error('User is banned');
           return;
         }
@@ -215,12 +265,10 @@
               .single();
             callTitle.innerText = `Звонок с ${otherProfile?.username || 'Пользователь'}`;
           } else {
-            errorEl.innerText = 'Чат не найден';
             console.error('Chat not found for chat_id:', urlChatId);
             return;
           }
         } else {
-          errorEl.innerText = 'Не указан чат для звонка';
           console.error('No chat_id provided in URL');
           return;
         }
@@ -248,8 +296,12 @@
 
         // Подписка на изменения в таблице calls
         subscribeToCalls();
+
+        // Переключение полноэкранного режима
+        remoteVideo.onclick = () => {
+          videoGrid.classList.toggle('fullscreen-remote');
+        };
       } catch (err) {
-        errorEl.innerText = 'Ошибка инициализации: ' + err.message;
         console.error('Init error:', err);
       }
     }
@@ -259,7 +311,7 @@
         console.log('Starting call, isCaller:', isCaller, 'chatId:', chatId);
         // Получение медиа с улучшенными настройками
         localStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
+          video: { facingMode: facingMode },
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
@@ -300,7 +352,6 @@
           if (peerConnection.connectionState === 'connected') {
             statusEl.innerText = 'Соединение установлено';
           } else if (peerConnection.connectionState === 'failed') {
-            errorEl.innerText = 'Ошибка соединения';
             console.error('Connection failed');
             endCall();
           }
@@ -324,12 +375,20 @@
           }).select('id').single();
           callId = callData.id;
           console.log('Call created with ID:', callId, 'Offer:', offer);
+          // Автоматическая отправка сообщения в чат
+          const messageContent = `Я звоню вам. Присоединяйтесь: super-random.netlify.app/test/call?chat_id=${chatId}`;
+          await supabase.from('messages').insert({
+            chat_id: chatId,
+            sender: currentUser.id,
+            content: messageContent,
+            read: false
+          });
+          console.log('Notification message sent to chat');
         }
 
         statusEl.innerText = isCaller ? 'Ожидание ответа...' : 'Соединение устанавливается...';
         endCallBtn.disabled = false;
       } catch (err) {
-        errorEl.innerText = 'Ошибка начала звонка: ' + err.message;
         console.error('startCall error:', err);
       }
     }
@@ -362,7 +421,6 @@
           window.location.href = 'https://super-random.netlify.app/test';
         }, 1000);
       } catch (err) {
-        errorEl.innerText = 'Ошибка завершения звонка: ' + err.message;
         console.error('endCall error:', err);
       }
     }
@@ -385,7 +443,6 @@
       console.log('Call inserted:', call);
       if (call.receiver_id === currentUser.id && call.status === 'initiated' && !callId) {
         if (!call.offer || !call.offer.type || !call.offer.sdp) {
-          statusEl.innerText = 'Ожидание предложения для звонка...';
           console.warn('Invalid offer in call insert:', call.offer);
           return;
         }
@@ -410,11 +467,9 @@
               statusEl.innerText = 'Соединение установлено';
               console.log('Answer set successfully');
             } catch (err) {
-              errorEl.innerText = 'Ошибка установки ответа: ' + err.message;
               console.error('Error setting answer:', err);
             }
           } else {
-            errorEl.innerText = 'Некорректный формат ответа';
             console.error('Invalid answer format:', call.answer);
           }
         } else if (call.offer && !isCaller && !peerConnection) {
@@ -425,7 +480,6 @@
             endCallBtn.disabled = false;
             await answerCall(call);
           } else {
-            errorEl.innerText = 'Некорректный формат предложения';
             console.error('Invalid offer format:', call.offer);
           }
         }
@@ -453,13 +507,12 @@
       try {
         console.log('Answering call:', call);
         if (!call.offer || !call.offer.type || !call.offer.sdp) {
-          errorEl.innerText = 'Некорректное предложение для звонка';
           console.error('Invalid offer in answerCall:', call.offer);
           return;
         }
 
         localStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
+          video: { facingMode: facingMode },
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
@@ -496,7 +549,6 @@
           if (peerConnection.connectionState === 'connected') {
             statusEl.innerText = 'Соединение установлено';
           } else if (peerConnection.connectionState === 'failed') {
-            errorEl.innerText = 'Ошибка соединения';
             console.error('Connection failed');
             endCall();
           }
@@ -511,7 +563,6 @@
         statusEl.innerText = 'Соединение устанавливается...';
         endCallBtn.disabled = false;
       } catch (err) {
-        errorEl.innerText = 'Ошибка ответа на звонок: ' + err.message;
         console.error('answerCall error:', err);
       }
     }
@@ -546,6 +597,31 @@
       }
     };
 
+    // Переключение камеры
+    switchCameraBtn.onclick = async () => {
+      if (localStream) {
+        facingMode = facingMode === 'user' ? 'environment' : 'user';
+        try {
+          const newStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: facingMode },
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: 48000
+            }
+          });
+          localStream.getTracks().forEach(track => track.stop());
+          localStream = newStream;
+          localVideo.srcObject = localStream;
+          localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+          console.log('Camera switched to:', facingMode);
+        } catch (err) {
+          console.error('Error switching camera:', err);
+        }
+      }
+    };
+
     window.addEventListener('load', init);
     window.addEventListener('beforeunload', async () => {
       if (callId) {
@@ -559,4 +635,4 @@
     });
   </script>
 </body>
-</html>
+  </html>
