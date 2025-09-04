@@ -14,6 +14,8 @@
       --text: #fff;
       --gray: #888;
       --radius: 14px;
+      --danger: #ff4d4f;
+      --primary: #1890ff;
     }
     * { box-sizing: border-box; }
     body {
@@ -27,49 +29,103 @@
       align-items: center;
       justify-content: center;
     }
-    .call-container {
+    .video-call-container {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      gap: 20px;
-      padding: 20px;
-      background: var(--bg-light);
-      border-radius: var(--radius);
-      max-width: 600px;
-      width: 90%;
-      text-align: center;
+      height: 100vh;
+      background-color: #f5f5f5;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    .video-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+    @media (min-width: 768px) {
+      .video-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
     }
     video {
       width: 100%;
-      max-width: 400px;
-      border-radius: var(--radius);
-      background: #000;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 8px;
+      background-color: #000;
+    }
+    #local-video {
+      position: absolute;
+      bottom: 100px;
+      right: 10px;
+      width: 120px;
+      height: 160px;
+      z-index: 10;
+      border: 2px solid #fff;
+      border-radius: 8px;
+    }
+    @media (max-width: 767px) {
+      #local-video {
+        width: 80px;
+        height: 100px;
+      }
+    }
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      padding: 20px;
+      background-color: #fff;
+      border-top: 1px solid #e0e0e0;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
     }
     button {
-      background: var(--accent);
-      color: #fff;
       padding: 10px 20px;
-      font-weight: bold;
       border: none;
-      border-radius: var(--radius);
+      border-radius: 25px;
+      color: white;
+      font-size: 16px;
       cursor: pointer;
+      transition: background-color 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
-    button:disabled { background: var(--gray); cursor: not-allowed; }
-    #status { font-size: 16px; color: var(--gray); }
-    #error { color: #c00; font-size: 14px; }
-    .controls { display: flex; gap: 10px; }
+    #mute-btn, #camera-btn {
+      background-color: var(--primary);
+    }
+    #mute-btn:hover, #camera-btn:hover {
+      background-color: #40a9ff;
+    }
+    #end-call {
+      background-color: var(--danger);
+    }
+    #end-call:hover {
+      background-color: #d43f3a;
+    }
+    #status { font-size: 16px; color: var(--gray); margin-top: 20px; }
+    #error { color: #c00; font-size: 14px; margin-top: 10px; }
   </style>
 </head>
 <body>
-  <div class="call-container">
+  <div class="video-call-container">
     <h2 id="call-title">Звонок</h2>
-    <video id="local-video" autoplay playsinline muted></video>
-    <video id="remote-video" autoplay playsinline></video>
+    <div class="video-grid">
+      <video id="remote-video" autoplay playsinline></video>
+      <video id="local-video" autoplay playsinline muted></video>
+    </div>
     <div id="status">Ожидание соединения...</div>
     <div id="error"></div>
     <div class="controls">
-      <button id="start-call" onclick="startCall()">Начать звонок</button>
-      <button id="end-call" onclick="endCall()" disabled>Завершить звонок</button>
+      <button id="mute-btn"><i class="fa fa-microphone"></i> Mute</button>
+      <button id="camera-btn"><i class="fa fa-video"></i> Camera Off</button>
+      <button id="end-call"><i class="fa fa-phone-slash"></i> End Call</button>
     </div>
   </div>
 
@@ -91,17 +147,36 @@
 
     const localVideo = document.getElementById('local-video');
     const remoteVideo = document.getElementById('remote-video');
-    const startCallBtn = document.getElementById('start-call');
+    const muteBtn = document.getElementById('mute-btn');
+    const cameraBtn = document.getElementById('camera-btn');
     const endCallBtn = document.getElementById('end-call');
     const statusEl = document.getElementById('status');
     const errorEl = document.getElementById('error');
     const callTitle = document.getElementById('call-title');
 
-    // WebRTC configuration
+    // WebRTC configuration with additional STUN/TURN for better reliability and speed
     const servers = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        {
+          urls: 'turn:openrelay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayprojectpassword'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayprojectpassword'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+          username: 'openrelayproject',
+          credential: 'openrelayprojectpassword'
+        }
       ]
     };
 
@@ -110,80 +185,113 @@
     const urlChatId = urlParams.get('chat_id');
 
     async function init() {
-      // Проверка авторизации
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        errorEl.innerText = 'Пожалуйста, войдите в систему';
-        startCallBtn.disabled = true;
-        return;
-      }
-      currentUser = session.user;
-
-      // Проверка бана
-      const { data: profile } = await supabase.from('profiles').select('ban, username').eq('id', currentUser.id).single();
-      if (profile.ban) {
-        await supabase.auth.signOut();
-        errorEl.innerText = 'Вы забанены';
-        startCallBtn.disabled = true;
-        return;
-      }
-
-      // Получение chat_id и otherUserId из таблицы chats
-      if (urlChatId) {
-        const { data: chat } = await supabase.from('chats')
-          .select('id, user1, user2')
-          .eq('id', urlChatId)
-          .single();
-        if (chat) {
-          chatId = chat.id;
-          otherUserId = chat.user1 === currentUser.id ? chat.user2 : chat.user1;
-          const { data: otherProfile } = await supabase.from('profiles')
-            .select('username')
-            .eq('id', otherUserId)
-            .single();
-          callTitle.innerText = `Звонок с ${otherProfile?.username || 'Пользователь'}`;
-        } else {
-          errorEl.innerText = 'Чат не найден';
-          startCallBtn.disabled = true;
+      try {
+        // Проверка авторизации
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          errorEl.innerText = 'Пожалуйста, войдите в систему';
           return;
         }
-      } else {
-        errorEl.innerText = 'Не указан чат для звонка';
-        startCallBtn.disabled = true;
-        return;
-      }
+        currentUser = session.user;
 
-      // Подписка на изменения в таблице calls
-      subscribeToCalls();
+        // Проверка бана
+        const { data: profile } = await supabase.from('profiles').select('ban, username').eq('id', currentUser.id).single();
+        if (profile.ban) {
+          await supabase.auth.signOut();
+          errorEl.innerText = 'Вы забанены';
+          return;
+        }
+
+        // Получение chat_id и otherUserId из таблицы chats
+        if (urlChatId) {
+          const { data: chat } = await supabase.from('chats')
+            .select('id, user1, user2')
+            .eq('id', urlChatId)
+            .single();
+          if (chat) {
+            chatId = chat.id;
+            otherUserId = chat.user1 === currentUser.id ? chat.user2 : chat.user1;
+            const { data: otherProfile } = await supabase.from('profiles')
+              .select('username')
+              .eq('id', otherUserId)
+              .single();
+            callTitle.innerText = `Звонок с ${otherProfile?.username || 'Пользователь'}`;
+          } else {
+            errorEl.innerText = 'Чат не найден';
+            return;
+          }
+        } else {
+          errorEl.innerText = 'Не указан чат для звонка';
+          return;
+        }
+
+        // Подписка на изменения в таблице calls
+        subscribeToCalls();
+
+        // Автоматический запуск звонка
+        await autoStartCall();
+      } catch (err) {
+        console.error('Error in init:', err);
+        errorEl.innerText = 'Ошибка инициализации: ' + err.message;
+      }
+    }
+
+    async function autoStartCall() {
+      try {
+        // Проверить, существует ли активный звонок для этого chat_id
+        const { data: existingCall } = await supabase.from('calls')
+          .select('*')
+          .eq('chat_id', chatId)
+          .eq('status', 'initiated')
+          .single();
+
+        if (existingCall) {
+          // Если есть входящий звонок и пользователь - получатель
+          if (existingCall.receiver_id === currentUser.id) {
+            callId = existingCall.id;
+            isCaller = false;
+            await answerCall(existingCall);
+          } else {
+            // Если пользователь - инициатор, но звонок уже существует (редкий случай)
+            statusEl.innerText = 'Звонок уже инициирован';
+          }
+        } else {
+          // Нет звонка - инициатор начинает
+          isCaller = true;
+          await startCall();
+        }
+      } catch (err) {
+        console.error('Error in autoStartCall:', err);
+        errorEl.innerText = 'Ошибка автозапуска: ' + err.message;
+      }
     }
 
     async function startCall() {
       try {
-        // Получение медиа (видео и аудио)
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         localVideo.srcObject = localStream;
 
-        // Создание WebRTC соединения
         peerConnection = new RTCPeerConnection(servers);
         localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-        // Обработка удаленного потока
         remoteStream = new MediaStream();
         remoteVideo.srcObject = remoteStream;
         peerConnection.ontrack = (event) => {
           event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
         };
 
-        // Обработка ICE-кандидатов
         peerConnection.onicecandidate = async (event) => {
           if (event.candidate) {
-            await supabase.from('calls').update({
-              ice_candidates: [...(await getCurrentIceCandidates() || []), event.candidate]
-            }).eq('id', callId);
+            try {
+              await supabase.from('calls').update({
+                ice_candidates: [...(await getCurrentIceCandidates() || []), event.candidate]
+              }).eq('id', callId);
+            } catch (err) {
+              console.error('Error updating ICE candidate:', err);
+            }
           }
         };
 
-        // Создание звонка в таблице с offer
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
         const { data: callData } = await supabase.from('calls').insert({
@@ -196,110 +304,11 @@
           ice_candidates: []
         }).select('id').single();
         callId = callData.id;
-        isCaller = true;
 
         statusEl.innerText = 'Ожидание ответа...';
-        startCallBtn.disabled = true;
-        endCallBtn.disabled = false;
       } catch (err) {
-        errorEl.innerText = 'Ошибка: ' + err.message;
-      }
-    }
-
-    async function endCall() {
-      if (peerConnection) {
-        peerConnection.close();
-        peerConnection = null;
-      }
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
-      }
-      if (remoteStream) {
-        remoteStream.getTracks().forEach(track => track.stop());
-        remoteStream = null;
-      }
-      if (callId) {
-        await supabase.from('calls').delete().eq('id', callId);
-        callId = null;
-      }
-      startCallBtn.disabled = false;
-      endCallBtn.disabled = true;
-      statusEl.innerText = 'Звонок завершен';
-      localVideo.srcObject = null;
-      remoteVideo.srcObject = null;
-    }
-
-    async function subscribeToCalls() {
-      callSubscription = supabase.channel('calls')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calls' }, handleCallInsert)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'calls' }, handleCallUpdate)
-        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'calls' }, handleCallDelete)
-        .subscribe();
-    }
-
-    async function handleCallInsert(payload) {
-      const call = payload.new;
-      if (call.receiver_id === currentUser.id && call.status === 'initiated' && !callId) {
-        if (!call.offer || !call.offer.type || !call.offer.sdp) {
-          // Ждём обновления offer
-          statusEl.innerText = 'Ожидание предложения для звонка...';
-          return;
-        }
-        callId = call.id;
-        isCaller = false;
-        statusEl.innerText = 'Входящий звонок...';
-        startCallBtn.disabled = false;
-        endCallBtn.disabled = false;
-        await answerCall(call);
-      }
-    }
-
-    async function handleCallUpdate(payload) {
-      const call = payload.new;
-      if (call.id === callId) {
-        if (call.status === 'ended') {
-          endCall();
-        } else if (call.answer && isCaller && peerConnection) {
-          // Для инициатора звонка устанавливаем answer
-          if (call.answer && call.answer.type === 'answer' && call.answer.sdp) {
-            try {
-              await peerConnection.setRemoteDescription(new RTCSessionDescription(call.answer));
-              statusEl.innerText = 'Соединение установлено';
-            } catch (err) {
-              errorEl.innerText = 'Ошибка установки ответа: ' + err.message;
-            }
-          } else {
-            errorEl.innerText = 'Некорректный формат ответа';
-          }
-        } else if (call.offer && !isCaller && !callId) {
-          // Для получателя: обрабатываем offer, если звонок ещё не принят
-          if (call.offer && call.offer.type === 'offer' && call.offer.sdp) {
-            callId = call.id;
-            isCaller = false;
-            statusEl.innerText = 'Входящий звонок...';
-            startCallBtn.disabled = false;
-            endCallBtn.disabled = false;
-            await answerCall(call);
-          } else {
-            errorEl.innerText = 'Некорректный формат предложения';
-          }
-        }
-        if (call.ice_candidates && call.ice_candidates.length > 0 && peerConnection) {
-          for (const candidate of call.ice_candidates) {
-            try {
-              await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-            } catch (err) {
-              console.error('Ошибка добавления ICE-кандидата:', err);
-            }
-          }
-        }
-      }
-    }
-
-    async function handleCallDelete(payload) {
-      if (payload.old.id === callId) {
-        endCall();
+        console.error('Error in startCall:', err);
+        errorEl.innerText = 'Ошибка запуска звонка: ' + err.message;
       }
     }
 
@@ -324,9 +333,13 @@
 
         peerConnection.onicecandidate = async (event) => {
           if (event.candidate) {
-            await supabase.from('calls').update({
-              ice_candidates: [...(await getCurrentIceCandidates() || []), event.candidate]
-            }).eq('id', callId);
+            try {
+              await supabase.from('calls').update({
+                ice_candidates: [...(await getCurrentIceCandidates() || []), event.candidate]
+              }).eq('id', callId);
+            } catch (err) {
+              console.error('Error updating ICE candidate:', err);
+            }
           }
         };
 
@@ -336,22 +349,157 @@
         await supabase.from('calls').update({ answer: answer, status: 'answered' }).eq('id', callId);
 
         statusEl.innerText = 'Соединение устанавливается...';
-        startCallBtn.disabled = true;
-        endCallBtn.disabled = false;
       } catch (err) {
+        console.error('Error in answerCall:', err);
         errorEl.innerText = 'Ошибка ответа на звонок: ' + err.message;
       }
     }
 
-    async function getCurrentIceCandidates() {
-      const { data } = await supabase.from('calls').select('ice_candidates').eq('id', callId).single();
-      return data?.ice_candidates || [];
+    async function endCall() {
+      try {
+        if (peerConnection) {
+          peerConnection.close();
+          peerConnection = null;
+        }
+        if (localStream) {
+          localStream.getTracks().forEach(track => track.stop());
+          localStream = null;
+        }
+        if (remoteStream) {
+          remoteStream.getTracks().forEach(track => track.stop());
+          remoteStream = null;
+        }
+        if (callId) {
+          await supabase.from('calls').delete().eq('id', callId);
+          callId = null;
+        }
+        statusEl.innerText = 'Звонок завершен';
+        localVideo.srcObject = null;
+        remoteVideo.srcObject = null;
+
+        // Перенаправление на сайт
+        window.location.href = "https://super-random.netlify.app/test";
+      } catch (err) {
+        console.error('Error in endCall:', err);
+        errorEl.innerText = 'Ошибка завершения звонка: ' + err.message;
+      }
     }
+
+    async function subscribeToCalls() {
+      callSubscription = supabase.channel('calls')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calls' }, handleCallInsert)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'calls' }, handleCallUpdate)
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'calls' }, handleCallDelete)
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('Subscribed to calls channel');
+          } else {
+            console.error('Subscription error:', status);
+          }
+        });
+    }
+
+    async function handleCallInsert(payload) {
+      const call = payload.new;
+      try {
+        if (call.receiver_id === currentUser.id && call.status === 'initiated' && !callId) {
+          if (!call.offer || !call.offer.type || !call.offer.sdp) {
+            statusEl.innerText = 'Ожидание предложения для звонка...';
+            return;
+          }
+          callId = call.id;
+          isCaller = false;
+          statusEl.innerText = 'Входящий звонок...';
+          await answerCall(call);
+        }
+      } catch (err) {
+        console.error('Error in handleCallInsert:', err);
+      }
+    }
+
+    async function handleCallUpdate(payload) {
+      const call = payload.new;
+      try {
+        if (call.id === callId) {
+          if (call.status === 'ended') {
+            endCall();
+          } else if (call.answer && isCaller && peerConnection) {
+            if (call.answer && call.answer.type === 'answer' && call.answer.sdp) {
+              await peerConnection.setRemoteDescription(new RTCSessionDescription(call.answer));
+              statusEl.innerText = 'Соединение установлено';
+            } else {
+              errorEl.innerText = 'Некорректный формат ответа';
+            }
+          } else if (call.offer && !isCaller && !peerConnection) {
+            if (call.offer && call.offer.type === 'offer' && call.offer.sdp) {
+              callId = call.id;
+              isCaller = false;
+              statusEl.innerText = 'Входящий звонок...';
+              await answerCall(call);
+            } else {
+              errorEl.innerText = 'Некорректный формат предложения';
+            }
+          }
+          if (call.ice_candidates && call.ice_candidates.length > 0 && peerConnection) {
+            for (const candidate of call.ice_candidates) {
+              await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error in handleCallUpdate:', err);
+      }
+    }
+
+    async function handleCallDelete(payload) {
+      try {
+        if (payload.old.id === callId) {
+          endCall();
+        }
+      } catch (err) {
+        console.error('Error in handleCallDelete:', err);
+      }
+    }
+
+    async function getCurrentIceCandidates() {
+      try {
+        const { data } = await supabase.from('calls').select('ice_candidates').eq('id', callId).single();
+        return data?.ice_candidates || [];
+      } catch (err) {
+        console.error('Error getting ICE candidates:', err);
+        return [];
+      }
+    }
+
+    // Кнопки управления
+    muteBtn.addEventListener('click', () => {
+      if (localStream) {
+        localStream.getAudioTracks().forEach(track => {
+          track.enabled = !track.enabled;
+          muteBtn.innerHTML = track.enabled ? '<i class="fa fa-microphone"></i> Mute' : '<i class="fa fa-microphone-slash"></i> Unmute';
+        });
+      }
+    });
+
+    cameraBtn.addEventListener('click', () => {
+      if (localStream) {
+        localStream.getVideoTracks().forEach(track => {
+          track.enabled = !track.enabled;
+          cameraBtn.innerHTML = track.enabled ? '<i class="fa fa-video"></i> Camera Off' : '<i class="fa fa-video-slash"></i> Camera On';
+        });
+      }
+    });
+
+    endCallBtn.addEventListener('click', endCall);
 
     window.addEventListener('load', init);
     window.addEventListener('beforeunload', async () => {
       if (callId) {
-        await supabase.from('calls').delete().eq('id', callId);
+        try {
+          await supabase.from('calls').delete().eq('id', callId);
+        } catch (err) {
+          console.error('Error in beforeunload:', err);
+        }
       }
     });
   </script>
