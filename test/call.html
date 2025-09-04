@@ -255,7 +255,7 @@
 
     async function handleCallUpdate(payload) {
       const call = payload.new;
-      if (call.id === callId) {
+      if (call.id === callId && peerConnection) {
         if (call.status === 'ended') {
           endCall();
         } else if (call.answer && isCaller) {
@@ -271,7 +271,7 @@
             errorEl.innerText = 'Некорректный формат ответа';
           }
         } else if (call.offer && !isCaller) {
-          // Для получателя звонка устанавливаем offer (это уже делается в answerCall)
+          // Для получателя звонка устанавливаем offer
           if (call.offer && call.offer.type === 'offer' && call.offer.sdp) {
             try {
               await peerConnection.setRemoteDescription(new RTCSessionDescription(call.offer));
