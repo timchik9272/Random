@@ -61,8 +61,8 @@
       box-shadow: var(--shadow);
     }
     #local-video {
-      width: 120px;
-      height: 160px;
+      width: 150px;
+      height: 200px;
       border-radius: var(--radius);
       background: #000;
       object-fit: cover;
@@ -71,6 +71,19 @@
       right: 10px;
       z-index: 10;
       box-shadow: var(--shadow);
+    }
+    .swap-video #remote-video {
+      width: 150px;
+      height: 200px;
+      position: absolute;
+      bottom: 80px;
+      right: 10px;
+      z-index: 10;
+    }
+    .swap-video #local-video {
+      width: 100%;
+      height: 100%;
+      position: static;
     }
     .fullscreen-remote #remote-video {
       width: 100vw;
@@ -84,13 +97,25 @@
       bottom: 100px;
       right: 20px;
     }
+    .fullscreen-remote.swap-video #local-video {
+      width: 100vw;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 5;
+    }
+    .fullscreen-remote.swap-video #remote-video {
+      bottom: 100px;
+      right: 20px;
+    }
     @media (max-width: 600px) {
       .call-container {
         padding: 10px;
       }
       #local-video {
-        width: 90px;
-        height: 120px;
+        width: 120px;
+        height: 160px;
         bottom: 70px;
         right: 5px;
       }
@@ -117,7 +142,7 @@
       bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 10;
+      z-index: 20;
     }
     button {
       background: var(--accent);
@@ -179,6 +204,8 @@
       <button id="toggle-mic" title="Вкл/выкл микрофон"><i class="fa fa-microphone"></i></button>
       <button id="toggle-camera" title="Вкл/выкл камеру"><i class="fa fa-video"></i></button>
       <button id="switch-camera" title="Переключить камеру"><i class="fa fa-sync-alt"></i></button>
+      <button id="swap-video" title="Поменять местами"><i class="fa fa-exchange-alt"></i></button>
+      <button id="fullscreen-toggle" title="На весь экран"><i class="fa fa-expand"></i></button>
       <button id="end-call" class="end-call-btn" onclick="endCall()"><i class="fa fa-phone-slash"></i></button>
     </div>
   </div>
@@ -207,6 +234,8 @@
     const toggleMicBtn = document.getElementById('toggle-mic');
     const toggleCameraBtn = document.getElementById('toggle-camera');
     const switchCameraBtn = document.getElementById('switch-camera');
+    const swapVideoBtn = document.getElementById('swap-video');
+    const fullscreenToggleBtn = document.getElementById('fullscreen-toggle');
     const endCallBtn = document.getElementById('end-call');
     const statusEl = document.getElementById('status');
     const videoGrid = document.getElementById('video-grid');
@@ -298,8 +327,9 @@
         subscribeToCalls();
 
         // Переключение полноэкранного режима
-        remoteVideo.onclick = () => {
+        fullscreenToggleBtn.onclick = () => {
           videoGrid.classList.toggle('fullscreen-remote');
+          fullscreenToggleBtn.innerHTML = `<i class="fa fa-${videoGrid.classList.contains('fullscreen-remote') ? 'compress' : 'expand'}"></i>`;
         };
       } catch (err) {
         console.error('Init error:', err);
@@ -413,7 +443,7 @@
           console.log('Call deleted from database');
           callId = null;
         }
-        statusEl.innerText = 'Звонок завершен';
+        statusEl.innerText = 'Звонок завержен';
         localVideo.srcObject = null;
         remoteVideo.srcObject = null;
         endCallBtn.disabled = true;
@@ -602,24 +632,27 @@
       if (localStream) {
         facingMode = facingMode === 'user' ? 'environment' : 'user';
         try {
-          const newStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: facingMode },
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-              sampleRate: 48000
-            }
-          });
-          localStream.getTracks().forEach(track => track.stop());
-          localStream = newStream;
+          const videoConstraints = { facingMode: facingMode };
+          const newVideoStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
+          const newVideoTrack = newVideoStream.getVideoTracks()[0];
+          localStream.getVideoTracks().forEach(track => track.stop());
+          localStream.addTrack(newVideoTrack);
           localVideo.srcObject = localStream;
-          localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+          const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+          if (sender) {
+            sender.replaceTrack(newVideoTrack);
+          }
           console.log('Camera switched to:', facingMode);
         } catch (err) {
           console.error('Error switching camera:', err);
         }
       }
+    };
+
+    // Поменять местами видео
+    swapVideoBtn.onclick = () => {
+      videoGrid.classList.toggle('swap-video');
+      console.log('Video swapped');
     };
 
     window.addEventListener('load', init);
@@ -635,4 +668,4 @@
     });
   </script>
 </body>
-  </html>
+        </html>
