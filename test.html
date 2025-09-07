@@ -174,7 +174,7 @@ uploadcare.start({ publicKey:"c12f2c3e134f56024db8" });
 /* ------------------ State ------------------ */
 let currentUser = null;
 let currentChat = null;
-let currentChatOtherId = null; // id собеседника (или равен currentUser.id для "Избранное")
+let currentChatOtherId = null;
 let msgSubscription = null;
 let chatSubscription = null;
 let profileSubscription = null;
@@ -182,16 +182,25 @@ let selectedMessageId = null;
 let selectedSender = null;
 let selectedImageUrl = null;
 let replyToMessage = null;
-let selfChatId = null; // id чата "с самим собой", если есть
-let chatSnapshot = null; // кеш для списка чатов
-let loadedMessages = []; // для оптимизации загрузки
-let oldestMessageId = null; // для lazy load
+let selfChatId = null;
+let chatSnapshot = null;
+let loadedMessages = [];
+let oldestMessageId = null;
 let loadingMore = false;
 let isAdmin = false;
 
+/* ------------------ WebView Integration ------------------ */
+function notifyWebViewUser(user) {
+  // Set a global variable or trigger an event that the WebView can intercept
+  window.webViewStringChange = user ? JSON.stringify({ userId: user.id, username: user.user_metadata.username, email: user.email }) : '';
+  // Optionally, dispatch a custom event for more complex WebView integrations
+  const event = new CustomEvent('webViewUserChange', { detail: window.webViewStringChange });
+  window.dispatchEvent(event);
+}
+
 /* ------------------ UI helpers ------------------ */
 function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
-function showLogin(){ showScreen('login-screen'); }
+function showLogin(){ showScreen('login-screen'); notifyWebViewUser(null); }
 function showRegister(){ showScreen('register-screen'); }
 function showMain(){ loadChats(); showScreen('main-screen'); }
 function openSettings(){ loadProfile(); showScreen('settings-screen'); }
@@ -227,6 +236,7 @@ async function signIn(){
     document.getElementById('main-nav-buttons').innerHTML += `<button onclick="openAdmin()"><i class="fa fa-user-shield"></i></button>`;
   }
   await supabase.from('profiles').update({ status:'онлайн', current_chat:null }).eq('id', currentUser.id);
+  notifyWebViewUser(currentUser); // Notify WebView of the logged-in user
   showMain();
   subscribeChats();
   subscribeProfile();
@@ -239,6 +249,7 @@ async function logout(){
     await supabase.auth.signOut();
     currentUser = null;
     isAdmin = false;
+    notifyWebViewUser(null); // Clear WebView user info on logout
   }
   showLogin();
 }
@@ -263,6 +274,7 @@ async function deleteAccount(){
   await supabase.from('profiles').delete().eq('id', currentUser.id);
   await supabase.auth.signOut();
   currentUser = null;
+  notifyWebViewUser(null); // Clear WebView user info on account deletion
   showLogin();
 }
 async function deleteAvatar(){
@@ -292,7 +304,6 @@ function formatDateTime(d){ const D=new Date(d); return D.toLocaleDateString('ru
 async function searchUser(){
   const input = document.getElementById('search-username').value.trim();
   if(!input){ alert('Введите username'); return; }
-  // искать точное совпадение (без учёта регистра)
   const { data:userProfile, error } = await supabase.from('profiles').select('id,username').ilike('username', input).limit(1).maybeSingle();
   if(error){ alert('Ошибка поиска: '+error.message); return; }
   if(!userProfile){ alert('Пользователь не найден'); return; }
@@ -300,7 +311,6 @@ async function searchUser(){
   let chatId = null;
 
   if(otherId === currentUser.id){
-    // чат сам с собой
     const { data:existing } = await supabase.from('chats').select('id').or(`and(user1.eq.${currentUser.id},user2.eq.${currentUser.id})`).limit(1);
     if(existing && existing.length>0){ chatId = existing[0].id; }
     else {
@@ -310,7 +320,6 @@ async function searchUser(){
     }
     openChat(chatId, 'Избранное', currentUser.id);
   } else {
-    // обычный диалог (поиск в обе стороны)
     const { data:existing } = await supabase.from('chats')
       .select('id,user1,user2')
       .or(`and(user1.eq.${currentUser.id},user2.eq.${otherId}),and(user1.eq.${otherId},user2.eq.${currentUser.id})`)
@@ -328,10 +337,8 @@ async function searchUser(){
 /* ------------------ Chat list (оптимизировано) ------------------ */
 async function loadChats(){
   if(!currentUser) return;
-  // получаем список чатов, где участвует текущий пользователь
   const { data:chats } = await supabase.from('chats').select('*').or(`user1.eq.${currentUser.id},user2.eq.${currentUser.id}`);
   if(!chats) return;
-  // параллельно собрать данные по последнему сообщению и имени
   const promises = chats.map(async chat => {
     const otherId = (chat.user1 === currentUser.id) ? chat.user2 : chat.user1;
     const isSelf = otherId === currentUser.id;
@@ -366,19 +373,14 @@ async function loadChats(){
   });
 
   const chatData = await Promise.all(promises);
-
-  // snapshot для сравнения: id -> lastCreated + unreadCount
   const newSnapshot = {};
   chatData.forEach(c=> newSnapshot[c.chatId] = `${c.lastCreated}::${c.unreadCount}`);
-
-  // если нет изменений — не перерисовываем список (экономим запросы / мерцание)
   const snapshotJson = JSON.stringify(newSnapshot);
   if(chatSnapshot && chatSnapshot === snapshotJson){
-    return; // ничего не менять
+    return;
   }
   chatSnapshot = snapshotJson;
 
-  // сортировка и отрисовка
   chatData.sort((a,b)=> new Date(b.lastCreated) - new Date(a.lastCreated));
   const list = document.getElementById('chat-list');
   list.innerHTML = '';
@@ -400,14 +402,12 @@ async function loadChats(){
     list.appendChild(div);
   }
 
-  // Определяем selfChatId
   if(!currentUser) { selfChatId = null; return; }
   const { data:existing } = await supabase.from('chats').select('id').or(`and(user1.eq.${currentUser.id},user2.eq.${currentUser.id})`).limit(1);
   if(existing && existing.length>0) selfChatId = existing[0].id;
   else selfChatId = null;
 }
 
-/* подписка на изменения чатов/сообщений — триггерит loadChats, но loadChats сам решает перерисовывать или нет */
 function subscribeChats(){
   if(chatSubscription) supabase.removeChannel(chatSubscription);
   chatSubscription = supabase
@@ -420,7 +420,6 @@ function subscribeChats(){
     .subscribe();
 }
 
-/* Подписка на изменения профиля для проверки бана */
 function subscribeProfile(){
   if(profileSubscription) supabase.removeChannel(profileSubscription);
   profileSubscription = supabase.channel('profile-'+currentUser.id)
@@ -464,11 +463,7 @@ async function openChat(chatId, otherName, otherId, otherAvatar = null){
     chatAvatar.style.display = 'none';
   }
   showScreen('chat-screen');
-
-  // обновляем поле current_chat в профиле — чтобы другие клиенты знали, что пользователь смотрит этот чат
   try{ await supabase.from('profiles').update({ current_chat: chatId }).eq('id', currentUser.id); } catch(e){ /* игнор */ }
-
-  // загрузить сообщения и подписаться на новые / обновления
   loadedMessages = [];
   oldestMessageId = null;
   await loadMessages(true);
@@ -477,15 +472,14 @@ async function openChat(chatId, otherName, otherId, otherAvatar = null){
   msgSubscription = supabase.channel('room-'+chatId)
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages', filter:`chat_id=eq.${chatId}` }, payload => {
       renderMessage(payload.new, true);
-      loadChats(); // обновить список чатов
+      loadChats();
     })
     .on('postgres_changes', { event:'UPDATE', schema:'public', table:'messages', filter:`chat_id=eq.${chatId}` }, payload => {
       renderMessage(payload.new, false);
-      loadChats(); // обновить при чтении/удалении
+      loadChats();
     })
     .subscribe();
 
-  // подписка на профиль собеседника (если это не "Избранное")
   if(otherId && !isSelf){
     if(window.statusChannelOther) supabase.removeChannel(window.statusChannelOther);
     window.statusChannelOther = supabase.channel('status-'+otherId)
@@ -499,11 +493,7 @@ async function openChat(chatId, otherName, otherId, otherAvatar = null){
   } else {
     document.getElementById('chat-status').innerText = '';
   }
-
-  // пометка входящих сообщений как прочитанных (только те, что отправлены не мной)
   await supabase.from('messages').update({ read:true }).eq('chat_id', chatId).neq('sender', currentUser.id).eq('read', false);
-
-  // слушатель скролла для lazy load и кнопки вниз
   const box = document.getElementById('messages');
   box.onscroll = () => {
     if (box.scrollTop === 0 && !loadingMore && oldestMessageId) {
@@ -513,7 +503,6 @@ async function openChat(chatId, otherName, otherId, otherAvatar = null){
   };
 }
 
-/* автопрокрутка к первому непрочитанному и вставка разделителя "непрочитанные" */
 async function loadMessages(initial = false){
   if(!currentChat) return;
   const limit = 50;
@@ -526,7 +515,7 @@ async function loadMessages(initial = false){
   const { data } = await query;
   if (!data || data.length === 0) return;
 
-  const messages = data.reverse(); // back to ascending
+  const messages = data.reverse();
   if (!initial) {
     loadedMessages = messages.concat(loadedMessages);
   } else {
@@ -539,14 +528,12 @@ async function loadMessages(initial = false){
   const box = document.getElementById('messages');
   if (initial) box.innerHTML = '';
 
-  // найти самый старый непрочитанный (который read===false и sender !== currentUser.id)
   let firstUnreadId = null;
   for(const msg of loadedMessages){
     if(!msg.read && msg.sender !== currentUser.id){ firstUnreadId = msg.id; break; }
   }
 
   for(const msg of messages){
-    // если это место для вставки "непрочитанные"
     if(firstUnreadId && msg.id === firstUnreadId){
       const sep = document.createElement('div');
       sep.className = 'unread-sep';
@@ -562,12 +549,10 @@ async function loadMessages(initial = false){
   }
 
   if (initial) {
-    // прокрутка: если есть непрочитанные — скроллим к разделителю (он окажется над первым непрочитанным)
     if(firstUnreadId){
       const sep = document.getElementById('unread-sep');
       if(sep){
         sep.scrollIntoView({ behavior:'instant', block:'start' });
-        // подсветим первый непрочитанный
         const firstEl = document.getElementById('msg-'+firstUnreadId);
         if(firstEl){
           firstEl.classList.add('highlight');
@@ -575,7 +560,6 @@ async function loadMessages(initial = false){
         }
       }
     } else {
-      // иначе — вниз
       box.scrollTop = box.scrollHeight;
     }
   }
@@ -605,7 +589,6 @@ function scrollToBottom() {
   toggleScrollDownBtn();
 }
 
-/* ------------------ Render single message ------------------ */
 async function renderMessage(msg, scroll=true, mode='append'){
   const box = document.getElementById('messages');
   let div = document.getElementById('msg-'+msg.id);
@@ -652,9 +635,6 @@ async function renderMessage(msg, scroll=true, mode='append'){
   if(msg.content) htmlParts.push(`<div>${escapeHtml(msg.content)}</div>`);
   if(msg.image_url) htmlParts.push(`<img src="${escapeHtml(msg.image_url)}" class="msg-img">`);
 
-  // галочки: если отправил я:
-  // - если чат "Избранное" (selfChatId) — всегда две галочки
-  // - иначе — смотрим поле read сообщения
   let ticks = '';
   if(isMe){
     if(currentChat === selfChatId) ticks = '<span class="ticks">✔✔</span>';
@@ -664,7 +644,6 @@ async function renderMessage(msg, scroll=true, mode='append'){
   htmlParts.push(`<span class="time">${formatTimeShort(msg.created_at)} ${ticks}</span>`);
   div.innerHTML = htmlParts.join('');
 
-  // сделать кликабельным превью ответа — при клике прокручиваем к исходному и подсвечиваем
   const replyElems = div.querySelectorAll('.reply-to');
   replyElems.forEach(el=>{
     const rid = el.getAttribute('data-reply-id');
@@ -675,12 +654,8 @@ async function renderMessage(msg, scroll=true, mode='append'){
         const target = document.getElementById('msg-'+rid);
         if(target){
           target.scrollIntoView({ behavior:'smooth', block:'center' });
-          // подсвечиваем сообщение
           target.classList.add('highlight');
           setTimeout(()=> target.classList.remove('highlight'), 2000);
-        } else {
-          // если сообщение ещё не загружено, попробуем подгрузить и затем подсветить (простая попытка)
-          // (если не удалось — просто ничего)
         }
       }
     };
@@ -690,7 +665,6 @@ async function renderMessage(msg, scroll=true, mode='append'){
   toggleScrollDownBtn();
 }
 
-/* ------------------ Send message (с учетом текущего просмотра собеседника) ------------------ */
 async function sendMessage(){
   const text = document.getElementById('msg-input').value.trim();
   if(!text && !selectedImageUrl) return;
@@ -703,15 +677,12 @@ async function sendMessage(){
     reply_to: replyToMessage ? replyToMessage.id : null,
     read: false
   };
-  // вставляем сообщение и сразу получаем вставленную строку
   const { data:inserted, error:insErr } = await supabase.from('messages').insert([payload]).select('*').single();
   if(insErr){ alert('Ошибка отправки: '+insErr.message); return; }
 
-  // если этот чат — "Избранное" (сам с собой) — помечаем сообщение прочитанным (две галочки)
   if(currentChat === selfChatId){
     await supabase.from('messages').update({ read:true }).eq('id', inserted.id);
   } else if(currentChatOtherId){
-    // проверим профиль собеседника — если он сейчас смотрит этот же чат (current_chat === currentChat) — пометим сообщение прочитанным
     try{
       const { data:otherProfile } = await supabase.from('profiles').select('current_chat').eq('id', currentChatOtherId).single();
       if(otherProfile && otherProfile.current_chat === currentChat){
@@ -720,7 +691,6 @@ async function sendMessage(){
     } catch(e){ /* игнор */ }
   }
 
-  // очистка ввода и превью
   document.getElementById('msg-input').value = '';
   selectedImageUrl = null;
   replyToMessage = null;
@@ -728,7 +698,6 @@ async function sendMessage(){
   hideReplyPreview();
 }
 
-/* ------------------ Image picker ------------------ */
 function triggerImageUpload(){
   document.getElementById('file-input').click();
 }
@@ -741,7 +710,6 @@ document.getElementById('file-input').addEventListener('change', (e) => {
   });
 });
 
-/* ------------------ Context menu / reply / delete ------------------ */
 async function showContextMenu(e, msgId, senderId, imageUrl){
   selectedMessageId = msgId; selectedSender = senderId;
   const menu = document.getElementById('context-menu');
@@ -800,7 +768,6 @@ async function confirmDelete(){
     return;
   }
   if(data){
-    // Обновляем отображение сообщения
     await renderMessage(data, false);
   }
   selectedMessageId = null;
@@ -850,7 +817,6 @@ function showReplyPreview(replyObj){
 function hideReplyPreview(){ document.getElementById('reply-preview-container').style.display = 'none'; document.getElementById('reply-preview').onclick = null; }
 function cancelReply(){ replyToMessage = null; hideReplyPreview(); }
 
-/* ------------------ Typing status ------------------ */
 document.getElementById('msg-input').addEventListener('input', async ()=>{
   if(!currentUser) return;
   await supabase.from('profiles').update({ typing:true }).eq('id', currentUser.id);
@@ -863,7 +829,6 @@ document.getElementById('msg-input').addEventListener('keydown', async (e)=>{
   if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }
 });
 
-/* ------------------ Utilities ------------------ */
 async function getUsernameById(id){
   if(!id) return 'Unknown';
   const { data } = await supabase.from('profiles').select('username').eq('id', id).single();
@@ -871,7 +836,6 @@ async function getUsernameById(id){
 }
 function formatStatus(profile){ if(!profile) return ''; if(profile.typing) return 'печатает...'; return profile.status || ''; }
 
-/* ------------------ Admin panel ------------------ */
 async function loadUsers(){
   const { data:users } = await supabase.from('profiles').select('*');
   const list = document.getElementById('user-list');
@@ -894,7 +858,6 @@ async function toggleBan(userId, currentBan){
   loadUsers();
 }
 
-/* ------------------ Session / cleanup ------------------ */
 window.addEventListener('load', async ()=>{
   const { data:{ session } } = await supabase.auth.getSession();
   if(session){ 
@@ -910,6 +873,7 @@ window.addEventListener('load', async ()=>{
     if (isAdmin) {
       document.getElementById('main-nav-buttons').innerHTML += `<button onclick="openAdmin()"><i class="fa fa-user-shield"></i></button>`;
     }
+    notifyWebViewUser(currentUser); // Notify WebView of the user on session load
     showMain(); 
     subscribeChats(); 
     subscribeProfile();
@@ -920,6 +884,7 @@ window.addEventListener('beforeunload', async ()=>{
     const nowTime = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
     const nowDate = new Date().toLocaleDateString('ru-RU');
     await supabase.from('profiles').update({ status:`был(а) в ${nowTime} ${nowDate}`, typing:false, current_chat:null }).eq('id', currentUser.id);
+    notifyWebViewUser(null); // Clear WebView user info on unload
   }
 });
 document.addEventListener('visibilitychange', async ()=>{
@@ -927,12 +892,12 @@ document.addEventListener('visibilitychange', async ()=>{
     const nowTime = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
     const nowDate = new Date().toLocaleDateString('ru-RU');
     await supabase.from('profiles').update({ status:`был(а) в ${nowTime} ${nowDate}`, typing:false, current_chat:null }).eq('id', currentUser.id);
+    notifyWebViewUser(null); // Clear WebView user info when hidden
   }
 });
 function backToMain(){
   if(msgSubscription) supabase.removeChannel(msgSubscription);
   if(window.statusChannelOther) supabase.removeChannel(window.statusChannelOther);
-  // очищаем поле current_chat
   if(currentUser) supabase.from('profiles').update({ current_chat:null }).eq('id', currentUser.id);
   currentChat = null;
   currentChatOtherId = null;
@@ -940,16 +905,12 @@ function backToMain(){
 }
 window.onclick = ()=> { document.getElementById('context-menu').style.display = 'none'; };
 
-/* ------------------ Гарантируемая корректная обработка "Оба в чате" ------------------ */
-/* selfChatId: найдем при загрузке списка чатов (если пользователь создал чат сам с собой) */
 (async function detectSelfChatId(){
-  //обновляем selfChatId при старте и при каждой загрузке чатов
   const origLoad = loadChats;
   loadChats = async function(){
     await origLoad();
   };
 })();
-
 </script>
 </body>
-                                                                 </html>
+  </html>
