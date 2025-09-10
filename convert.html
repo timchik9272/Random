@@ -1,0 +1,8 @@
+<script>
+    try {
+        const data = new URLSearchParams(location.search).get('data');
+        document.write(JSON.parse(decodeURIComponent(data))[0].id);
+    } catch {
+        document.write('');
+    }
+</script>
