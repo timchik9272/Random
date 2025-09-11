@@ -2,64 +2,155 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <title>VirusTotal URL Checker</title>
+  <title>URL Scanner — пример</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: sans-serif; background:#f6f8fa; padding:20px; }
-    input, button { padding:8px; margin:4px 0; }
-    pre { background:#fff; padding:10px; border:1px solid #ccc; white-space:pre-wrap; }
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;max-width:900px;margin:30px auto;padding:0 16px}
+    label{display:block;margin-top:12px}
+    input,select,button,textarea{width:100%;padding:8px;margin-top:6px;border:1px solid #ccc;border-radius:6px}
+    button{width:auto;padding:10px 16px}
+    pre{background:#111;color:#efe;padding:12px;border-radius:6px;white-space:pre-wrap;word-break:break-word}
+    .hint{font-size:0.9em;color:#666}
   </style>
 </head>
 <body>
-  <h1>Проверка ссылки через VirusTotal</h1>
-  <input id="url" type="text" placeholder="https://example.com" size="50">
-  <button id="scan">Проверить</button>
-  <pre id="out">Ничего не проверено</pre>
+  <h1>URL Scanner (пример)</h1>
 
-  <script>
-    const API_KEY = "bc6c478943ce4aaea1425733c84108cce38a7035498447f376329bf175e5911b";
-    const out = document.getElementById('out');
+  <label>Выберите сервис
+    <select id="service">
+      <option value="virustotal">VirusTotal (URL scan / report)</option>
+      <option value="urlscan">urlscan.io (site rendering + report)</option>
+      <option value="safebrowse">Google Safe Browsing / Web Risk (lookup)</option>
+      <option value="phishtank">PhishTank (phishing DB)</option>
+    </select>
+  </label>
 
-    document.getElementById('scan').addEventListener('click', async () => {
-      const url = document.getElementById('url').value.trim();
-      if (!url) return alert('Введите URL');
-      out.textContent = "Отправка в VirusTotal...";
+  <label>API-ключ (вставьте ваш ключ)
+    <input id="apiKey" placeholder="API key (некоторые сервисы допускают пустой ключ)" />
+  </label>
 
-      try {
-        // 1) отправляем URL
-        const params = new URLSearchParams();
-        params.append("url", url);
+  <label>URL для проверки
+    <input id="targetUrl" placeholder="https://example.com/..." />
+  </label>
 
-        let resp = await fetch("https://www.virustotal.com/api/v3/urls", {
-          method: "POST",
-          headers: { "x-apikey": API_KEY, "Content-Type": "application/x-www-form-urlencoded" },
-          body: params.toString()
-        });
+  <div style="margin-top:12px">
+    <button id="checkBtn">Проверить</button>
+    <button id="useProxyBtn" title="Включить, если API выдают CORS/ключ нельзя держать в браузере">Использовать прокси (опц.)</button>
+  </div>
 
-        let data = await resp.json();
-        if (!resp.ok) {
-          out.textContent = "Ошибка: " + JSON.stringify(data);
-          return;
+  <p class="hint">Если получение результата даёт ошибку CORS или "401", используйте прокси на своём сервере (пример ниже).</p>
+
+  <h3>Результат</h3>
+  <pre id="out">Нажмите "Проверить"</pre>
+
+<script>
+const out = document.getElementById('out');
+const checkBtn = document.getElementById('checkBtn');
+const useProxyBtn = document.getElementById('useProxyBtn');
+
+let useProxy = false;
+useProxyBtn.addEventListener('click', ()=> {
+  useProxy = !useProxy;
+  useProxyBtn.textContent = useProxy ? 'Прокси: ON' : 'Использовать прокси (опц.)';
+});
+
+checkBtn.addEventListener('click', async () => {
+  out.textContent = 'Выполняю запрос...';
+  const svc = document.getElementById('service').value;
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const url = document.getElementById('targetUrl').value.trim();
+  if(!url){ out.textContent = 'Укажите URL'; return; }
+
+  try {
+    if(svc === 'virustotal') {
+      // VirusTotal: пример получения отчёта по URL
+      // Public API: сначала нужно отправить URL и получить scan_id, либо запрошенный отчет по encoded_url
+      // Не забудьте: ключ не храните в клиентском JS в бою!
+      const endpoint = useProxy ? `/proxy/virustotal/url` : `https://www.virustotal.com/api/v3/urls`;
+      // отправляем URL (формат: application/x-www-form-urlencoded body: url=<url>)
+      const body = new URLSearchParams();
+      body.append('url', url);
+      const res = await fetch(endpoint, {
+        method:'POST',
+        headers: useProxy ? {'content-type':'application/x-www-form-urlencoded'} : {
+          'x-apikey': apiKey,
+          'content-type':'application/x-www-form-urlencoded'
+        },
+        body: body.toString()
+      });
+      const j = await res.json();
+      out.textContent = JSON.stringify(j, null, 2);
+      return;
+    }
+
+    if(svc === 'urlscan') {
+      // urlscan.io: submit a scan and get result. free tier exists
+      const endpoint = useProxy ? `/proxy/urlscan/scan` : `https://urlscan.io/api/v1/scan/`;
+      const res = await fetch(endpoint, {
+        method:'POST',
+        headers: useProxy ? {'content-type':'application/json'} : {
+          'API-Key': apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          url: url,
+          visibility: 'private'
+        })
+      });
+      const j = await res.json();
+      out.textContent = JSON.stringify(j, null, 2);
+      return;
+    }
+
+    if(svc === 'safebrowse') {
+      // Google Safe Browsing (Web Risk) example (threatMatches.find)
+      // Typically requires POST to Google's endpoint with API key in URL param
+      // Endpoint: https://safebrowsing.googleapis.com/v4/threatMatches:find?key=API_KEY
+      const endpoint = useProxy ? `/proxy/safebrowse` : `https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${encodeURIComponent(apiKey)}`;
+      const req = {
+        client: {clientId: "yourapp", clientVersion: "1.0"},
+        threatInfo: {
+          threatTypes: ["MALWARE","SOCIAL_ENGINEERING","UNWANTED_SOFTWARE","POTENTIALLY_HARMFUL_APPLICATION"],
+          platformTypes: ["ANY_PLATFORM"],
+          threatEntryTypes: ["URL"],
+          threatEntries: [{url: url}]
         }
+      };
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: useProxy ? {'content-type':'application/json'} : {'Content-Type':'application/json'},
+        body: JSON.stringify(req)
+      });
+      const j = await res.json();
+      out.textContent = JSON.stringify(j, null, 2);
+      return;
+    }
 
-        const analysisId = data.data.id;
+    if(svc === 'phishtank') {
+      // PhishTank simple check API (example)
+      // They have a check endpoint: https://checkurl.phishtank.com/checkurl/
+      // Note: PhishTank may require registration to get API key
+      const endpoint = useProxy ? `/proxy/phishtank` : `https://checkurl.phishtank.com/checkurl/`;
+      // PhishTank expects form data: url=<url>&format=json&app_key=<key>
+      const form = new URLSearchParams();
+      form.append('url', url);
+      form.append('format','json');
+      if(apiKey) form.append('app_key', apiKey);
+      const res = await fetch(endpoint, {
+        method:'POST',
+        headers: useProxy ? {'content-type':'application/x-www-form-urlencoded'} : {'Content-Type':'application/x-www-form-urlencoded'},
+        body: form.toString()
+      });
+      const j = await res.json();
+      out.textContent = JSON.stringify(j, null, 2);
+      return;
+    }
 
-        // 2) опрашиваем анализ
-        let analysis;
-        for (let i=0;i<10;i++) {
-          await new Promise(r => setTimeout(r, 1000));
-          let poll = await fetch(`https://www.virustotal.com/api/v3/analyses/${analysisId}`, {
-            headers: { "x-apikey": API_KEY }
-          });
-          analysis = await poll.json();
-          if (analysis.data && analysis.data.attributes.status === "completed") break;
-        }
-
-        out.textContent = JSON.stringify(analysis, null, 2);
-
-      } catch (e) {
-        out.textContent = "Ошибка: " + e.message;
-      }
-    });
-  </script>
+    out.textContent = 'Неизвестный сервис';
+  } catch (err) {
+    out.textContent = 'Ошибка: ' + (err && err.message ? err.message : String(err)) + '\n\n(Если CORS/401 — попробуйте использовать прокси на сервере)';
+  }
+});
+</script>
 </body>
 </html>
