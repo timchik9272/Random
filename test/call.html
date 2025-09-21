@@ -352,8 +352,12 @@
           if (isCaller) {
             await startCall();
           } else {
-            statusEl.innerText = 'Входящий звонок...';
-            await answerCall(existingCall);
+            if (existingCall.offer && existingCall.offer.type && existingCall.offer.sdp) {
+              statusEl.innerText = 'Входящий звонок...';
+              await answerCall(existingCall);
+            } else {
+              statusEl.innerText = 'Ожидание предложения для звонка...';
+            }
           }
         } else {
           isCaller = true;
@@ -371,15 +375,27 @@
     async function startCall() {
       try {
         console.log('Starting call, isCaller:', isCaller, 'chatId:', chatId);
+        // Проверяем, нет ли уже активного звонка, если пользователь не инициатор
+        if (!isCaller) {
+          console.log('Not caller, skipping startCall');
+          statusEl.innerText = 'Ожидание входящего звонка...';
+          return;
+        }
+
         // Проверяем, нет ли уже активного звонка
         const { data: existingCall } = await supabase.from('calls')
           .select('*')
           .eq('chat_id', chatId)
           .eq('status', 'initiated')
           .single();
-        if (existingCall && !isCaller) {
+        if (existingCall) {
           console.log('Existing call found, not starting new call');
-          statusEl.innerText = 'Входящий звонок уже существует';
+          statusEl.innerText = 'Звонок уже инициирован';
+          callId = existingCall.id;
+          isCaller = existingCall.caller_id === currentUser.id;
+          if (!isCaller) {
+            await answerCall(existingCall);
+          }
           return;
         }
 
@@ -412,6 +428,7 @@
               console.log('ICE candidate sent:', event.candidate);
             } catch (err) {
               console.error('Error sending ICE candidate:', err);
+              statusEl.innerText = 'Ошибка отправки ICE-кандидата: ' + err.message;
             }
           }
         };
@@ -427,7 +444,7 @@
           }
         };
 
-        if (!callId && isCaller) {
+        if (!callId) {
           const offer = await peerConnection.createOffer({
             offerToReceiveAudio: true,
             offerToReceiveVideo: true
@@ -444,8 +461,7 @@
           }).select('id').single();
           callId = callData.id;
           console.log('Call created with ID:', callId, 'Offer:', offer);
-          // Отправка уведомления как HTML-ссылка
-          const messageContent = `<a href="https://super-random.netlify.app/test/call?chat_id=${chatId}">Присоединиться к звонку</a>`;
+          const messageContent = `Я звоню вам. Присоединяйтесь: super-random.netlify.app/test/call?chat_id=${chatId}`;
           await supabase.from('messages').insert({
             chat_id: chatId,
             sender: currentUser.id,
@@ -455,7 +471,7 @@
           console.log('Notification message sent to chat:', messageContent);
         }
 
-        statusEl.innerText = isCaller ? 'Ожидание ответа...' : 'Соединение устанавливается...';
+        statusEl.innerText = 'Ожидание ответа...';
         endCallBtn.disabled = false;
       } catch (err) {
         console.error('startCall error:', err);
