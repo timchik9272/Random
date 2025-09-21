@@ -294,7 +294,7 @@
           });
           if (error) {
             console.error('Auto-login error:', error.message);
-            statusEl.innerText = 'Ошибка авторизации';
+            statusEl.innerText = 'Ошибка авторизации: ' + error.message;
             return;
           }
           console.log('Auto-login successful');
@@ -340,6 +340,7 @@
           return;
         }
 
+        // Проверка существующего звонка
         const { data: existingCall } = await supabase.from('calls')
           .select('*')
           .eq('chat_id', chatId)
@@ -350,10 +351,9 @@
           isCaller = existingCall.caller_id === currentUser.id;
           if (isCaller) {
             await startCall();
-          } else if (existingCall.offer && existingCall.offer.type && existingCall.offer.sdp) {
-            await answerCall(existingCall);
           } else {
-            statusEl.innerText = 'Ожидание предложения для звонка...';
+            statusEl.innerText = 'Входящий звонок...';
+            await answerCall(existingCall);
           }
         } else {
           isCaller = true;
@@ -361,17 +361,28 @@
         }
 
         subscribeToCalls();
-
         fullscreenToggleBtn.onclick = toggleFullscreen;
       } catch (err) {
         console.error('Init error:', err);
-        statusEl.innerText = 'Ошибка инициализации';
+        statusEl.innerText = 'Ошибка инициализации: ' + err.message;
       }
     }
 
     async function startCall() {
       try {
         console.log('Starting call, isCaller:', isCaller, 'chatId:', chatId);
+        // Проверяем, нет ли уже активного звонка
+        const { data: existingCall } = await supabase.from('calls')
+          .select('*')
+          .eq('chat_id', chatId)
+          .eq('status', 'initiated')
+          .single();
+        if (existingCall && !isCaller) {
+          console.log('Existing call found, not starting new call');
+          statusEl.innerText = 'Входящий звонок уже существует';
+          return;
+        }
+
         localStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: {
@@ -411,11 +422,12 @@
             statusEl.innerText = 'Соединение установлено';
           } else if (peerConnection.connectionState === 'failed') {
             console.error('Connection failed');
+            statusEl.innerText = 'Ошибка соединения';
             endCall();
           }
         };
 
-        if (!callId) {
+        if (!callId && isCaller) {
           const offer = await peerConnection.createOffer({
             offerToReceiveAudio: true,
             offerToReceiveVideo: true
@@ -432,21 +444,22 @@
           }).select('id').single();
           callId = callData.id;
           console.log('Call created with ID:', callId, 'Offer:', offer);
-          const messageContent = `Я звоню вам. Присоединяйтесь: super-random.netlify.app/test/call?chat_id=${chatId}&email=${encodeURIComponent(email || '')}&password=${encodeURIComponent(password || '')}`;
+          // Отправка уведомления как HTML-ссылка
+          const messageContent = `<a href="https://super-random.netlify.app/test/call?chat_id=${chatId}">Присоединиться к звонку</a>`;
           await supabase.from('messages').insert({
             chat_id: chatId,
             sender: currentUser.id,
             content: messageContent,
             read: false
           });
-          console.log('Notification message sent to chat');
+          console.log('Notification message sent to chat:', messageContent);
         }
 
         statusEl.innerText = isCaller ? 'Ожидание ответа...' : 'Соединение устанавливается...';
         endCallBtn.disabled = false;
       } catch (err) {
         console.error('startCall error:', err);
-        statusEl.innerText = 'Ошибка начала звонка';
+        statusEl.innerText = 'Ошибка начала звонка: ' + err.message;
       }
     }
 
@@ -470,7 +483,7 @@
           console.log('Call deleted from database');
           callId = null;
         }
-        statusEl.innerText = 'Звонок завершен';
+        statusEl.innerText = 'Звонок завершён';
         localVideo.srcObject = null;
         remoteVideo.srcObject = null;
         endCallBtn.disabled = true;
@@ -480,7 +493,7 @@
         }, 1000);
       } catch (err) {
         console.error('endCall error:', err);
-        statusEl.innerText = 'Ошибка завершения звонка';
+        statusEl.innerText = 'Ошибка завершения звонка: ' + err.message;
       }
     }
 
@@ -494,6 +507,7 @@
           .subscribe();
       } catch (err) {
         console.error('subscribeToCalls error:', err);
+        statusEl.innerText = 'Ошибка подписки на звонки: ' + err.message;
       }
     }
 
@@ -503,6 +517,7 @@
       if (call.receiver_id === currentUser.id && call.status === 'initiated' && !callId) {
         if (!call.offer || !call.offer.type || !call.offer.sdp) {
           console.warn('Invalid offer in call insert:', call.offer);
+          statusEl.innerText = 'Недействительное предложение звонка';
           return;
         }
         callId = call.id;
@@ -527,19 +542,11 @@
               console.log('Answer set successfully');
             } catch (err) {
               console.error('Error setting answer:', err);
+              statusEl.innerText = 'Ошибка установки ответа: ' + err.message;
             }
           } else {
             console.error('Invalid answer format:', call.answer);
-          }
-        } else if (call.offer && !isCaller && !peerConnection) {
-          if (call.offer && call.offer.type === 'offer' && call.offer.sdp) {
-            callId = call.id;
-            isCaller = false;
-            statusEl.innerText = 'Входящий звонок...';
-            endCallBtn.disabled = false;
-            await answerCall(call);
-          } else {
-            console.error('Invalid offer format:', call.offer);
+            statusEl.innerText = 'Недействительный формат ответа';
           }
         }
         if (call.ice_candidates && call.ice_candidates.length > 0 && peerConnection) {
@@ -549,6 +556,7 @@
               console.log('ICE candidate added:', candidate);
             } catch (err) {
               console.error('Error adding ICE candidate:', err);
+              statusEl.innerText = 'Ошибка добавления ICE-кандидата: ' + err.message;
             }
           }
         }
@@ -567,6 +575,7 @@
         console.log('Answering call:', call);
         if (!call.offer || !call.offer.type || !call.offer.sdp) {
           console.error('Invalid offer in answerCall:', call.offer);
+          statusEl.innerText = 'Недействительное предложение звонка';
           return;
         }
 
@@ -599,6 +608,7 @@
               console.log('ICE candidate sent:', event.candidate);
             } catch (err) {
               console.error('Error sending ICE candidate:', err);
+              statusEl.innerText = 'Ошибка отправки ICE-кандидата: ' + err.message;
             }
           }
         };
@@ -609,6 +619,7 @@
             statusEl.innerText = 'Соединение установлено';
           } else if (peerConnection.connectionState === 'failed') {
             console.error('Connection failed');
+            statusEl.innerText = 'Ошибка соединения';
             endCall();
           }
         };
@@ -623,7 +634,7 @@
         endCallBtn.disabled = false;
       } catch (err) {
         console.error('answerCall error:', err);
-        statusEl.innerText = 'Ошибка ответа на звонок';
+        statusEl.innerText = 'Ошибка ответа на звонок: ' + err.message;
       }
     }
 
@@ -672,6 +683,7 @@
           console.log('Camera switched to:', facingMode);
         } catch (err) {
           console.error('Error switching camera:', err);
+          statusEl.innerText = 'Ошибка переключения камеры: ' + err.message;
         }
       }
     };
@@ -685,6 +697,7 @@
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(err => {
           console.error('Error entering fullscreen:', err);
+          statusEl.innerText = 'Ошибка входа в полноэкранный режим: ' + err.message;
         });
         videoGrid.classList.add('fullscreen');
         fullscreenToggleBtn.innerHTML = `<i class="fa fa-compress"></i>`;
@@ -697,6 +710,7 @@
       if (document.fullscreenElement) {
         document.exitFullscreen().catch(err => {
           console.error('Error exiting fullscreen:', err);
+          statusEl.innerText = 'Ошибка выхода из полноэкранного режима: ' + err.message;
         });
       }
       videoGrid.classList.remove('fullscreen');
