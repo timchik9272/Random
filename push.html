@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -25,21 +26,25 @@
     if (error) console.error('Ошибка сохранения подписки:', error.message);
   }
 
-  // Запрос уведомлений после входа, если не разрешены
+  // Запрос уведомлений после входа, если не разрешены (исправлено для v16)
   async function promptForPush() {
     if (!currentUser) return;
     OneSignalDeferred.push(async function(OneSignal) {
-      const isSubscribed = await OneSignal.isPushNotificationsEnabled();
-      if (!isSubscribed) {
-        await OneSignal.showSlidedownPrompt();
-        OneSignal.on('subscriptionChange', function(isSubscribed) {
-          if (isSubscribed) {
-            OneSignal.getUserId(function(playerId) {
-              savePushSubscription(playerId);
-              OneSignal.setExternalUserId(currentUser.id); // Привязка user_id
-            });
-          }
-        });
+      try {
+        const isSubscribed = await OneSignal.isPushNotificationsEnabled();
+        if (!isSubscribed) {
+          await OneSignal.showSlidedownPrompt();
+          OneSignal.on('subscriptionChange', function(isSubscribed) {
+            if (isSubscribed) {
+              OneSignal.getUserId(function(playerId) {
+                savePushSubscription(playerId);
+                OneSignal.setExternalUserId(currentUser.id); // Привязка user_id
+              });
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Ошибка проверки уведомлений:', error);
       }
     });
   }
@@ -952,3 +957,4 @@ window.onclick = ()=> { document.getElementById('context-menu').style.display = 
 </script>
 </body>
 </html>
+```
