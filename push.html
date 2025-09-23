@@ -1,102 +1,85 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="utf-8" />
-<title>MiniMessenger</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-<script src="https://ucarecdn.com/libs/widget/3.x/uploadcare.full.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
-<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-<script>
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(async function(OneSignal) {
-    await OneSignal.init({
-      appId: "2e324874-a45f-4a70-ac36-130ef8af56a7",
-      safari_web_id: "web.onesignal.auto.0d123f70-12e5-49b1-a758-f1abcc853120",
-      notifyButton: {
-        enable: true,
-      },
+  <meta charset="utf-8" />
+  <title>MiniMessenger</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="https://ucarecdn.com/libs/widget/3.x/uploadcare.full.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <!-- OneSignal SDK и конфигурация -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: "2e324874-a45f-4a70-ac36-130ef8af56a7",
+        safari_web_id: "web.onesignal.auto.0d123f70-12e5-49b1-a758-f1abcc853120",
+        notifyButton: {
+          enable: true,
+        },
+      });
     });
-
-    // Функция для обновления player_id в базе данных
-    async function updateOneSignalId() {
-      if (window.currentUser) {
-        const userId = await OneSignal.User.PushSubscription.getUserId();
-        if (userId) {
-          await supabase.from('profiles').update({ onesignal_player_id: userId }).eq('id', window.currentUser.id);
-          console.log('OneSignal ID updated:', userId);
-        }
-      }
-    }
-
-    // Обновляем ID при изменении статуса подписки
-    OneSignal.Notifications.addEventListener("permissionChange", updateOneSignalId);
-    
-    // Обновляем ID сразу после инициализации, если пользователь авторизован
-    if (window.currentUser) {
-      await updateOneSignalId();
-    }
-  });
-</script>
-<style>
-:root{--bg:#0e0e0e;--bg-light:#1e1e1e;--accent:#0088cc;--text:#fff;--gray:#888;--radius:14px;}
-*{box-sizing:border-box}
-body{margin:0;font-family:sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;height:100vh;display:flex;flex-direction:column;}
-.screen{display:none;flex-direction:column;height:100vh;}
-.active{display:flex;}
-input,textarea,button{border:none;border-radius:var(--radius);font-size:15px;}
-input,textarea{background:var(--bg-light);color:var(--text);padding:10px;}
-button{background:var(--accent);color:#fff;padding:10px 12px;font-weight:bold;margin:6px 0;cursor:pointer;}
-nav{display:flex;align-items:center;gap:12px;padding:8px;background:var(--bg);position:sticky;top:0;z-index:10;border-bottom:1px solid #222;}
-.chat-list,.messages{flex:1;overflow-y:auto;}
-.chat-list{height:calc(100vh - 56px);} /* nav height approx */
-.chat-item{padding:12px;border-bottom:1px solid #222;cursor:pointer;display:flex;justify-content:space-between;align-items:center;}
-.chat-item .info{display:flex;flex-direction:column;flex:1;}
-.chat-item .last{display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:13px;color:var(--gray);}
-.chat-item .avatar{width:40px;height:40px;border-radius:50%;margin-right:12px;object-fit:cover;}
-.unread-badge{background:var(--accent);color:#fff;border-radius:50%;min-width:22px;height:22px;display:flex;justify-content:center;align-items:center;font-size:12px;padding:0 6px;}
-.msg{margin:6px 10px;padding:10px 14px;border-radius:var(--radius);max-width:75%;position:relative;border:1px solid #222;word-wrap:break-word;}
-.msg.me{background:var(--accent);margin-left:auto;color:#fff;}
-.msg.other{background:var(--bg-light);color:var(--text);}
-.msg.deleted{font-style:italic;color:var(--gray);background:transparent;border-style:dashed;}
-.msg .reply-to{font-size:13px;color:var(--gray);margin-bottom:6px;border-left:2px solid var(--gray);padding-left:8px;cursor:pointer;display:block;}
-.time{display:block;font-size:12px;margin-top:6px;text-align:right;}
-.me .time{color:#fff;} .other .time{color:var(--gray);}
-img.msg-img{max-width:100%;border-radius:var(--radius);margin-top:6px;display:block;}
-.input-box{display:flex;flex-direction:column;gap:6px;padding:8px;background:var(--bg);border-top:1px solid #222;position:sticky;bottom:0;}
-.input-row{display:flex;gap:6px;align-items:flex-end;}
-.input-box textarea{flex:1;min-height:44px;max-height:140px;padding:12px;border-radius:12px;resize:none;color:var(--text);background:var(--bg-light);}
-.send-btn,.img-btn{width:44px;height:44px;border-radius:50%;display:flex;justify-content:center;align-items:center;font-size:16px;background:var(--accent);color:#fff;border:none;cursor:pointer;}
-#preview img{max-width:140px;border-radius:var(--radius);margin:6px;}
-.context-menu{position:absolute;background:var(--bg-light);border:1px solid #333;border-radius:8px;display:none;flex-direction:column;z-index:1000;}
-.context-menu button{background:none;border:none;color:var(--text);padding:10px 14px;text-align:left;cursor:pointer;}
-.context-menu button:hover{background:#222;}
-.ticks{font-size:14px;margin-left:6px;color:var(--gray);}
-.typing-status{font-size:12px;color:var(--gray);}
-.unread-sep{display:flex;justify-content:center;align-items:center;margin:10px 0;color:var(--accent);font-size:13px;border-top:1px dashed var(--gray);border-bottom:1px dashed var(--gray);padding:6px 0;background:transparent;position:relative;}
-.reply-preview{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:#111;margin:6px 8px;border:1px solid #222;}
-.reply-preview .meta{font-size:13px;color:var(--gray);flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
-.reply-preview .meta strong{color:var(--gray);font-weight:600;margin-right:6px;}
-.reply-preview .cancel{cursor:pointer;padding:6px;border-radius:8px;background:#222;}
-.reply-preview .cancel:hover{background:#333;}
-.reply-to:hover{background:rgba(255,255,255,0.02);border-radius:8px;padding:6px;}
-.highlight{background:rgba(0,136,204,0.3) !important;box-shadow:0 0 10px rgba(0,136,204,0.5) !important;transform:translateY(-2px);transition:all .3s ease;}
-@media (max-width:520px){.msg{max-width:86%;}nav h2{font-size:16px;margin:0;}}
-#scroll-down-btn{position:fixed;bottom:80px;right:20px;width:40px;height:40px;border-radius:50%;background:var(--accent);color:#fff;display:none;z-index:10;cursor:pointer;border:none;}
-#scroll-down-btn i{font-size:18px;}
-.call-btn{background:transparent;color:var(--text);font-size:18px;padding:4px;border-radius:50%;cursor:pointer;}
-.call-btn:hover{background:#222;}
-.nav-avatar{width:32px;height:32px;border-radius:50%;margin-left:auto;object-fit:cover;}
-#profile-avatar{width:80px;height:80px;border-radius:50%;margin-bottom:12px;object-fit:cover;}
-.user-item{padding:12px;border-bottom:1px solid #222;display:flex;justify-content:space-between;align-items:center;}
-.user-item .info{flex:1;}
-.user-item button{background:#c00;margin-left:8px;}
-.user-item button.unban{background:var(--accent);}
-</style>
+  </script>
+  <style>
+    :root{--bg:#0e0e0e;--bg-light:#1e1e1e;--accent:#0088cc;--text:#fff;--gray:#888;--radius:14px;}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;height:100vh;display:flex;flex-direction:column;}
+    .screen{display:none;flex-direction:column;height:100vh;}
+    .active{display:flex;}
+    input,textarea,button{border:none;border-radius:var(--radius);font-size:15px;}
+    input,textarea{background:var(--bg-light);color:var(--text);padding:10px;}
+    button{background:var(--accent);color:#fff;padding:10px 12px;font-weight:bold;margin:6px 0;cursor:pointer;}
+    nav{display:flex;align-items:center;gap:12px;padding:8px;background:var(--bg);position:sticky;top:0;z-index:10;border-bottom:1px solid #222;}
+    .chat-list,.messages{flex:1;overflow-y:auto;}
+    .chat-list{height:calc(100vh - 56px);} /* nav height approx */
+    .chat-item{padding:12px;border-bottom:1px solid #222;cursor:pointer;display:flex;justify-content:space-between;align-items:center;}
+    .chat-item .info{display:flex;flex-direction:column;flex:1;}
+    .chat-item .last{display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:13px;color:var(--gray);}
+    .chat-item .avatar{width:40px;height:40px;border-radius:50%;margin-right:12px;object-fit:cover;}
+    .unread-badge{background:var(--accent);color:#fff;border-radius:50%;min-width:22px;height:22px;display:flex;justify-content:center;align-items:center;font-size:12px;padding:0 6px;}
+    .msg{margin:6px 10px;padding:10px 14px;border-radius:var(--radius);max-width:75%;position:relative;border:1px solid #222;word-wrap:break-word;}
+    .msg.me{background:var(--accent);margin-left:auto;color:#fff;}
+    .msg.other{background:var(--bg-light);color:var(--text);}
+    .msg.deleted{font-style:italic;color:var(--gray);background:transparent;border-style:dashed;}
+    .msg .reply-to{font-size:13px;color:var(--gray);margin-bottom:6px;border-left:2px solid var(--gray);padding-left:8px;cursor:pointer;display:block;}
+    .time{display:block;font-size:12px;margin-top:6px;text-align:right;}
+    .me .time{color:#fff;} .other .time{color:var(--gray);}
+    img.msg-img{max-width:100%;border-radius:var(--radius);margin-top:6px;display:block;}
+    .input-box{display:flex;flex-direction:column;gap:6px;padding:8px;background:var(--bg);border-top:1px solid #222;position:sticky;bottom:0;}
+    .input-row{display:flex;gap:6px;align-items:flex-end;}
+    .input-box textarea{flex:1;min-height:44px;max-height:140px;padding:12px;border-radius:12px;resize:none;color:var(--text);background:var(--bg-light);}
+    .send-btn,.img-btn{width:44px;height:44px;border-radius:50%;display:flex;justify-content:center;align-items:center;font-size:16px;background:var(--accent);color:#fff;border:none;cursor:pointer;}
+    #preview img{max-width:140px;border-radius:var(--radius);margin:6px;}
+    .context-menu{position:absolute;background:var(--bg-light);border:1px solid #333;border-radius:8px;display:none;flex-direction:column;z-index:1000;}
+    .context-menu button{background:none;border:none;color:var(--text);padding:10px 14px;text-align:left;cursor:pointer;}
+    .context-menu button:hover{background:#222;}
+    .ticks{font-size:14px;margin-left:6px;color:var(--gray);}
+    .typing-status{font-size:12px;color:var(--gray);}
+    .unread-sep{display:flex;justify-content:center;align-items:center;margin:10px 0;color:var(--accent);font-size:13px;border-top:1px dashed var(--gray);border-bottom:1px dashed var(--gray);padding:6px 0;background:transparent;position:relative;}
+    .reply-preview{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:#111;margin:6px 8px;border:1px solid #222;}
+    .reply-preview .meta{font-size:13px;color:var(--gray);flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+    .reply-preview .meta strong{color:var(--gray);font-weight:600;margin-right:6px;}
+    .reply-preview .cancel{cursor:pointer;padding:6px;border-radius:8px;background:#222;}
+    .reply-preview .cancel:hover{background:#333;}
+    .reply-to:hover{background:rgba(255,255,255,0.02);border-radius:8px;padding:6px;}
+    .highlight{background:rgba(0,136,204,0.3) !important;box-shadow:0 0 10px rgba(0,136,204,0.5) !important;transform:translateY(-2px);transition:all .3s ease;}
+    @media (max-width:520px){.msg{max-width:86%;}nav h2{font-size:16px;margin:0;}}
+    #scroll-down-btn{position:fixed;bottom:80px;right:20px;width:40px;height:40px;border-radius:50%;background:var(--accent);color:#fff;display:none;z-index:10;cursor:pointer;border:none;}
+    #scroll-down-btn i{font-size:18px;}
+    .call-btn{background:transparent;color:var(--text);font-size:18px;padding:4px;border-radius:50%;cursor:pointer;}
+    .call-btn:hover{background:#222;}
+    .nav-avatar{width:32px;height:32px;border-radius:50%;margin-left:auto;object-fit:cover;}
+    #profile-avatar{width:80px;height:80px;border-radius:50%;margin-bottom:12px;object-fit:cover;}
+    .user-item{padding:12px;border-bottom:1px solid #222;display:flex;justify-content:space-between;align-items:center;}
+    .user-item .info{flex:1;}
+    .user-item button{background:#c00;margin-left:8px;}
+    .user-item button.unban{background:var(--accent);}
+  </style>
 </head>
 <body>
 
+<!-- Вход -->
 <div id="login-screen" class="screen active">
   <h2 style="padding:12px">Вход</h2>
   <div style="padding:12px">
@@ -107,6 +90,7 @@ img.msg-img{max-width:100%;border-radius:var(--radius);margin-top:6px;display:bl
   </div>
 </div>
 
+<!-- Регистрация -->
 <div id="register-screen" class="screen">
   <h2 style="padding:12px">Регистрация</h2>
   <div style="padding:12px">
@@ -118,6 +102,7 @@ img.msg-img{max-width:100%;border-radius:var(--radius);margin-top:6px;display:bl
   </div>
 </div>
 
+<!-- Главный экран -->
 <div id="main-screen" class="screen">
   <nav><h2>Чаты</h2>
     <div id="main-nav-buttons">
@@ -128,6 +113,7 @@ img.msg-img{max-width:100%;border-radius:var(--radius);margin-top:6px;display:bl
   <div class="chat-list" id="chat-list"></div>
 </div>
 
+<!-- Новый чат -->
 <div id="search-screen" class="screen">
   <nav><button onclick="backToMain()"><i class="fa fa-arrow-left"></i></button><h2>Новый чат</h2></nav>
   <div style="padding:12px">
@@ -136,6 +122,7 @@ img.msg-img{max-width:100%;border-radius:var(--radius);margin-top:6px;display:bl
   </div>
 </div>
 
+<!-- Чат -->
 <div id="chat-screen" class="screen">
   <nav style="gap:12px;">
     <button onclick="backToMain()"><i class="fa fa-arrow-left"></i></button>
@@ -167,6 +154,7 @@ img.msg-img{max-width:100%;border-radius:var(--radius);margin-top:6px;display:bl
   <button id="scroll-down-btn" onclick="scrollToBottom()"><i class="fa fa-arrow-down"></i></button>
 </div>
 
+<!-- Настройки -->
 <div id="settings-screen" class="screen">
   <nav><button onclick="backToMain()"><i class="fa fa-arrow-left"></i></button><h2>Настройки</h2></nav>
   <div style="padding:12px;text-align:center;">
@@ -179,6 +167,7 @@ img.msg-img{max-width:100%;border-radius:var(--radius);margin-top:6px;display:bl
   </div>
 </div>
 
+<!-- Админ панель -->
 <div id="admin-screen" class="screen">
   <nav><button onclick="backToMain()"><i class="fa fa-arrow-left"></i></button><h2>Админ панель</h2></nav>
   <div id="user-list" style="flex:1;overflow-y:auto;padding:12px;"></div>
@@ -214,42 +203,91 @@ let oldestMessageId = null;
 let loadingMore = false;
 let isAdmin = false;
 
+/* ------------------ OneSignal Integration ------------------ */
+async function updateOneSignalPlayerId() {
+  if (!currentUser) return;
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    // Получаем player_id после подписки пользователя
+    const playerId = await OneSignal.getUserId();
+    if (playerId && currentUser) {
+      const { error } = await supabase.from('profiles').update({ onesignal_player_id: playerId }).eq('id', currentUser.id);
+      if (error) console.error('Ошибка обновления onesignal_player_id:', error.message);
+    }
+  });
+}
+
 /* ------------------ WebView Integration ------------------ */
 function notifyWebViewUser(user) {
-  // Set a global variable or trigger an event that the WebView can intercept
   window.webViewStringChange = user ? JSON.stringify({ userId: user.id, username: user.user_metadata.username, email: user.email }) : '';
-  // Optionally, dispatch a custom event for more complex WebView integrations
   const event = new CustomEvent('webViewUserChange', { detail: window.webViewStringChange });
   window.dispatchEvent(event);
 }
 
 /* ------------------ UI helpers ------------------ */
-function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
-function showLogin(){ showScreen('login-screen'); notifyWebViewUser(null); }
-function showRegister(){ showScreen('register-screen'); }
-function showMain(){ loadChats(); showScreen('main-screen'); }
-function openSettings(){ loadProfile(); showScreen('settings-screen'); }
-function openSearch(){ showScreen('search-screen'); }
-function openAdmin(){ loadUsers(); showScreen('admin-screen'); }
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function showLogin() {
+  showScreen('login-screen');
+  notifyWebViewUser(null);
+}
+function showRegister() {
+  showScreen('register-screen');
+}
+function showMain() {
+  loadChats();
+  showScreen('main-screen');
+}
+function openSettings() {
+  loadProfile();
+  showScreen('settings-screen');
+}
+function openSearch() {
+  showScreen('search-screen');
+}
+function openAdmin() {
+  loadUsers();
+  showScreen('admin-screen');
+}
 
 /* ------------------ Auth ------------------ */
-async function signUp(){
+async function signUp() {
   const email = document.getElementById('reg-email').value.trim();
   const password = document.getElementById('reg-password').value;
   const username = document.getElementById('reg-username').value.trim();
-  if(!email || !password || !username){ alert('Заполните все поля'); return; }
+  if (!email || !password || !username) {
+    alert('Заполните все поля');
+    return;
+  }
   const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { username } } });
-  if(error){ alert(error.message); return; }
-  await supabase.from('profiles').insert([{ id: data.user.id, email, username, status:'онлайн', typing:false, current_chat:null, avatar_url: null, ban: false }]);
-  alert('Подтвердите email и войдите'); showLogin();
+  if (error) {
+    alert(error.message);
+    return;
+  }
+  await supabase.from('profiles').insert([
+    { id: data.user.id, email, username, status: 'онлайн', typing: false, current_chat: null, avatar_url: null, ban: false, onesignal_player_id: null }
+  ]);
+  // Обновляем onesignal_player_id после регистрации
+  currentUser = data.user;
+  await updateOneSignalPlayerId();
+  alert('Подтвердите email и войдите');
+  showLogin();
 }
 
-async function signIn(){
+async function signIn() {
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
-  if(!email || !password){ alert('Введите email и пароль'); return; }
+  if (!email || !password) {
+    alert('Введите email и пароль');
+    return;
+  }
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if(error){ alert(error.message); return; }
+  if (error) {
+    alert(error.message);
+    return;
+  }
   currentUser = data.user;
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
   if (profile.ban) {
@@ -261,27 +299,25 @@ async function signIn(){
   if (isAdmin) {
     document.getElementById('main-nav-buttons').innerHTML += `<button onclick="openAdmin()"><i class="fa fa-user-shield"></i></button>`;
   }
-  await supabase.from('profiles').update({ status:'онлайн', current_chat:null }).eq('id', currentUser.id);
+  await supabase.from('profiles').update({ status: 'онлайн', current_chat: null, typing: false }).eq('id', currentUser.id);
+  // Обновляем onesignal_player_id после входа
+  await updateOneSignalPlayerId();
   notifyWebViewUser(currentUser);
   showMain();
   subscribeChats();
   subscribeProfile();
-  
-  // Обновляем OneSignal ID после успешного входа
-  if (window.OneSignal) {
-    const userId = await OneSignal.User.PushSubscription.getUserId();
-    if (userId) {
-      await supabase.from('profiles').update({ onesignal_player_id: userId }).eq('id', currentUser.id);
-      console.log('OneSignal ID updated on signIn:', userId);
-    }
-  }
 }
 
-async function logout(){
-  if(currentUser){
-    const nowTime = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+async function logout() {
+  if (currentUser) {
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const nowDate = new Date().toLocaleDateString('ru-RU');
-    await supabase.from('profiles').update({ status:`был(а) в ${nowTime} ${nowDate}`, typing:false, current_chat:null }).eq('id', currentUser.id);
+    await supabase.from('profiles').update({
+      status: `был(а) в ${nowTime} ${nowDate}`,
+      typing: false,
+      current_chat: null,
+      onesignal_player_id: null
+    }).eq('id', currentUser.id);
     await supabase.auth.signOut();
     currentUser = null;
     isAdmin = false;
@@ -290,10 +326,10 @@ async function logout(){
   showLogin();
 }
 
-async function loadProfile(){
-  if(!currentUser) return;
+async function loadProfile() {
+  if (!currentUser) return;
   const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
-  document.getElementById('profile-info').innerText = `Username: ${data.username}\nEmail: ${data.email}\nСтатус: ${data.status}\nOneSignal Player ID: ${data.onesignal_player_id || 'N/A'}`;
+  document.getElementById('profile-info').innerText = `Username: ${data.username}\nEmail: ${data.email}\nСтатус: ${data.status}`;
   const avatar = document.getElementById('profile-avatar');
   const deleteBtn = document.getElementById('delete-avatar-btn');
   if (data.avatar_url) {
@@ -306,9 +342,10 @@ async function loadProfile(){
   }
 }
 
-async function deleteAccount(){
-  if(!currentUser) return;
-  if(!confirm('Удалить аккаунт безвозвратно?')) return;
+async function deleteAccount() {
+  if (!currentUser) return;
+  if (!confirm('Удалить аккаунт безвозвратно?')) return;
+  await supabase.from('profiles').update({ onesignal_player_id: null }).eq('id', currentUser.id);
   await supabase.from('profiles').delete().eq('id', currentUser.id);
   await supabase.auth.signOut();
   currentUser = null;
@@ -316,13 +353,13 @@ async function deleteAccount(){
   showLogin();
 }
 
-async function deleteAvatar(){
-  if(!currentUser) return;
+async function deleteAvatar() {
+  if (!currentUser) return;
   await supabase.from('profiles').update({ avatar_url: null }).eq('id', currentUser.id);
   loadProfile();
 }
 
-function triggerAvatarUpload(){
+function triggerAvatarUpload() {
   document.getElementById('avatar-input').click();
 }
 
@@ -331,44 +368,72 @@ document.getElementById('avatar-input').addEventListener('change', async (e) => 
   if (!file) return;
   uploadcare.fileFrom('object', file).done(async (info) => {
     const { error } = await supabase.from('profiles').update({ avatar_url: info.cdnUrl }).eq('id', currentUser.id);
-    if(error) alert('Ошибка загрузки аватара: ' + error.message);
+    if (error) alert('Ошибка загрузки аватара: ' + error.message);
     else loadProfile();
   });
 });
 
 /* ------------------ Misc helpers ------------------ */
-function escapeHtml(text){ const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
-function formatTimeShort(d){ return new Date(d).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
-function formatDateTime(d){ const D=new Date(d); return D.toLocaleDateString('ru-RU') + ' ' + D.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+function escapeHtml(text) {
+  const d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
+}
+
+function formatTimeShort(d) {
+  return new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDateTime(d) {
+  const D = new Date(d);
+  return D.toLocaleDateString('ru-RU') + ' ' + D.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 
 /* ------------------ Search / create chat ------------------ */
-async function searchUser(){
+async function searchUser() {
   const input = document.getElementById('search-username').value.trim();
-  if(!input){ alert('Введите username'); return; }
-  const { data:userProfile, error } = await supabase.from('profiles').select('id,username').ilike('username', input).limit(1).maybeSingle();
-  if(error){ alert('Ошибка поиска: '+error.message); return; }
-  if(!userProfile){ alert('Пользователь не найден'); return; }
+  if (!input) {
+    alert('Введите username');
+    return;
+  }
+  const { data: userProfile, error } = await supabase.from('profiles').select('id,username').ilike('username', input).limit(1).maybeSingle();
+  if (error) {
+    alert('Ошибка поиска: ' + error.message);
+    return;
+  }
+  if (!userProfile) {
+    alert('Пользователь не найден');
+    return;
+  }
   const otherId = userProfile.id;
   let chatId = null;
 
-  if(otherId === currentUser.id){
-    const { data:existing } = await supabase.from('chats').select('id').or(`and(user1.eq.${currentUser.id},user2.eq.${currentUser.id})`).limit(1);
-    if(existing && existing.length>0){ chatId = existing[0].id; }
-    else {
-      const { data:newChat, error:cErr } = await supabase.from('chats').insert([{ user1:currentUser.id, user2:currentUser.id }]).select('id').single();
-      if(cErr){ alert(cErr.message); return; }
+  if (otherId === currentUser.id) {
+    const { data: existing } = await supabase.from('chats').select('id').or(`and(user1.eq.${currentUser.id},user2.eq.${currentUser.id})`).limit(1);
+    if (existing && existing.length > 0) {
+      chatId = existing[0].id;
+    } else {
+      const { data: newChat, error: cErr } = await supabase.from('chats').insert([{ user1: currentUser.id, user2: currentUser.id }]).select('id').single();
+      if (cErr) {
+        alert(cErr.message);
+        return;
+      }
       chatId = newChat.id;
     }
     openChat(chatId, 'Избранное', currentUser.id);
   } else {
-    const { data:existing } = await supabase.from('chats')
+    const { data: existing } = await supabase.from('chats')
       .select('id,user1,user2')
       .or(`and(user1.eq.${currentUser.id},user2.eq.${otherId}),and(user1.eq.${otherId},user2.eq.${currentUser.id})`)
       .limit(1);
-    if(existing && existing.length>0){ chatId = existing[0].id; }
-    else {
-      const { data:newChat, error:cErr } = await supabase.from('chats').insert([{ user1:currentUser.id, user2:otherId }]).select('id').single();
-      if(cErr){ alert(cErr.message); return; }
+    if (existing && existing.length > 0) {
+      chatId = existing[0].id;
+    } else {
+      const { data: newChat, error: cErr } = await supabase.from('chats').insert([{ user1: currentUser.id, user2: otherId }]).select('id').single();
+      if (cErr) {
+        alert(cErr.message);
+        return;
+      }
       chatId = newChat.id;
     }
     openChat(chatId, userProfile.username, otherId);
@@ -376,95 +441,110 @@ async function searchUser(){
 }
 
 /* ------------------ Chat list (оптимизировано) ------------------ */
-async function loadChats(){
-  if(!currentUser) return;
-  const { data:chats } = await supabase.from('chats').select('*').or(`user1.eq.${currentUser.id},user2.eq.${currentUser.id}`);
-  if(!chats) return;
+async function loadChats() {
+  if (!currentUser) return;
+  const { data: chats } = await supabase.from('chats').select('*').or(`user1.eq.${currentUser.id},user2.eq.${currentUser.id}`);
+  if (!chats) return;
   const promises = chats.map(async chat => {
     const otherId = (chat.user1 === currentUser.id) ? chat.user2 : chat.user1;
     const isSelf = otherId === currentUser.id;
     let chatName = 'Unknown';
     let avatar = null;
-    if(isSelf){ chatName = 'Избранное'; 
-      const { data:profile } = await supabase.from('profiles').select('avatar_url').eq('id', currentUser.id).single();
+    if (isSelf) {
+      chatName = 'Избранное';
+      const { data: profile } = await supabase.from('profiles').select('avatar_url').eq('id', currentUser.id).single();
       avatar = profile?.avatar_url || null;
-    }
-    else {
-      const { data:profile } = await supabase.from('profiles').select('username,avatar_url').eq('id', otherId).single();
+    } else {
+      const { data: profile } = await supabase.from('profiles').select('username,avatar_url').eq('id', otherId).single();
       chatName = profile?.username || 'Unknown';
       avatar = profile?.avatar_url || null;
     }
-    const { data:msgs } = await supabase.from('messages').select('id,content,image_url,created_at,read').eq('chat_id', chat.id).order('created_at',{ascending:false}).limit(1);
-    let lastMsgText = '', lastMsgImg=false, lastTime = '', lastCreated = 0;
-    if(msgs && msgs.length>0){
+    const { data: msgs } = await supabase.from('messages').select('id,content,image_url,created_at,read').eq('chat_id', chat.id).order('created_at', { ascending: false }).limit(1);
+    let lastMsgText = '', lastMsgImg = false, lastTime = '', lastCreated = 0;
+    if (msgs && msgs.length > 0) {
       lastMsgText = msgs[0].content || '';
       lastMsgImg = !!msgs[0].image_url;
       lastCreated = msgs[0].created_at;
       const d = new Date(msgs[0].created_at);
       const today = new Date();
-      if(d.toDateString() === today.toDateString()){
-        lastTime = d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      if (d.toDateString() === today.toDateString()) {
+        lastTime = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       } else {
-        lastTime = d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+        lastTime = d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       }
     }
-    const { data:unread } = await supabase.from('messages').select('id').eq('chat_id', chat.id).eq('read', false).neq('sender', currentUser.id);
-    const unreadCount = (unread||[]).length;
+    const { data: unread } = await supabase.from('messages').select('id').eq('chat_id', chat.id).eq('read', false).neq('sender', currentUser.id);
+    const unreadCount = (unread || []).length;
     return { chatId: chat.id, otherId, chatName, avatar, lastMsgText, lastMsgImg, lastTime, unreadCount, lastCreated };
   });
 
   const chatData = await Promise.all(promises);
   const newSnapshot = {};
-  chatData.forEach(c=> newSnapshot[c.chatId] = `${c.lastCreated}::${c.unreadCount}`);
+  chatData.forEach(c => newSnapshot[c.chatId] = `${c.lastCreated}::${c.unreadCount}`);
   const snapshotJson = JSON.stringify(newSnapshot);
-  if(chatSnapshot && chatSnapshot === snapshotJson){
+  if (chatSnapshot && chatSnapshot === snapshotJson) {
     return;
   }
   chatSnapshot = snapshotJson;
 
-  chatData.sort((a,b)=> new Date(b.lastCreated) - new Date(a.lastCreated));
+  chatData.sort((a, b) => new Date(b.lastCreated) - new Date(a.lastCreated));
   const list = document.getElementById('chat-list');
   list.innerHTML = '';
-  for(const c of chatData){
-    const div = document.createElement('div'); div.className='chat-item';
+  for (const c of chatData) {
+    const div = document.createElement('div');
+    div.className = 'chat-item';
     if (c.avatar) {
-      const avatarImg = document.createElement('img'); avatarImg.className='avatar'; avatarImg.src = c.avatar;
+      const avatarImg = document.createElement('img');
+      avatarImg.className = 'avatar';
+      avatarImg.src = c.avatar;
       div.appendChild(avatarImg);
     }
-    const info = document.createElement('div'); info.className='info';
-    const name = document.createElement('div'); name.innerText = c.chatName;
-    const last = document.createElement('div'); last.className = 'last';
+    const info = document.createElement('div');
+    info.className = 'info';
+    const name = document.createElement('div');
+    name.innerText = c.chatName;
+    const last = document.createElement('div');
+    last.className = 'last';
     const msgTxt = (c.lastMsgImg ? "🖼" : "") + (c.lastMsgText ? " " + c.lastMsgText : "");
-    last.innerHTML = `<span style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;display:inline-block;max-width:180px">${escapeHtml(msgTxt)}</span><span>${escapeHtml(c.lastTime||'')}</span>`;
-    info.appendChild(name); info.appendChild(last);
+    last.innerHTML = `<span style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis;display:inline-block;max-width:180px">${escapeHtml(msgTxt)}</span><span>${escapeHtml(c.lastTime || '')}</span>`;
+    info.appendChild(name);
+    info.appendChild(last);
     div.appendChild(info);
-    if(c.unreadCount>0){ const badge = document.createElement('div'); badge.className='unread-badge'; badge.innerText = c.unreadCount; div.appendChild(badge); }
-    div.onclick = ()=> openChat(c.chatId, c.chatName, c.otherId, c.avatar);
+    if (c.unreadCount > 0) {
+      const badge = document.createElement('div');
+      badge.className = 'unread-badge';
+      badge.innerText = c.unreadCount;
+      div.appendChild(badge);
+    }
+    div.onclick = () => openChat(c.chatId, c.chatName, c.otherId, c.avatar);
     list.appendChild(div);
   }
 
-  if(!currentUser) { selfChatId = null; return; }
-  const { data:existing } = await supabase.from('chats').select('id').or(`and(user1.eq.${currentUser.id},user2.eq.${currentUser.id})`).limit(1);
-  if(existing && existing.length>0) selfChatId = existing[0].id;
+  if (!currentUser) {
+    selfChatId = null;
+    return;
+  }
+  const { data: existing } = await supabase.from('chats').select('id').or(`and(user1.eq.${currentUser.id},user2.eq.${currentUser.id})`).limit(1);
+  if (existing && existing.length > 0) selfChatId = existing[0].id;
   else selfChatId = null;
 }
 
-function subscribeChats(){
-  if(chatSubscription) supabase.removeChannel(chatSubscription);
+function subscribeChats() {
+  if (chatSubscription) supabase.removeChannel(chatSubscription);
   chatSubscription = supabase
     .channel('chats-global')
-    .on('postgres_changes', { event:'INSERT', schema:'public', table:'chats' }, payload => loadChats())
-    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'chats' }, payload => loadChats())
-    .on('postgres_changes', { event:'DELETE', schema:'public', table:'chats' }, payload => loadChats())
-    .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages' }, payload => loadChats())
-    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'messages' }, payload => loadChats())
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, payload => loadChats())
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chats' }, payload => loadChats())
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chats' }, payload => loadChats())
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => loadChats())
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, payload => loadChats())
     .subscribe();
 }
 
-function subscribeProfile(){
-  if(profileSubscription) supabase.removeChannel(profileSubscription);
-  profileSubscription = supabase.channel('profile-'+currentUser.id)
-    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'profiles', filter:`id=eq.${currentUser.id}` }, payload => {
+function subscribeProfile() {
+  if (profileSubscription) supabase.removeChannel(profileSubscription);
+  profileSubscription = supabase.channel('profile-' + currentUser.id)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${currentUser.id}` }, payload => {
       if (payload.new.ban) {
         supabase.auth.signOut();
         alert('Вы забанены');
@@ -474,7 +554,7 @@ function subscribeProfile(){
 }
 
 /* ------------------ Open chat / messages ------------------ */
-async function openChat(chatId, otherName, otherId, otherAvatar = null){
+async function openChat(chatId, otherName, otherId, otherAvatar = null) {
   currentChat = chatId;
   currentChatOtherId = otherId;
   const isSelf = otherId === currentUser.id;
@@ -482,7 +562,7 @@ async function openChat(chatId, otherName, otherId, otherAvatar = null){
   document.getElementById('chat-status').innerText = '';
   document.getElementById('typing-status').innerText = '';
   const callLink = document.getElementById('call-link');
-  if(!isSelf){
+  if (!isSelf) {
     callLink.href = `https://timchik9272.github.io/Messenger-GitHub-Pages/call?chat_id=${encodeURIComponent(chatId)}`;
     callLink.style.display = 'block';
   } else {
@@ -493,7 +573,7 @@ async function openChat(chatId, otherName, otherId, otherAvatar = null){
     chatAvatar.src = otherAvatar;
     chatAvatar.style.display = 'block';
   } else if (isSelf) {
-    const { data:profile } = await supabase.from('profiles').select('avatar_url').eq('id', currentUser.id).single();
+    const { data: profile } = await supabase.from('profiles').select('avatar_url').eq('id', currentUser.id).single();
     if (profile.avatar_url) {
       chatAvatar.src = profile.avatar_url;
       chatAvatar.style.display = 'block';
@@ -504,37 +584,41 @@ async function openChat(chatId, otherName, otherId, otherAvatar = null){
     chatAvatar.style.display = 'none';
   }
   showScreen('chat-screen');
-  try{ await supabase.from('profiles').update({ current_chat: chatId }).eq('id', currentUser.id); } catch(e){ /* игнор */ }
+  try {
+    await supabase.from('profiles').update({ current_chat: chatId }).eq('id', currentUser.id);
+  } catch (e) {
+    /* игнор */
+  }
   loadedMessages = [];
   oldestMessageId = null;
   await loadMessages(true);
 
-  if(msgSubscription) supabase.removeChannel(msgSubscription);
-  msgSubscription = supabase.channel('room-'+chatId)
-    .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages', filter:`chat_id=eq.${chatId}` }, payload => {
+  if (msgSubscription) supabase.removeChannel(msgSubscription);
+  msgSubscription = supabase.channel('room-' + chatId)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `chat_id=eq.${chatId}` }, payload => {
       renderMessage(payload.new, true);
       loadChats();
     })
-    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'messages', filter:`chat_id=eq.${chatId}` }, payload => {
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `chat_id=eq.${chatId}` }, payload => {
       renderMessage(payload.new, false);
       loadChats();
     })
     .subscribe();
 
-  if(otherId && !isSelf){
-    if(window.statusChannelOther) supabase.removeChannel(window.statusChannelOther);
-    window.statusChannelOther = supabase.channel('status-'+otherId)
-      .on('postgres_changes', { event:'UPDATE', schema:'public', table:'profiles', filter:`id=eq.${otherId}` }, p=>{
+  if (otherId && !isSelf) {
+    if (window.statusChannelOther) supabase.removeChannel(window.statusChannelOther);
+    window.statusChannelOther = supabase.channel('status-' + otherId)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${otherId}` }, p => {
         const st = formatStatus(p.new);
         document.getElementById('chat-status').innerText = st;
         document.getElementById('typing-status').innerText = p.new.typing ? 'печатает...' : '';
       }).subscribe();
-    const { data:profile } = await supabase.from('profiles').select('*').eq('id', otherId).single();
-    if(profile) document.getElementById('chat-status').innerText = formatStatus(profile);
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', otherId).single();
+    if (profile) document.getElementById('chat-status').innerText = formatStatus(profile);
   } else {
     document.getElementById('chat-status').innerText = '';
   }
-  await supabase.from('messages').update({ read:true }).eq('chat_id', chatId).neq('sender', currentUser.id).eq('read', false);
+  await supabase.from('messages').update({ read: true }).eq('chat_id', chatId).neq('sender', currentUser.id).eq('read', false);
   const box = document.getElementById('messages');
   box.onscroll = () => {
     if (box.scrollTop === 0 && !loadingMore && oldestMessageId) {
@@ -544,14 +628,14 @@ async function openChat(chatId, otherName, otherId, otherAvatar = null){
   };
 }
 
-async function loadMessages(initial = false){
-  if(!currentChat) return;
+async function loadMessages(initial = false) {
+  if (!currentChat) return;
   const limit = 50;
   let query = supabase.from('messages').select('*').eq('chat_id', currentChat);
   if (initial) {
-    query = query.order('created_at', {ascending: false}).limit(limit);
+    query = query.order('created_at', { ascending: false }).limit(limit);
   } else {
-    query = query.lt('id', oldestMessageId).order('created_at', {ascending: false}).limit(limit);
+    query = query.lt('id', oldestMessageId).order('created_at', { ascending: false }).limit(limit);
   }
   const { data } = await query;
   if (!data || data.length === 0) return;
@@ -570,12 +654,15 @@ async function loadMessages(initial = false){
   if (initial) box.innerHTML = '';
 
   let firstUnreadId = null;
-  for(const msg of loadedMessages){
-    if(!msg.read && msg.sender !== currentUser.id){ firstUnreadId = msg.id; break; }
+  for (const msg of loadedMessages) {
+    if (!msg.read && msg.sender !== currentUser.id) {
+      firstUnreadId = msg.id;
+      break;
+    }
   }
 
-  for(const msg of messages){
-    if(firstUnreadId && msg.id === firstUnreadId){
+  for (const msg of messages) {
+    if (firstUnreadId && msg.id === firstUnreadId) {
       const sep = document.createElement('div');
       sep.className = 'unread-sep';
       sep.id = 'unread-sep';
@@ -590,14 +677,14 @@ async function loadMessages(initial = false){
   }
 
   if (initial) {
-    if(firstUnreadId){
+    if (firstUnreadId) {
       const sep = document.getElementById('unread-sep');
-      if(sep){
-        sep.scrollIntoView({ behavior:'instant', block:'start' });
-        const firstEl = document.getElementById('msg-'+firstUnreadId);
-        if(firstEl){
+      if (sep) {
+        sep.scrollIntoView({ behavior: 'instant', block: 'start' });
+        const firstEl = document.getElementById('msg-' + firstUnreadId);
+        if (firstEl) {
           firstEl.classList.add('highlight');
-          setTimeout(()=> firstEl.classList.remove('highlight'), 2000);
+          setTimeout(() => firstEl.classList.remove('highlight'), 2000);
         }
       }
     } else {
@@ -630,16 +717,19 @@ function scrollToBottom() {
   toggleScrollDownBtn();
 }
 
-async function renderMessage(msg, scroll=true, mode='append'){
+async function renderMessage(msg, scroll = true, mode = 'append') {
   const box = document.getElementById('messages');
-  let div = document.getElementById('msg-'+msg.id);
+  let div = document.getElementById('msg-' + msg.id);
   const isMe = msg.sender === currentUser.id;
 
-  if(!div){
+  if (!div) {
     div = document.createElement('div');
-    div.id = 'msg-'+msg.id;
+    div.id = 'msg-' + msg.id;
     div.className = 'msg ' + (isMe ? 'me' : 'other');
-    div.oncontextmenu = (e)=>{ e.preventDefault(); showContextMenu(e, msg.id, msg.sender, msg.image_url); };
+    div.oncontextmenu = (e) => {
+      e.preventDefault();
+      showContextMenu(e, msg.id, msg.sender, msg.image_url);
+    };
     if (mode === 'prepend') {
       box.insertBefore(div, box.firstChild);
     } else {
@@ -649,36 +739,36 @@ async function renderMessage(msg, scroll=true, mode='append'){
     div.className = 'msg ' + (isMe ? 'me' : 'other');
   }
 
-  if(msg.is_deleted){
-    div.className='msg deleted';
-    div.innerText='Сообщение удалено';
-    if(scroll) box.scrollTop = box.scrollHeight;
+  if (msg.is_deleted) {
+    div.className = 'msg deleted';
+    div.innerText = 'Сообщение удалено';
+    if (scroll) box.scrollTop = box.scrollHeight;
     return;
   }
 
   let htmlParts = [];
-  if(msg.reply_to){
-    try{
-      const { data:orig } = await supabase.from('messages').select('id,sender,content,image_url').eq('id', msg.reply_to).single();
-      if(orig){
+  if (msg.reply_to) {
+    try {
+      const { data: orig } = await supabase.from('messages').select('id,sender,content,image_url').eq('id', msg.reply_to).single();
+      if (orig) {
         const username = await getUsernameById(orig.sender);
-        let snippet = orig.content && orig.content.trim().length>0 ? orig.content.trim().slice(0,120) : (orig.image_url ? '[изображение]' : '[сообщение]');
+        let snippet = orig.content && orig.content.trim().length > 0 ? orig.content.trim().slice(0, 120) : (orig.image_url ? '[изображение]' : '[сообщение]');
         const headerHTML = `<div class="reply-to" data-reply-id="${orig.id}" style="font-size:13px;color:var(--gray);border-left:2px solid var(--gray);padding-left:6px;">Ответ <strong>@${escapeHtml(username)}</strong>: ${escapeHtml(snippet)}</div>`;
         htmlParts.push(headerHTML);
       } else {
         htmlParts.push(`<div class="reply-to" style="font-size:13px;color:var(--gray)">Ответ: (сообщение удалено)</div>`);
       }
-    } catch(e){
+    } catch (e) {
       htmlParts.push(`<div class="reply-to" style="font-size:13px;color:var(--gray)">Ответ</div>`);
     }
   }
 
-  if(msg.content) htmlParts.push(`<div>${escapeHtml(msg.content)}</div>`);
-  if(msg.image_url) htmlParts.push(`<img src="${escapeHtml(msg.image_url)}" class="msg-img">`);
+  if (msg.content) htmlParts.push(`<div>${escapeHtml(msg.content)}</div>`);
+  if (msg.image_url) htmlParts.push(`<img src="${escapeHtml(msg.image_url)}" class="msg-img">`);
 
   let ticks = '';
-  if(isMe){
-    if(currentChat === selfChatId) ticks = '<span class="ticks">✔✔</span>';
+  if (isMe) {
+    if (currentChat === selfChatId) ticks = '<span class="ticks">✔✔</span>';
     else ticks = msg.read ? '<span class="ticks">✔✔</span>' : '<span class="ticks">✔</span>';
   }
 
@@ -686,30 +776,30 @@ async function renderMessage(msg, scroll=true, mode='append'){
   div.innerHTML = htmlParts.join('');
 
   const replyElems = div.querySelectorAll('.reply-to');
-  replyElems.forEach(el=>{
+  replyElems.forEach(el => {
     const rid = el.getAttribute('data-reply-id');
     el.style.cursor = 'pointer';
-    el.onclick = (ev)=>{
+    el.onclick = (ev) => {
       ev.stopPropagation();
-      if(rid){
-        const target = document.getElementById('msg-'+rid);
-        if(target){
-          target.scrollIntoView({ behavior:'smooth', block:'center' });
+      if (rid) {
+        const target = document.getElementById('msg-' + rid);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
           target.classList.add('highlight');
-          setTimeout(()=> target.classList.remove('highlight'), 2000);
+          setTimeout(() => target.classList.remove('highlight'), 2000);
         }
       }
     };
   });
 
-  if(scroll) box.scrollTop = box.scrollHeight;
+  if (scroll) box.scrollTop = box.scrollHeight;
   toggleScrollDownBtn();
 }
 
-async function sendMessage(){
+async function sendMessage() {
   const text = document.getElementById('msg-input').value.trim();
-  if(!text && !selectedImageUrl) return;
-  if(!currentChat) return;
+  if (!text && !selectedImageUrl) return;
+  if (!currentChat) return;
   const payload = {
     chat_id: currentChat,
     sender: currentUser.id,
@@ -718,46 +808,22 @@ async function sendMessage(){
     reply_to: replyToMessage ? replyToMessage.id : null,
     read: false
   };
-  const { data:inserted, error:insErr } = await supabase.from('messages').insert([payload]).select('*').single();
-  if(insErr){ alert('Ошибка отправки: ' + insErr.message); return; }
+  const { data: inserted, error: insErr } = await supabase.from('messages').insert([payload]).select('*').single();
+  if (insErr) {
+    alert('Ошибка отправки: ' + insErr.message);
+    return;
+  }
 
-  // Логика отправки OneSignal уведомления
-  if (currentChatOtherId) {
+  if (currentChat === selfChatId) {
+    await supabase.from('messages').update({ read: true }).eq('id', inserted.id);
+  } else if (currentChatOtherId) {
     try {
-      const { data:otherProfile } = await supabase.from('profiles').select('onesignal_player_id, username').eq('id', currentChatOtherId).single();
-      
-      // Отправляем уведомление, если у получателя есть onesignal_player_id
-      if (otherProfile && otherProfile.onesignal_player_id) {
-          const messageText = text || '🖼 Изображение';
-          const notification = {
-              app_id: "2e324874-a45f-4a70-ac36-130ef8af56a7",
-              contents: { en: `Новое сообщение от ${currentUser.user_metadata.username}: ${messageText.length > 50 ? messageText.substring(0, 50) + '...' : messageText}` },
-              headings: { en: `Новое сообщение` },
-              include_player_ids: [otherProfile.onesignal_player_id],
-              url: window.location.href, // Ссылка на ваше приложение
-          };
-
-          const response = await fetch('https://onesignal.com/api/v1/notifications', {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json; charset=utf-8',
-                  'Authorization': 'os_v2_app_fyzeq5fel5fhblbwcmhprl2wu6lmvbhhg2yusnurzqbdl26s4nvosj2pma3hwmmahak4jcib6tcsxr7pusit62yzt4g3jpxs75rw65y' // Замените на ваш REST API key
-              },
-              body: JSON.stringify(notification),
-          });
-          const result = await response.json();
-          console.log('OneSignal API response:', result);
-      }
-
-      // Обновляем статус "прочитано"
+      const { data: otherProfile } = await supabase.from('profiles').select('current_chat').eq('id', currentChatOtherId).single();
       if (otherProfile && otherProfile.current_chat === currentChat) {
-          await supabase.from('messages').update({ read: true }).eq('id', inserted.id);
-      } else {
-          await supabase.from('messages').update({ read: false }).eq('id', inserted.id);
+        await supabase.from('messages').update({ read: true }).eq('id', inserted.id);
       }
-
-    } catch(e){ 
-      console.error('Error sending notification or updating read status:', e); 
+    } catch (e) {
+      /* игнор */
     }
   }
 
@@ -768,9 +834,10 @@ async function sendMessage(){
   hideReplyPreview();
 }
 
-function triggerImageUpload(){
+function triggerImageUpload() {
   document.getElementById('file-input').click();
 }
+
 document.getElementById('file-input').addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -780,49 +847,52 @@ document.getElementById('file-input').addEventListener('change', (e) => {
   });
 });
 
-async function showContextMenu(e, msgId, senderId, imageUrl){
-  selectedMessageId = msgId; selectedSender = senderId;
+async function showContextMenu(e, msgId, senderId, imageUrl) {
+  selectedMessageId = msgId;
+  selectedSender = senderId;
   const menu = document.getElementById('context-menu');
   menu.innerHTML = '';
-  
+
   const copyBtn = document.createElement('button');
   copyBtn.innerText = 'Копировать';
   copyBtn.onclick = copyMessage;
   menu.appendChild(copyBtn);
-  
+
   const replyBtn = document.createElement('button');
   replyBtn.innerText = 'Ответить';
   replyBtn.onclick = replyMessage;
   menu.appendChild(replyBtn);
-  
-  if(senderId === currentUser.id){
+
+  if (senderId === currentUser.id) {
     const deleteBtn = document.createElement('button');
     deleteBtn.innerText = 'Удалить';
     deleteBtn.onclick = confirmDelete;
     menu.appendChild(deleteBtn);
   }
-  
-  if(imageUrl){
+
+  if (imageUrl) {
     const downloadBtn = document.createElement('button');
     downloadBtn.innerText = 'Скачать';
     downloadBtn.onclick = downloadMessageImage;
     menu.appendChild(downloadBtn);
   }
-  
+
   menu.style.left = e.pageX + 'px';
   menu.style.top = e.pageY + 'px';
   menu.style.display = 'flex';
 }
-function copyMessage(){
-  if(!selectedMessageId) return;
-  const el = document.getElementById('msg-'+selectedMessageId);
-  if(el) navigator.clipboard.writeText(el.innerText || '');
+
+function copyMessage() {
+  if (!selectedMessageId) return;
+  const el = document.getElementById('msg-' + selectedMessageId);
+  if (el) navigator.clipboard.writeText(el.innerText || '');
   selectedMessageId = null;
   document.getElementById('context-menu').style.display = 'none';
 }
-async function confirmDelete(){
-  if(!selectedMessageId || !currentUser) return;
-  if(selectedSender !== currentUser.id){
+
+async function confirmDelete() {
+  if (!selectedMessageId || !currentUser) return;
+  if (selectedSender !== currentUser.id) {
     alert('Вы можете удалять только свои сообщения');
     document.getElementById('context-menu').style.display = 'none';
     return;
@@ -833,20 +903,21 @@ async function confirmDelete(){
     .eq('sender', currentUser.id)
     .select('*')
     .single();
-  if(error){
+  if (error) {
     alert('Ошибка удаления: ' + error.message);
     return;
   }
-  if(data){
+  if (data) {
     await renderMessage(data, false);
   }
   selectedMessageId = null;
   document.getElementById('context-menu').style.display = 'none';
 }
-async function downloadMessageImage(){
-  if(!selectedMessageId) return;
+
+async function downloadMessageImage() {
+  if (!selectedMessageId) return;
   const { data } = await supabase.from('messages').select('image_url').eq('id', selectedMessageId).single();
-  if(data && data.image_url){
+  if (data && data.image_url) {
     const a = document.createElement('a');
     a.href = data.image_url;
     a.download = 'image.jpg';
@@ -856,17 +927,19 @@ async function downloadMessageImage(){
   }
   document.getElementById('context-menu').style.display = 'none';
 }
-async function replyMessage(){
-  if(!selectedMessageId) return;
+
+async function replyMessage() {
+  if (!selectedMessageId) return;
   document.getElementById('context-menu').style.display = 'none';
-  const { data:msg } = await supabase.from('messages').select('*').eq('id', selectedMessageId).single();
-  if(!msg) return;
+  const { data: msg } = await supabase.from('messages').select('*').eq('id', selectedMessageId).single();
+  if (!msg) return;
   const uname = await getUsernameById(msg.sender);
-  const text = (msg.content||'').split('\n')[0].slice(0,180);
+  const text = (msg.content || '').split('\n')[0].slice(0, 180);
   replyToMessage = { id: selectedMessageId, text, username: uname };
   showReplyPreview(replyToMessage);
 }
-function showReplyPreview(replyObj){
+
+function showReplyPreview(replyObj) {
   const container = document.getElementById('reply-preview-container');
   document.getElementById('reply-username').innerText = '@' + (replyObj.username || 'user');
   document.getElementById('reply-text').innerText = ' ' + (replyObj.text || '');
@@ -874,45 +947,64 @@ function showReplyPreview(replyObj){
   const preview = document.getElementById('reply-preview');
   preview.onclick = (e) => {
     e.stopPropagation();
-    const target = document.getElementById('msg-'+replyObj.id);
-    if(target){
-      target.scrollIntoView({ behavior:'smooth', block:'center' });
+    const target = document.getElementById('msg-' + replyObj.id);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
       target.classList.add('highlight');
-      setTimeout(()=> target.classList.remove('highlight'), 2000);
+      setTimeout(() => target.classList.remove('highlight'), 2000);
     } else {
       alert('Исходное сообщение не на этой странице.');
     }
   };
 }
-function hideReplyPreview(){ document.getElementById('reply-preview-container').style.display = 'none'; document.getElementById('reply-preview').onclick = null; }
-function cancelReply(){ replyToMessage = null; hideReplyPreview(); }
 
-document.getElementById('msg-input').addEventListener('input', async ()=>{
-  if(!currentUser) return;
-  await supabase.from('profiles').update({ typing:true }).eq('id', currentUser.id);
+function hideReplyPreview() {
+  document.getElementById('reply-preview-container').style.display = 'none';
+  document.getElementById('reply-preview').onclick = null;
+}
+
+function cancelReply() {
+  replyToMessage = null;
+  hideReplyPreview();
+}
+
+document.getElementById('msg-input').addEventListener('input', async () => {
+  if (!currentUser) return;
+  await supabase.from('profiles').update({ typing: true }).eq('id', currentUser.id);
   clearTimeout(window.typingTimeout);
-  window.typingTimeout = setTimeout(async ()=>{
-    await supabase.from('profiles').update({ typing:false }).eq('id', currentUser.id);
+  window.typingTimeout = setTimeout(async () => {
+    await supabase.from('profiles').update({ typing: false }).eq('id', currentUser.id);
   }, 1500);
 });
-document.getElementById('msg-input').addEventListener('keydown', async (e)=>{
-  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }
+
+document.getElementById('msg-input').addEventListener('keydown', async (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
 });
 
-async function getUsernameById(id){
-  if(!id) return 'Unknown';
+async function getUsernameById(id) {
+  if (!id) return 'Unknown';
   const { data } = await supabase.from('profiles').select('username').eq('id', id).single();
   return data?.username || 'Unknown';
 }
-function formatStatus(profile){ if(!profile) return ''; if(profile.typing) return 'печатает...'; return profile.status || ''; }
 
-async function loadUsers(){
-  const { data:users } = await supabase.from('profiles').select('*');
+function formatStatus(profile) {
+  if (!profile) return '';
+  if (profile.typing) return 'печатает...';
+  return profile.status || '';
+}
+
+async function loadUsers() {
+  const { data: users } = await supabase.from('profiles').select('*');
   const list = document.getElementById('user-list');
   list.innerHTML = '';
   users.forEach(user => {
-    const div = document.createElement('div'); div.className='user-item';
-    const info = document.createElement('div'); info.className='info';
+    const div = document.createElement('div');
+    div.className = 'user-item';
+    const info = document.createElement('div');
+    info.className = 'info';
     info.innerText = `${user.username} (${user.email})`;
     div.appendChild(info);
     const banBtn = document.createElement('button');
@@ -923,15 +1015,16 @@ async function loadUsers(){
     list.appendChild(div);
   });
 }
-async function toggleBan(userId, currentBan){
+
+async function toggleBan(userId, currentBan) {
   await supabase.from('profiles').update({ ban: !currentBan }).eq('id', userId);
   loadUsers();
 }
 
-window.addEventListener('load', async ()=>{
-  const { data:{ session } } = await supabase.auth.getSession();
-  if(session){ 
-    currentUser = session.user; 
+window.addEventListener('load', async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    currentUser = session.user;
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
     if (profile.ban) {
       await supabase.auth.signOut();
@@ -943,56 +1036,62 @@ window.addEventListener('load', async ()=>{
     if (isAdmin) {
       document.getElementById('main-nav-buttons').innerHTML += `<button onclick="openAdmin()"><i class="fa fa-user-shield"></i></button>`;
     }
+    // Обновляем onesignal_player_id при загрузке сессии
+    await updateOneSignalPlayerId();
     notifyWebViewUser(currentUser);
-    showMain(); 
-    subscribeChats(); 
+    showMain();
+    subscribeChats();
     subscribeProfile();
-    
-    // Обновляем OneSignal ID при загрузке страницы
-    if (window.OneSignal) {
-        const userId = await OneSignal.User.PushSubscription.getUserId();
-        if (userId) {
-            await supabase.from('profiles').update({ onesignal_player_id: userId }).eq('id', currentUser.id);
-            console.log('OneSignal ID updated on page load:', userId);
-        }
-    }
   }
 });
 
-window.addEventListener('beforeunload', async ()=>{
-  if(currentUser){
-    const nowTime = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+window.addEventListener('beforeunload', async () => {
+  if (currentUser) {
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const nowDate = new Date().toLocaleDateString('ru-RU');
-    await supabase.from('profiles').update({ status:`был(а) в ${nowTime} ${nowDate}`, typing:false, current_chat:null }).eq('id', currentUser.id);
-    notifyWebViewUser(null);
-  }
-});
-document.addEventListener('visibilitychange', async ()=>{
-  if(document.hidden && currentUser){
-    const nowTime = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-    const nowDate = new Date().toLocaleDateString('ru-RU');
-    await supabase.from('profiles').update({ status:`был(а) в ${nowTime} ${nowDate}`, typing:false, current_chat:null }).eq('id', currentUser.id);
+    await supabase.from('profiles').update({
+      status: `был(а) в ${nowTime} ${nowDate}`,
+      typing: false,
+      current_chat: null,
+      onesignal_player_id: null
+    }).eq('id', currentUser.id);
     notifyWebViewUser(null);
   }
 });
 
-function backToMain(){
-  if(msgSubscription) supabase.removeChannel(msgSubscription);
-  if(window.statusChannelOther) supabase.removeChannel(window.statusChannelOther);
-  if(currentUser) supabase.from('profiles').update({ current_chat:null }).eq('id', currentUser.id);
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden && currentUser) {
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const nowDate = new Date().toLocaleDateString('ru-RU');
+    await supabase.from('profiles').update({
+      status: `был(а) в ${nowTime} ${nowDate}`,
+      typing: false,
+      current_chat: null,
+      onesignal_player_id: null
+    }).eq('id', currentUser.id);
+    notifyWebViewUser(null);
+  }
+});
+
+function backToMain() {
+  if (msgSubscription) supabase.removeChannel(msgSubscription);
+  if (window.statusChannelOther) supabase.removeChannel(window.statusChannelOther);
+  if (currentUser) supabase.from('profiles').update({ current_chat: null }).eq('id', currentUser.id);
   currentChat = null;
   currentChatOtherId = null;
   showMain();
 }
 
-window.onclick = ()=> { document.getElementById('context-menu').style.display = 'none'; };
+window.onclick = () => {
+  document.getElementById('context-menu').style.display = 'none';
+};
 
-(async function detectSelfChatId(){
+(async function detectSelfChatId() {
   const origLoad = loadChats;
-  loadChats = async function(){
+  loadChats = async function() {
     await origLoad();
   };
 })();
 </script>
 </body>
-      </html>
+  </html>
