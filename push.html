@@ -37,8 +37,8 @@
 <body>
     <h1>Отправка пуш-уведомлений</h1>
     <div>
-        <label for="userId">ID получателя:</label>
-        <input type="text" id="userId" placeholder="Введите ID получателя">
+        <label for="userId">ID получателя (external_id):</label>
+        <input type="text" id="userId" placeholder="Введите external_id получателя">
     </div>
     <div>
         <label for="notificationText">Текст уведомления:</label>
@@ -61,18 +61,14 @@
             });
 
             // Отображение External User ID
-            OneSignal.User.getExternalId().then(function(externalId) {
-                if (externalId) {
-                    document.getElementById('userIdDisplay').textContent = externalId;
-                } else {
-                    document.getElementById('userIdDisplay').textContent = "Не установлен (подпишитесь на уведомления)";
-                }
-            });
-
-            // Установка External User ID (для примера, случайный ID)
-            const randomUserId = 'user-' + Math.random().toString(36).substr(2, 9);
-            await OneSignal.User.setExternalId(randomUserId);
-            document.getElementById('userIdDisplay').textContent = randomUserId;
+            let externalId = OneSignal.User.externalId;
+            if (!externalId) {
+                // Генерация случайного ID для примера
+                const randomUserId = 'user-' + Math.random().toString(36).substr(2, 9);
+                await OneSignal.login(randomUserId);
+                externalId = OneSignal.User.externalId;
+            }
+            document.getElementById('userIdDisplay').textContent = externalId || "Не установлен (подпишитесь на уведомления)";
         });
 
         // Функция для отправки пуш-уведомления
@@ -93,10 +89,12 @@
                 },
                 body: JSON.stringify({
                     app_id: "2e324874-a45f-4a70-ac36-130ef8af56a7",
-                    include_external_user_ids: [userId],
+                    include_aliases: {
+                        external_id: [userId]
+                    },
+                    target_channel: "push",
                     contents: { en: notificationText },
-                    name: "Custom Notification",
-                    isAnyWeb: true
+                    name: "Custom Notification"
                 })
             });
 
