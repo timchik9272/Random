@@ -51,19 +51,7 @@ img.msg-img{max-width:100%;border-radius:var(--radius);margin-top:6px;display:bl
 .reply-preview .cancel:hover{background:#333;}
 .reply-to:hover{background:rgba(255,255,255,0.02);border-radius:8px;padding:6px;}
 .highlight{background:rgba(0,136,204,0.3) !important;box-shadow:0 0 10px rgba(0,136,204,0.5) !important;transform:translateY(-2px);transition:all .3s ease;}
-.push-success { 
-  position: absolute; 
-  top: -20px; 
-  right: 0; 
-  background: rgba(0,255,0,0.2); 
-  padding: 4px 8px; 
-  border-radius: 4px; 
-  color: #0f0; 
-  font-size: 12px; 
-  opacity: 0; 
-  transition: opacity 0.5s; 
-}
-.push-success.visible { opacity: 1; }
+.success-text { position: absolute; top: -20px; left: 0; color: #00ff00; font-size: 12px; white-space: nowrap; }
 @media (max-width:520px){.msg{max-width:86%;}nav h2{font-size:16px;margin:0;}}
 #scroll-down-btn{position:fixed;bottom:80px;right:20px;width:40px;height:40px;border-radius:50%;background:var(--accent);color:#fff;display:none;z-index:10;cursor:pointer;border:none;}
 #scroll-down-btn i{font-size:18px;}
@@ -202,9 +190,10 @@ OneSignalDeferred.push(async function(OneSignal) {
     }
   });
   // Проверка начального статуса
-  if (currentUser) {
-    const onesignalId = OneSignal.User.PushSubscription.optedIn ? OneSignal.User.onesignalId : null;
-    await supabase.from('profiles').update({ OneSignal_ID: onesignalId }).eq('id', currentUser.id);
+  if (OneSignal.User.PushSubscription.optedIn && currentUser) {
+    await supabase.from('profiles').update({ OneSignal_ID: OneSignal.User.onesignalId }).eq('id', currentUser.id);
+  } else if (!OneSignal.User.PushSubscription.optedIn && currentUser) {
+    await supabase.from('profiles').update({ OneSignal_ID: null }).eq('id', currentUser.id);
   }
 });
 
@@ -273,12 +262,14 @@ async function signIn(){
     document.getElementById('main-nav-buttons').innerHTML += `<button onclick="openAdmin()"><i class="fa fa-user-shield"></i></button>`;
   }
   await supabase.from('profiles').update({ status:'онлайн', current_chat:null }).eq('id', currentUser.id);
-  // Update OneSignal_ID on sign in
-  if (OneSignalDeferred[0]) {
-    const OneSignal = OneSignalDeferred[0];
-    const onesignalId = OneSignal.User.PushSubscription.optedIn ? OneSignal.User.onesignalId : null;
-    await supabase.from('profiles').update({ OneSignal_ID: onesignalId }).eq('id', currentUser.id);
-  }
+  // Обновить OneSignal_ID при входе
+  OneSignalDeferred.push(async (OneSignal) => {
+    if (OneSignal.User.PushSubscription.optedIn) {
+      await supabase.from('profiles').update({ OneSignal_ID: OneSignal.User.onesignalId }).eq('id', currentUser.id);
+    } else {
+      await supabase.from('profiles').update({ OneSignal_ID: null }).eq('id', currentUser.id);
+    }
+  });
   notifyWebViewUser(currentUser); // Notify WebView of the logged-in user
   showMain();
   subscribeChats();
@@ -708,35 +699,6 @@ async function renderMessage(msg, scroll=true, mode='append'){
   toggleScrollDownBtn();
 }
 
-function typeText(element, text, speed = 50, callback) {
-  let i = 0;
-  function type() {
-    if (i < text.length) {
-      element.innerHTML += text.charAt(i);
-      i++;
-      setTimeout(type, speed);
-    } else if (callback) {
-      callback();
-    }
-  }
-  type();
-}
-
-function eraseText(element, speed = 50, callback) {
-  let text = element.innerHTML;
-  let i = text.length;
-  function erase() {
-    if (i > 0) {
-      element.innerHTML = text.substring(0, i - 1);
-      i--;
-      setTimeout(erase, speed);
-    } else if (callback) {
-      callback();
-    }
-  }
-  erase();
-}
-
 async function sendMessage(){
   const text = document.getElementById('msg-input').value.trim();
   if(!text && !selectedImageUrl) return;
@@ -754,13 +716,12 @@ async function sendMessage(){
 
   // Логика пуш-уведомления только для не-self чата
   let pushSuccess = false;
+  let senderUsername = currentUser.user_metadata?.username || 'пользователя';
   if (currentChatOtherId && currentChat !== selfChatId) {
     try {
-      const { data: otherProfile } = await supabase.from('profiles').select('OneSignal_ID, username').eq('id', currentChatOtherId).single();
+      const { data: otherProfile } = await supabase.from('profiles').select('OneSignal_ID').eq('id', currentChatOtherId).single();
       if (otherProfile && otherProfile.OneSignal_ID) {
-        const senderUsername = currentUser.user_metadata?.username || 'пользователя';
-        const notificationHeading = `Новое сообщение от: ${senderUsername}`;
-        const notificationContent = `${text.substring(0, 100) || (selectedImageUrl ? 'Изображение' : '')}`;
+        const notificationText = `${text.substring(0, 100) || (selectedImageUrl ? 'Изображение' : 'Сообщение')}`;
         const response = await fetch('https://api.onesignal.com/notifications', {
           method: 'POST',
           headers: {
@@ -773,8 +734,8 @@ async function sendMessage(){
               onesignal_id: [otherProfile.OneSignal_ID]
             },
             target_channel: "push",
-            headings: { en: notificationHeading },
-            contents: { en: notificationContent },
+            headings: { en: `Новое сообщение от: ${senderUsername}` },
+            contents: { en: notificationText },
             name: "Custom Notification"
           })
         });
@@ -788,23 +749,23 @@ async function sendMessage(){
   // Рендер сообщения
   await renderMessage(inserted, true);
 
-  // Если пуш успешно отправлен, показать побуквенный текст
+  // Если пуш успешно отправлен, показать текст с анимацией
   if (pushSuccess) {
     const msgDiv = document.getElementById('msg-' + inserted.id);
     if (msgDiv) {
-      const successText = document.createElement('div');
-      successText.className = 'push-success';
+      const successDiv = document.createElement('div');
+      successDiv.className = 'success-text';
       msgDiv.style.position = 'relative';
-      msgDiv.appendChild(successText);
-      successText.classList.add('visible');
-      typeText(successText, 'Сообщение успешно отправлено пользователю', 50, () => {
+      msgDiv.appendChild(successDiv);
+      const successText = "Сообщение успешно отправлено пользователю";
+      typeWriter(successDiv, successText, 50, () => {
         setTimeout(() => {
-          eraseText(successText, 50, () => {
-            if (successText.parentNode) {
-              successText.parentNode.removeChild(successText);
+          typeErase(successDiv, successText, 50, () => {
+            if (successDiv.parentNode) {
+              successDiv.parentNode.removeChild(successDiv);
             }
           });
-        }, 1000); // Пауза перед стиранием
+        }, 1000); // Пауза перед исчезновением
       });
     }
   }
@@ -825,6 +786,36 @@ async function sendMessage(){
   replyToMessage = null;
   document.getElementById('preview').innerHTML = '';
   hideReplyPreview();
+}
+
+// Функция для побуквенного появления текста
+function typeWriter(element, text, delay, callback) {
+  let i = 0;
+  function type() {
+    if (i < text.length) {
+      element.innerHTML += text.charAt(i);
+      i++;
+      setTimeout(type, delay);
+    } else if (callback) {
+      callback();
+    }
+  }
+  type();
+}
+
+// Функция для побуквенного исчезновения текста
+function typeErase(element, text, delay, callback) {
+  let i = text.length;
+  function erase() {
+    if (i > 0) {
+      element.innerHTML = text.substring(0, i - 1);
+      i--;
+      setTimeout(erase, delay);
+    } else if (callback) {
+      callback();
+    }
+  }
+  erase();
 }
 
 function triggerImageUpload(){
@@ -1002,12 +993,14 @@ window.addEventListener('load', async ()=>{
     if (isAdmin) {
       document.getElementById('main-nav-buttons').innerHTML += `<button onclick="openAdmin()"><i class="fa fa-user-shield"></i></button>`;
     }
-    // Update OneSignal_ID on auto login
-    if (OneSignalDeferred[0]) {
-      const OneSignal = OneSignalDeferred[0];
-      const onesignalId = OneSignal.User.PushSubscription.optedIn ? OneSignal.User.onesignalId : null;
-      await supabase.from('profiles').update({ OneSignal_ID: onesignalId }).eq('id', currentUser.id);
-    }
+    // Обновить OneSignal_ID при автовходе
+    OneSignalDeferred.push(async (OneSignal) => {
+      if (OneSignal.User.PushSubscription.optedIn) {
+        await supabase.from('profiles').update({ OneSignal_ID: OneSignal.User.onesignalId }).eq('id', currentUser.id);
+      } else {
+        await supabase.from('profiles').update({ OneSignal_ID: null }).eq('id', currentUser.id);
+      }
+    });
     notifyWebViewUser(currentUser); // Notify WebView of the user on session load
     showMain(); 
     subscribeChats(); 
