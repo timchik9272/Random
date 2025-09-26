@@ -37,15 +37,15 @@
 <body>
     <h1>Отправка пуш-уведомлений</h1>
     <div>
-        <label for="userId">ID получателя (PushSubscription ID):</label>
-        <input type="text" id="userId" placeholder="Введите PushSubscription ID получателя">
+        <label for="userId">ID получателя (OneSignal ID):</label>
+        <input type="text" id="userId" placeholder="Введите OneSignal ID получателя">
     </div>
     <div>
         <label for="notificationText">Текст уведомления:</label>
         <textarea id="notificationText" placeholder="Введите текст уведомления" rows="4"></textarea>
     </div>
     <button onclick="sendPushNotification()">Отправить уведомление</button>
-    <p>Ваш PushSubscription ID: <span id="userIdDisplay">Не определен</span></p>
+    <p>Ваш OneSignal ID: <span id="userIdDisplay">Не определен</span></p>
 
     <!-- Подключение OneSignal SDK -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
@@ -60,10 +60,10 @@
                 },
             });
 
-            // Функция для обновления отображения PushSubscription ID
+            // Функция для обновления отображения OneSignal ID
             const updateUserIdDisplay = () => {
-                const subscriptionId = OneSignal.User.PushSubscription.id;
-                document.getElementById('userIdDisplay').textContent = subscriptionId || "Не установлен (подпишитесь на уведомления)";
+                const onesignalId = OneSignal.User.onesignalId;
+                document.getElementById('userIdDisplay').textContent = onesignalId || "Не установлен (подпишитесь на уведомления)";
             };
             updateUserIdDisplay();
 
@@ -71,7 +71,7 @@
             OneSignal.User.PushSubscription.addEventListener('change', (event) => {
                 updateUserIdDisplay();
                 if (event.current.id) {
-                    console.log('PushSubscription ID установлен:', event.current.id);
+                    console.log('OneSignal User ID:', OneSignal.User.onesignalId);
                 }
             });
 
@@ -81,7 +81,7 @@
             }
         });
 
-        // Функция для отправки пуш-уведомления по PushSubscription ID
+        // Функция для отправки пуш-уведомления по OneSignal ID
         async function sendPushNotification() {
             const userId = document.getElementById('userId').value;
             const notificationText = document.getElementById('notificationText').value;
@@ -99,7 +99,10 @@
                 },
                 body: JSON.stringify({
                     app_id: "2e324874-a45f-4a70-ac36-130ef8af56a7",
-                    include_subscription_ids: [userId],
+                    include_aliases: {
+                        onesignal_id: [userId]
+                    },
+                    target_channel: "push",
                     contents: { en: notificationText },
                     name: "Custom Notification"
                 })
