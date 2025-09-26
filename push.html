@@ -37,15 +37,15 @@
 <body>
     <h1>Отправка пуш-уведомлений</h1>
     <div>
-        <label for="userId">ID получателя (external_id):</label>
-        <input type="text" id="userId" placeholder="Введите external_id получателя">
+        <label for="userId">ID получателя (PushSubscription ID):</label>
+        <input type="text" id="userId" placeholder="Введите PushSubscription ID получателя">
     </div>
     <div>
         <label for="notificationText">Текст уведомления:</label>
         <textarea id="notificationText" placeholder="Введите текст уведомления" rows="4"></textarea>
     </div>
     <button onclick="sendPushNotification()">Отправить уведомление</button>
-    <p>Ваш ID: <span id="userIdDisplay">Не определен</span></p>
+    <p>Ваш PushSubscription ID: <span id="userIdDisplay">Не определен</span></p>
 
     <!-- Подключение OneSignal SDK -->
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
@@ -60,18 +60,28 @@
                 },
             });
 
-            // Отображение External User ID
-            let externalId = OneSignal.User.externalId;
-            if (!externalId) {
-                // Генерация случайного ID для примера
-                const randomUserId = 'user-' + Math.random().toString(36).substr(2, 9);
-                await OneSignal.login(randomUserId);
-                externalId = OneSignal.User.externalId;
+            // Функция для обновления отображения PushSubscription ID
+            const updateUserIdDisplay = () => {
+                const subscriptionId = OneSignal.User.PushSubscription.id;
+                document.getElementById('userIdDisplay').textContent = subscriptionId || "Не установлен (подпишитесь на уведомления)";
+            };
+            updateUserIdDisplay();
+
+            // Обработка события изменения подписки
+            OneSignal.User.PushSubscription.addEventListener('change', (event) => {
+                updateUserIdDisplay();
+                if (event.current.id) {
+                    console.log('PushSubscription ID установлен:', event.current.id);
+                }
+            });
+
+            // Проверка начального статуса подписки
+            if (OneSignal.User.PushSubscription.optedIn) {
+                updateUserIdDisplay();
             }
-            document.getElementById('userIdDisplay').textContent = externalId || "Не установлен (подпишитесь на уведомления)";
         });
 
-        // Функция для отправки пуш-уведомления
+        // Функция для отправки пуш-уведомления по PushSubscription ID
         async function sendPushNotification() {
             const userId = document.getElementById('userId').value;
             const notificationText = document.getElementById('notificationText').value;
@@ -89,10 +99,7 @@
                 },
                 body: JSON.stringify({
                     app_id: "2e324874-a45f-4a70-ac36-130ef8af56a7",
-                    include_aliases: {
-                        external_id: [userId]
-                    },
-                    target_channel: "push",
+                    include_subscription_ids: [userId],
                     contents: { en: notificationText },
                     name: "Custom Notification"
                 })
