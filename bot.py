@@ -4,11 +4,11 @@
 #include <DHT.h>
 
 // WiFi credentials
-#define WIFI_SSID "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+#define WIFI_SSID "AMR273"
+#define WIFI_PASSWORD "amr41amr123456789"
 
-// Telegram BOT Token (Get from Botfather)
-#define BOT_TOKEN "YOUR_BOT_TOKEN"
+// Telegram BOT Token
+#define BOT_TOKEN "7318549028:AAEL3WnLTylBkYWHub0tx8VpMGHTRaKHDCk"
 
 // DHT sensor pin and type
 #define SENSOR_PIN D3
@@ -63,16 +63,15 @@ void loop() {
 void handleNewMessages(int numNewMessages) {
   for (int i = 0; i < numNewMessages; i++) {
     String chat_id = bot.messages[i].chat_id;
-    long user_id = bot.messages[i].from_id;
+    long user_id = bot.messages[i].from_id.toInt(); // Convert String to long
     String text = bot.messages[i].text;
-    String message_id = bot.messages[i].message_id;
+    String message_id = String(bot.messages[i].message_id); // Convert int to String
     String message_type = bot.messages[i].type;
 
     // Check if banned
     UserSpamInfo* user = getUserInfo(user_id);
     if (millis() < user->banUntil) {
-      bot.deleteMessage(chat_id, message_id);
-      bot.sendMessage(chat_id, "Вы забанены на " + String((user->banUntil - millis()) / 60000) + " минут. ⏰");
+      bot.sendMessage(chat_id, "Вы забанены на " + String((user->banUntil - millis()) / 60000) + " минут. ⏰", "");
       continue;
     }
 
@@ -82,52 +81,48 @@ void handleNewMessages(int numNewMessages) {
     // Check spam
     if (user->count > MAX_MESSAGES) {
       user->banUntil = millis() + BAN_DURATION;
-      bot.deleteMessage(chat_id, message_id);
-      bot.sendMessage(chat_id, "Обнаружен спам! Забанены на 5 минут. 🚫");
-      // Forward to admin if enabled
+      bot.sendMessage(chat_id, "Обнаружен спам! Забанены на 5 минут. 🚫", "");
       if (notificationsEnabled) {
-        bot.sendMessage(String(ADMIN_ID), "Пользователь " + String(user_id) + " забанен за спам. ⚠️");
+        bot.sendMessage(String(ADMIN_ID), "Пользователь " + String(user_id) + " забанен за спам. ⚠️", "");
       }
       continue;
     }
 
     // Forward to admin if not from admin and notifications enabled
     if (user_id != ADMIN_ID && notificationsEnabled) {
-      bot.sendMessage(String(ADMIN_ID), "От " + String(user_id) + ": " + text + " 📩");
+      bot.sendMessage(String(ADMIN_ID), "От " + String(user_id) + ": " + text + " 📩", "");
     }
 
     // Check if allowed
     bool allowed = isAllowed(user_id);
     if (!allowed) {
-      bot.sendMessage(chat_id, "Вы не имеете доступа к боту. 🚫");
-      bot.deleteMessage(chat_id, message_id);
+      bot.sendMessage(chat_id, "Вы не имеете доступа к боту. 🚫", "");
       continue;
     }
 
     if (message_type == "callback_query") {
       String callback_data = text;  // callback_data is in text for queries
-      String query_id = message_id;  // Use message_id as query_id
-      String orig_message_id = bot.messages[i].original_message_id;
+      String query_id = message_id;  // Use message_id for callback query
 
       if (callback_data == "update") {
         String data = getTemperatureAndHumidity();
         bot.answerCallbackQuery(query_id, "Данные обновлены! 🔄");
-        bot.editMessage(chat_id, orig_message_id, data, "", getInlineKeyboard(user_id == ADMIN_ID));
+        bot.sendMessageWithInlineKeyboard(chat_id, data, "", getInlineKeyboard(user_id == ADMIN_ID), bot.messages[i].message_id);
       } else if (callback_data == "admin_panel" && user_id == ADMIN_ID) {
         bot.answerCallbackQuery(query_id, "Открываем админ-панель ⚙️");
         String adminText = "Админ-панель ⚙️";
-        bot.editMessage(chat_id, orig_message_id, adminText, "", getAdminKeyboard());
+        bot.sendMessageWithInlineKeyboard(chat_id, adminText, "", getAdminKeyboard(), bot.messages[i].message_id);
       } else if (callback_data == "toggle_notif" && user_id == ADMIN_ID) {
         notificationsEnabled = !notificationsEnabled;
         bot.answerCallbackQuery(query_id, "Уведомления " + String(notificationsEnabled ? "включены ✅" : "выключены ❌"));
         String adminText = "Админ-панель ⚙️";
-        bot.editMessage(chat_id, orig_message_id, adminText, "", getAdminKeyboard());
+        bot.sendMessageWithInlineKeyboard(chat_id, adminText, "", getAdminKeyboard(), bot.messages[i].message_id);
       } else if (callback_data == "set_allowed" && user_id == ADMIN_ID) {
         bot.answerCallbackQuery(query_id, "Отправьте /setallowed <ids> или /setallowed all 📝");
       } else if (callback_data == "back" && user_id == ADMIN_ID) {
         bot.answerCallbackQuery(query_id, "Возврат к главному меню ⬅️");
         String data = getTemperatureAndHumidity();
-        bot.editMessage(chat_id, orig_message_id, data, "", getInlineKeyboard(true));
+        bot.sendMessageWithInlineKeyboard(chat_id, data, "", getInlineKeyboard(true), bot.messages[i].message_id);
       }
 
       continue;
@@ -141,16 +136,12 @@ void handleNewMessages(int numNewMessages) {
       String args = text.substring(12);  // Skip "/setallowed "
       if (args.length() > 0) {
         allowedUsers = args;
-        bot.sendMessage(chat_id, "Разрешённые пользователи установлены: " + allowedUsers + " ✅");
+        bot.sendMessage(chat_id, "Разрешённые пользователи установлены: " + allowedUsers + " ✅", "");
       } else {
-        bot.sendMessage(chat_id, "Использование: /setallowed id1,id2,... или all 📝");
+        bot.sendMessage(chat_id, "Использование: /setallowed id1,id2,... или all 📝", "");
       }
-    } else if (text == "/togglenotif" && user_id == ADMIN_ID) {
-      notificationsEnabled = !notificationsEnabled;
-      bot.sendMessage(chat_id, "Уведомления " + String(notificationsEnabled ? "включены ✅" : "выключены ❌"));
     } else {
-      // Optional: reply to user
-      bot.sendMessage(chat_id, "Команда не распознана. ❓");
+      bot.sendMessage(chat_id, "Команда не распознана. Используйте /start. ❓", "");
     }
   }
 }
