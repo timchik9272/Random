@@ -4,11 +4,11 @@
 #include <DHT.h>
 
 // WiFi credentials
-#define WIFI_SSID "AMR273"
-#define WIFI_PASSWORD "amr41amr123456789"
+#define WIFI_SSID "figvamaneimyawifi"
+#define WIFI_PASSWORD "figvamaneparolotwifi"
 
 // Telegram BOT Token
-#define BOT_TOKEN "7318549028:AAEL3WnLTylBkYWHub0tx8VpMGHTRaKHDCk"
+#define BOT_TOKEN "figvamanetokenmoegotgbota"
 
 // DHT sensor pin and type
 #define SENSOR_PIN D3
