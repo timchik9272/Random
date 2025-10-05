@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Java to AIX Converter для MIT App Inventor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f4; color: #333; }
+        h1 { color: #2c3e50; }
+        textarea { width: 100%; height: 200px; margin: 10px 0; padding: 10px; font-family: monospace; border: 1px solid #ddd; border-radius: 4px; }
+        input, select { width: 200px; padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; }
+        button { padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #2980b9; }
+        #output { background: #fff; padding: 15px; border: 1px solid #ddd; border-radius: 4px; margin-top: 20px; min-height: 50px; }
+        .error { color: #e74c3c; }
+        .success { color: #27ae60; }
+        label { display: block; margin: 10px 0 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Конвертер Java в .aix для MIT App Inventor</h1>
+    <p>Вставьте Java-код вашего компонента (с аннотациями @DesignerComponent и т.д.):</p>
+    <textarea id="javaCode" placeholder="// Пример: package com.example.MyComponent; ... @DesignerComponent ... public class MyComponent extends AndroidNonvisibleComponent { ... }">package com.yourname.imagecompressor;
+
+import com.google.appinventor.components.annotations.*;
+import com.google.appinventor.components.runtime.*;
+import com.google.appinventor.components.common.ComponentCategory;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.util.Base64;
+import java.io.*;
+
+@DesignerComponent(version = 1,
+    description = "Компонент для сжатия изображений.",
+    category = ComponentCategory.EXTENSION,
+    nonVisible = true,
+    iconName = "")
+@SimpleObject(external = true)
+@UsesPermissions(permissionNames = "android.permission.WRITE_EXTERNAL_STORAGE")
+public class ImageCompressor extends AndroidNonvisibleComponent {
+    // Ваш код здесь...
+}</textarea><br>
+
+    <label for="packageName">Имя пакета (package):</label>
+    <input type="text" id="packageName" value="com.yourname.imagecompressor" placeholder="com.example.myextension">
+
+    <label for="className">Имя класса:</label>
+    <input type="text" id="className" value="ImageCompressor" placeholder="MyComponent">
+
+    <label for="extensionName">Имя расширения (для JSON):</label>
+    <input type="text" id="extensionName" value="ImageCompressor" placeholder="MyExtension">
+
+    <button onclick="generateAIX()">Генерировать .aix</button>
+
+    <div id="output"></div>
+
+    <script>
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function generateAIX() {
+            const javaCode = document.getElementById('javaCode').value.trim();
+            const packageName = document.getElementById('packageName').value.trim();
+            const className = document.getElementById('className').value.trim();
+            const extName = document.getElementById('extensionName').value.trim();
+
+            const output = document.getElementById('output');
+
+            if (!javaCode || !packageName || !className || !extName) {
+                output.innerHTML = '<span class="error">Заполните все поля!</span>';
+                return;
+            }
+
+            try {
+                // Создаём ZIP
+                const zip = new JSZip();
+
+                // 1. YoungAndroidProject.json
+                const uuid = generateUUID();
+                const jsonData = {
+                    "SourceVersion": 1,
+                    "Properties": {
+                        "Main": extName,
+                        "AppName": extName,
+                        "UUID": uuid,
+                        "VersionCode": 1,
+                        "VersionName": "1.0",
+                        "FormFileName": extName + ".yai"
+                    },
+                    "SourceComponents": extName + "$" + className
+                };
+                zip.file('YoungAndroidProject.json', JSON.stringify(jsonData, null, 2));
+
+                // 2. src/ с Java-файлом (путь по пакету)
+                const packagePath = packageName.replace(/\./g, '/');
+                const javaPath = `src/${packagePath}/${className}.java`;
+                zip.file(javaPath, javaCode);
+
+                // 3. manifest/AndroidManifest.xml (базовый, добавьте разрешения)
+                const manifest = `<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+</manifest>`;
+                zip.folder('manifest').file('AndroidManifest.xml', manifest);
+
+                // 4. properties/source.properties
+                const props = `AppName=${extName}
+DateCreated=2025-10-05
+DateModified=2025-10-05
+`;
+                zip.folder('properties').file('source.properties', props);
+
+                // 5. Пустая папка blocks/ (App Inventor заполнит)
+                zip.folder('blocks');
+
+                // Генерируем и скачиваем
+                zip.generateAsync({type: 'blob'}).then(function(content) {
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(content);
+                    link.download = extName + '.aix';
+                    link.click();
+                    output.innerHTML = `<span class="success">.aix сгенерирован! UUID: ${uuid}</span><br>Импортируйте в App Inventor. Для блоков — проверьте аннотации в Java.`;
+                });
+
+            } catch (e) {
+                output.innerHTML = `<span class="error">Ошибка: ${e.message}</span>`;
+            }
+        }
+    </script>
+</body>
+</html>
