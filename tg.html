@@ -3,14 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Чат Input</title>
+    <title>Полноценный Чат</title>
     <style>
         body {
             background: #121212;
             color: #ffffff;
             font-family: Arial, sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #chatContainer {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 10px;
+            background: #1e1e1e;
+            max-width: 80%;
+            align-self: flex-start;
+        }
+
+        .message audio, .message video {
+            width: 100%;
+            max-width: 300px;
+            border-radius: 10px;
         }
 
         .chat-input-container {
@@ -18,10 +42,7 @@
             align-items: flex-end;
             padding: 10px;
             background: #1e1e1e;
-            max-width: 400px;
-            margin: 0 auto;
-            border-radius: 20px;
-            border: 1px solid #333;
+            border-top: 1px solid #333;
         }
 
         #messageInput {
@@ -79,28 +100,18 @@
             z-index: 1000;
         }
 
-        #videoElement {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 300px;
-            height: 300px;
-            object-fit: cover;
-            border-radius: 50%;
-            z-index: 1;
-        }
-
-        .video-canvas {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+        .video-wrapper {
             width: 300px;
             height: 300px;
             border-radius: 50%;
             overflow: hidden;
-            z-index: 2;
+            background: #333;
+        }
+
+        #videoElement {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
 
         .stop-btn {
@@ -147,10 +158,11 @@
     </style>
 </head>
 <body>
+    <div id="chatContainer"></div>
+
     <div class="chat-input-container">
         <input type="text" id="messageInput" placeholder="Сообщение..." maxlength="1000">
         <button id="recordBtn" class="record-btn" title="Запись">
-            <!-- Иконки: используй SVG или img -->
             <svg id="micIcon" class="icon" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 3 5.47 6.91 5.83V20h-2v2h6v-2h-2v-1.03c3.9-.37 6.41-2.83 6.91-5.83.09-.6-.39-1.14-1-1.14z"/>
             </svg>
@@ -160,17 +172,17 @@
         </button>
     </div>
 
-    <!-- Для видео-preview (скрыто по умолчанию) -->
     <div id="videoPreview" class="video-preview hidden">
-        <video id="videoElement" autoplay muted playsinline></video>
-        <canvas id="videoCanvas" class="video-canvas"></canvas> <!-- Для круглой маски -->
+        <div class="video-wrapper">
+            <video id="videoElement" autoplay muted playsinline></video>
+        </div>
         <button id="stopVideoBtn" class="stop-btn">Стоп</button>
         <div id="recordingIndicator" class="recording-indicator hidden">Запись...</div>
         <div id="errorMessage" class="error-message hidden"></div>
     </div>
 
     <script>
-        class ChatInput {
+        class Messenger {
             constructor() {
                 this.messageInput = document.getElementById('messageInput');
                 this.recordBtn = document.getElementById('recordBtn');
@@ -178,10 +190,10 @@
                 this.cameraIcon = document.getElementById('cameraIcon');
                 this.videoPreview = document.getElementById('videoPreview');
                 this.videoElement = document.getElementById('videoElement');
-                this.videoCanvas = document.getElementById('videoCanvas');
                 this.stopVideoBtn = document.getElementById('stopVideoBtn');
                 this.recordingIndicator = document.getElementById('recordingIndicator');
                 this.errorMessage = document.getElementById('errorMessage');
+                this.chatContainer = document.getElementById('chatContainer');
 
                 this.mediaRecorder = null;
                 this.recordedChunks = [];
@@ -189,20 +201,28 @@
                 this.isRecording = false;
                 this.isVideoMode = false;
                 this.longPressTimer = null;
-                this.LONG_PRESS_DELAY = 500; // ms
+                this.LONG_PRESS_DELAY = 500;
                 this.isLongPressHandled = false;
-                this.drawFrameId = null;
 
                 this.init();
             }
 
             init() {
-                // Показывать кнопку только если input пустой
+                // Показывать кнопку записи только если input пустой
                 this.messageInput.addEventListener('input', () => {
                     this.recordBtn.style.display = this.messageInput.value.trim() === '' ? 'flex' : 'none';
                 });
 
-                // Обработка нажатий (поддержка touch и mouse)
+                // Отправка текста по Enter
+                this.messageInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && this.messageInput.value.trim() !== '') {
+                        this.sendTextMessage(this.messageInput.value.trim());
+                        this.messageInput.value = '';
+                        this.recordBtn.style.display = 'flex';
+                    }
+                });
+
+                // Обработка нажатий на кнопку записи
                 let startTime, startY;
                 const handleStart = (e) => {
                     e.preventDefault();
@@ -221,32 +241,33 @@
                     this.cancelPressTimer();
 
                     if (this.isRecording) {
-                        if (movedDistance > 50) { // Drag для отмены (как в TG)
-                            this.stopRecording(true); // true = cancel
+                        if (movedDistance > 50) {
+                            this.stopRecording(true); // Отмена
                         } else {
                             this.stopRecording(false);
                         }
                     } else if (!this.isLongPressHandled && duration < this.LONG_PRESS_DELAY) {
-                        // Короткое нажатие: переключение режима
                         this.toggleMode();
                     }
 
                     this.isLongPressHandled = false;
                 };
 
-                // Mouse events
                 this.recordBtn.addEventListener('mousedown', handleStart);
                 document.addEventListener('mouseup', handleEnd);
 
-                // Touch events
                 this.recordBtn.addEventListener('touchstart', handleStart, { passive: false });
                 document.addEventListener('touchend', handleEnd, { passive: false });
 
-                // Для видео
                 this.stopVideoBtn.addEventListener('click', () => this.stopVideoMode());
 
-                // Инициализация: кнопка скрыта, если input не пустой
                 this.messageInput.dispatchEvent(new Event('input'));
+            }
+
+            showError(msg) {
+                this.errorMessage.textContent = msg;
+                this.errorMessage.classList.remove('hidden');
+                setTimeout(() => this.errorMessage.classList.add('hidden'), 5000);
             }
 
             startPressTimer() {
@@ -274,7 +295,6 @@
                 this.micIcon.classList.toggle('hidden');
                 this.cameraIcon.classList.toggle('hidden');
                 this.recordBtn.title = this.isVideoMode ? 'Видео-кружочек' : 'Голосовое';
-                // Для видео: сразу открыть preview
                 if (this.isVideoMode) {
                     this.startVideoPreview();
                 } else {
@@ -282,21 +302,10 @@
                 }
             }
 
-            showError(msg) {
-                this.errorMessage.textContent = msg;
-                this.errorMessage.classList.remove('hidden');
-                setTimeout(() => {
-                    this.errorMessage.classList.add('hidden');
-                }, 5000);
-            }
-
             async startVoiceRecording() {
                 try {
-                    if (this.currentStream) {
-                        this.currentStream.getTracks().forEach(track => track.stop());
-                    }
                     this.currentStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    this.mediaRecorder = new MediaRecorder(this.currentStream, { mimeType: 'audio/webm' });
+                    this.mediaRecorder = new MediaRecorder(this.currentStream);
                     this.recordedChunks = [];
 
                     this.mediaRecorder.ondataavailable = (e) => {
@@ -305,31 +314,24 @@
 
                     this.mediaRecorder.onstop = () => {
                         const blob = new Blob(this.recordedChunks, { type: 'audio/webm' });
-                        this.sendVoiceMessage(blob);
+                        this.sendMediaMessage(blob, 'audio');
                         this.cleanupStream();
                     };
 
-                    this.mediaRecorder.onerror = (e) => {
-                        console.error('Ошибка MediaRecorder:', e);
-                        this.showError('Ошибка записи аудио');
-                    };
-
-                    this.mediaRecorder.start(100); // timeslice для реального потока
+                    this.mediaRecorder.start();
                     this.isRecording = true;
                     this.recordBtn.style.transform = 'scale(1.1)';
                     this.recordingIndicator.classList.remove('hidden');
                     this.recordingIndicator.textContent = 'Запись голосового...';
-                    console.log('Запись голосового начата');
                 } catch (err) {
-                    console.error('Ошибка getUserMedia для аудио:', err);
-                    this.showError('Нет доступа к микрофону. Проверьте разрешения и используйте HTTPS/localhost.');
+                    this.showError('Ошибка доступа к микрофону: ' + err.message);
                 }
             }
 
             async startVideoRecording() {
                 try {
                     await this.setupVideoStream(true);
-                    this.mediaRecorder = new MediaRecorder(this.currentStream, { mimeType: 'video/webm' });
+                    this.mediaRecorder = new MediaRecorder(this.currentStream);
                     this.recordedChunks = [];
 
                     this.mediaRecorder.ondataavailable = (e) => {
@@ -338,69 +340,36 @@
 
                     this.mediaRecorder.onstop = () => {
                         const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
-                        this.sendVideoMessage(blob);
+                        this.sendMediaMessage(blob, 'video');
                         this.cleanupStream();
                         this.videoPreview.classList.add('hidden');
                     };
 
-                    this.mediaRecorder.onerror = (e) => {
-                        console.error('Ошибка MediaRecorder для видео:', e);
-                        this.showError('Ошибка записи видео');
-                    };
-
-                    this.mediaRecorder.start(100);
+                    this.mediaRecorder.start();
                     this.isRecording = true;
                     this.videoPreview.classList.remove('hidden');
                     this.recordingIndicator.classList.remove('hidden');
                     this.recordingIndicator.textContent = 'Запись видео...';
-                    console.log('Запись видео-кружочка начата');
                 } catch (err) {
-                    console.error('Ошибка для видео:', err);
-                    this.showError('Нет доступа к камере. Проверьте разрешения, HTTPS/localhost, фронт-камеру.');
+                    this.showError('Ошибка доступа к камере: ' + err.message);
                 }
             }
 
             async setupVideoStream(forRecording = false) {
-                if (this.currentStream) {
-                    this.currentStream.getTracks().forEach(track => track.stop());
-                }
+                if (this.currentStream) this.currentStream.getTracks().forEach(track => track.stop());
 
-                // Fallback constraints for mobile
                 let constraints = {
-                    video: { 
-                        width: { ideal: 480 }, 
-                        height: { ideal: 480 },
-                        facingMode: { ideal: 'user' }  // ideal, не exact
-                    },
+                    video: true,
                     audio: forRecording
                 };
 
-                // Если не сработает, fallback без facingMode
-                try {
-                    this.currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-                } catch (err) {
-                    console.warn('Fallback без facingMode:', err);
-                    constraints.video.facingMode = undefined;
-                    this.currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-                }
+                this.currentStream = await navigator.mediaDevices.getUserMedia(constraints);
 
                 this.videoElement.srcObject = this.currentStream;
                 this.videoElement.muted = true;
                 this.videoElement.playsInline = true;
 
-                // Ждём loadedmetadata и play
-                await new Promise((resolve, reject) => {
-                    this.videoElement.onloadedmetadata = () => {
-                        this.videoElement.play().then(resolve).catch(reject);
-                    };
-                    this.videoElement.onerror = reject;
-                    if (this.videoElement.readyState >= 1) {
-                        this.videoElement.play().then(resolve).catch(reject);
-                    }
-                });
-
-                // Начинаем рисовать на canvas
-                this.startDrawing();
+                await this.videoElement.play();
             }
 
             async startVideoPreview() {
@@ -408,30 +377,9 @@
                     await this.setupVideoStream(false);
                     this.videoPreview.classList.remove('hidden');
                     this.recordingIndicator.classList.add('hidden');
-                    console.log('Preview видео открыт');
                 } catch (err) {
-                    console.error('Ошибка preview:', err);
-                    this.showError('Ошибка preview камеры. Проверьте разрешения и HTTPS.');
+                    this.showError('Ошибка preview камеры: ' + err.message);
                 }
-            }
-
-            startDrawing() {
-                const ctx = this.videoCanvas.getContext('2d');
-                const drawFrame = () => {
-                    if (this.videoElement.readyState === this.videoElement.HAVE_ENOUGH_DATA) {
-                        ctx.save();
-                        ctx.clearRect(0, 0, 300, 300);
-                        ctx.beginPath();
-                        ctx.arc(150, 150, 150, 0, 2 * Math.PI);
-                        ctx.clip();
-                        ctx.drawImage(this.videoElement, 0, 0, 300, 300);
-                        ctx.restore();
-                    }
-                    if (this.videoPreview.classList.contains('hidden') === false) {
-                        this.drawFrameId = requestAnimationFrame(drawFrame);
-                    }
-                };
-                drawFrame();
             }
 
             stopVideoMode() {
@@ -439,10 +387,6 @@
                 this.cleanupStream();
                 this.videoPreview.classList.add('hidden');
                 this.recordingIndicator.classList.add('hidden');
-                if (this.drawFrameId) {
-                    cancelAnimationFrame(this.drawFrameId);
-                    this.drawFrameId = null;
-                }
             }
 
             stopRecording(cancel = false) {
@@ -454,7 +398,6 @@
                 }
                 if (cancel) {
                     this.recordedChunks = [];
-                    console.log('Запись отменена');
                 }
             }
 
@@ -466,10 +409,6 @@
                 if (this.videoElement.srcObject) {
                     this.videoElement.srcObject = null;
                 }
-                if (this.drawFrameId) {
-                    cancelAnimationFrame(this.drawFrameId);
-                    this.drawFrameId = null;
-                }
             }
 
             closeVideoPreview() {
@@ -478,31 +417,36 @@
                 this.recordingIndicator.classList.add('hidden');
             }
 
-            sendVoiceMessage(blob) {
-                // Реальная отправка: скачиваем для теста
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'voice.webm';
-                a.click();
-                URL.revokeObjectURL(url);
-                console.log('Голосовое сохранено/отправлено');
+            sendTextMessage(text) {
+                const messageDiv = document.createElement('div');
+                messageDiv.classList.add('message');
+                messageDiv.textContent = text;
+                this.chatContainer.appendChild(messageDiv);
+                this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
             }
 
-            sendVideoMessage(blob) {
-                // Реальная отправка: скачиваем для теста
+            sendMediaMessage(blob, type) {
                 const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'video.webm';
-                a.click();
-                URL.revokeObjectURL(url);
-                console.log('Видео сохранено/отправлено');
+                const messageDiv = document.createElement('div');
+                messageDiv.classList.add('message');
+                if (type === 'audio') {
+                    const audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = url;
+                    messageDiv.appendChild(audio);
+                } else if (type === 'video') {
+                    const video = document.createElement('video');
+                    video.controls = true;
+                    video.src = url;
+                    video.style.borderRadius = '50%'; // Круглый видео в чате
+                    messageDiv.appendChild(video);
+                }
+                this.chatContainer.appendChild(messageDiv);
+                this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
             }
         }
 
-        // Инициализация
-        new ChatInput();
+        new Messenger();
     </script>
 </body>
 </html>
