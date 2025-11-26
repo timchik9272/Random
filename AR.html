@@ -3,65 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Мое WebAR Приложение</title>
-    
+    <title>Zappar WebAR (Plane Tracking)</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            width: 100vw;
-            height: 100vh;
-            background-color: #f0f0f0;
-            font-family: sans-serif;
-        }
-
-        /* Настраиваем компонент на весь экран */
-        model-viewer {
-            width: 100%;
-            height: 100%;
-        }
-
-        /* Стиль кнопки активации AR */
-        .ar-button {
-            background-color: white;
-            border-radius: 4px;
-            border: none;
-            position: absolute;
-            bottom: 30px;
-            right: 50%;
-            transform: translateX(50%);
-            padding: 10px 20px;
-            font-weight: bold;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.25);
-            color: #333;
-            display: none; /* Скрыта, пока AR не доступен */
-        }
-        
-        /* Показываем кнопку, если AR поддерживается */
-        model-viewer[ar-status="not-presenting"] > .ar-button {
-            display: block;
+        body { margin: 0; padding: 0; overflow: hidden; }
+        /* A-Frame сцена должна занимать весь экран */
+        a-scene { 
+            width: 100vw; 
+            height: 100vh; 
         }
     </style>
 </head>
 <body>
 
-    <model-viewer 
-        src="https://modelviewer.dev/shared-assets/models/Astronaut.glb"
-        ios-src="https://modelviewer.dev/shared-assets/models/Astronaut.usdz"
-        alt="3D модель космонавта"
-        ar
-        ar-modes="webxr scene-viewer quick-look"
-        camera-controls
-        auto-rotate
-        shadow-intensity="1">
-        
-        <button slot="ar-button" class="ar-button">
-            👋 Поставить в AR
-        </button>
-        
-    </model-viewer>
+    <script src="https://unpkg.com/aframe@1.5.0/dist/aframe-master.min.js"></script>
 
-    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@zappar/aframe-components@1.2.0/dist/zappar-aframe-components.min.js"></script>
+
+    <a-scene 
+        zappar-camera="user-facing: false;"
+        renderer="antialias: true; logarithmicDepthBuffer: true;">
+
+        <a-entity light="type: ambient; intensity: 0.5;"></a-entity>
+        <a-entity light="type: directional; intensity: 0.5; position: 1 1 1;"></a-entity>
+
+        <a-entity 
+            zappar-anchor="target: plane; placement-mode: identity;"
+            id="plane-anchor"
+            >
+
+            <a-gltf-model 
+                src="https://cdn.glitch.global/60a6a2a0-4a87-47b2-840e-742232a5146c/robot.glb"
+                scale="0.5 0.5 0.5"
+                rotation="0 180 0">
+            </a-gltf-model>
+        </a-entity>
+        
+        <a-entity zappar-placement-ui></a-entity>
+
+    </a-scene>
 
 </body>
 </html>
