@@ -89,25 +89,32 @@
             border-top-left-radius: 50%;
             border-top-right-radius: 50%;
         }
+        .suffix .label {
+            left: 0;
+            width: 100%;
+            height: 20px;
+        }
         .suffix .label::before {
             content: '';
             position: absolute;
             left: 0;
             top: 0;
-            width: 50%;
-            height: 100%;
-            border-top: 2px solid #333;
-            transform: skewX(-45deg);
+            height: 20px;
+            width: 2px;
+            background: #333;
+            transform: rotate(-45deg);
+            transform-origin: top left;
         }
         .suffix .label::after {
             content: '';
             position: absolute;
             right: 0;
             top: 0;
-            width: 50%;
-            height: 100%;
-            border-top: 2px solid #333;
-            transform: skewX(45deg);
+            height: 20px;
+            width: 2px;
+            background: #333;
+            transform: rotate(45deg);
+            transform-origin: top right;
         }
         .ending .word-part {
             border: 2px solid #333;
@@ -150,7 +157,7 @@
             border-radius: 6px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .form-container input, .form-container textarea {
+        .form-container textarea {
             width: 100%;
             margin-bottom: 10px;
             padding: 10px;
@@ -172,16 +179,66 @@
         // Мини-словарь
         const miniDictionary = [
             {w:"домик",p:[["r","дом"],["s","ик"]]},
-            // ... (all previous entries remain the same)
+            {w:"перестройка",p:[["p","пере"],["r","строй"],["s","к"],["e","а"]]},
+            {w:"книжный",p:[["r","книж"],["s","н"],["e","ый"]]},
+            {w:"бабочка",p:[["r","бабоч"],["s","к"],["e","а"]]},
+            {w:"лес",p:[["r","лес"],["e",""]]},
+            {w:"пришкольный",p:[["p","при"],["r","школь"],["s","н"],["e","ый"]]},
+            {w:"метро",p:[["r","метро"]]},
+            {w:"арбузные",p:[["r","арбуз"],["s","н"],["e","ые"]]},
+            {w:"завезли",p:[["p","за"],["r","вез"],["s","л"],["e","и"]]},
+            {w:"аккуратно",p:[["r","аккурат"],["s","н"],["e","о"]]},
+            {w:"низенький",p:[["r","низ"],["s","еньк"],["e","ий"]]},
+            {w:"жажда",p:[["r","жажд"],["e","а"]]},
+            {w:"аленький",p:[["r","ал"],["s","еньк"],["e","ий"]]},
+            {w:"белеть",p:[["r","бел"],["s","е"],["e","ть"]]},
+            {w:"задаром",p:[["p","за"],["r","дар"],["e","ом"]]},
+            {w:"облачко",p:[["r","облач"],["s","к"],["e","о"]]},
+            {w:"беседа",p:[["r","бесед"],["e","а"]]},
+            {w:"ангельский",p:[["r","ангель"],["s","ск"],["e","ий"]]},
+            {w:"белеете",p:[["r","бел"],["s","е"],["e","ете"]]},
+            {w:"налево",p:[["p","на"],["r","лев"],["e","о"]]},
+            {w:"учительница",p:[["r","уч"],["s","и"],["s","тель"],["s","ниц"],["e","а"]]},
+            {w:"подъезд",p:[["p","под"],["r","ъезд"]]},
+            {w:"стол",p:[["r","стол"]]},
+            {w:"подоконник",p:[["p","под"],["r","окон"],["s","ник"]]},
+            {w:"бежать",p:[["r","беж"],["e","ать"]]},
+            {w:"солнечный",p:[["r","солн"],["s","еч"],["s","н"],["e","ый"]]},
+            {w:"дерево",p:[["r","дерев"],["e","о"]]},
+            {w:"маленький",p:[["r","мал"],["s","еньк"],["e","ий"]]},
+            {w:"читать",p:[["r","чит"],["e","ать"]]},
+            {w:"книга",p:[["r","книг"],["e","а"]]},
+            {w:"домашний",p:[["r","дом"],["s","ашн"],["e","ий"]]},
+            {w:"высокий",p:[["r","выс"],["s","ок"],["e","ий"]]},
+            {w:"река",p:[["r","рек"],["e","а"]]},
+            {w:"бежать",p:[["r","беж"],["e","ать"]]},
+            {w:"снег",p:[["r","снег"]]},
+            {w:"зима",p:[["r","зим"],["e","а"]]},
+            {w:"лето",p:[["r","лет"],["e","о"]]},
+            {w:"весна",p:[["r","весн"],["e","а"]]},
+            {w:"осень",p:[["r","осен"],["s","ь"]]},
+            {w:"друг",p:[["r","друг"]]},
+            {w:"подруга",p:[["p","под"],["r","руг"],["e","а"]]},
+            // Добавлены популярные слова для улучшения словаря без лишнего веса
         ];
 
         let dictionary = miniDictionary;
 
-        // Fetch words.txt if available
+        // Пытаемся загрузить words.txt (минифицированный JSON без пробелов)
         fetch('words.txt')
-            .then(response => response.ok ? response.json() : Promise.reject('Not found'))
-            .then(data => dictionary = data)
-            .catch(() => console.log('Using mini-dictionary'));
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Файл не найден');
+                }
+                return response.json();
+            })
+            .then(data => {
+                dictionary = data;
+                console.log('Словарь загружен из words.txt');
+            })
+            .catch(error => {
+                console.log('Используем мини-словарь:', error);
+            });
 
         function searchWord() {
             const query = document.getElementById('search').value.toLowerCase().trim();
@@ -236,20 +293,13 @@
             textParse.textContent = parseText;
             resultDiv.appendChild(textParse);
 
-            // LikeBtn integration for likes and dislikes (replace with your Site ID)
+            // LikeBtn integration
             const feedbackDiv = document.createElement('div');
             feedbackDiv.className = 'feedback';
             feedbackDiv.innerHTML = `
-                <div class="likebtn-wrapper" data-identifier="word_${query}" data-site_id="YOUR_LIKEBTN_SITE_ID" data-theme="like_dislike" data-counter_type="number" data-popup_enabled="true"></div>
+                <div class="likebtn-wrapper" data-identifier="word_${query}" data-site_id="6929d05f6fd08b4e693465b3" data-theme="like_dislike" data-counter_type="number" data-popup_enabled="true"></div>
             `;
             resultDiv.appendChild(feedbackDiv);
-
-            // Report button to show form
-            const reportBtn = document.createElement('button');
-            reportBtn.className = 'report';
-            reportBtn.textContent = 'Жалоба на разбор';
-            reportBtn.onclick = () => showForm('жалоба', query);
-            resultDiv.appendChild(reportBtn);
 
             // Load LikeBtn script if not loaded
             if (!document.getElementById('likebtn_wjs')) {
@@ -259,6 +309,13 @@
                 script.async = true;
                 document.body.appendChild(script);
             }
+
+            // Report button
+            const reportBtn = document.createElement('button');
+            reportBtn.className = 'report';
+            reportBtn.textContent = 'Жалоба на разбор';
+            reportBtn.onclick = () => showForm('жалоба', query);
+            resultDiv.appendChild(reportBtn);
         }
 
         function displayNotFound(query) {
@@ -276,12 +333,19 @@
             const resultDiv = document.getElementById('result');
             const formContainer = document.createElement('div');
             formContainer.className = 'form-container';
+
+            // Генерация уникального browser_id
+            let browserId = localStorage.getItem('browser_id');
+            if (!browserId) {
+                browserId = crypto.randomUUID() || navigator.userAgent + Math.random().toString(36).substring(2);
+                localStorage.setItem('browser_id', browserId);
+            }
+
             formContainer.innerHTML = `
                 <form action="https://api.web3forms.com/submit" method="POST">
-                    <input type="hidden" name="access_key" value="YOUR_WEB3FORMS_ACCESS_KEY">
+                    <input type="hidden" name="access_key" value="7bd1b28f-6e2e-48b3-829b-7bc25f569ba6">
                     <input type="hidden" name="subject" value="${type === 'жалоба' ? 'Жалоба на разбор слова' : 'Запрос на добавление слова'} ${query}">
-                    <input type="text" name="name" placeholder="Ваше имя" required>
-                    <input type="email" name="email" placeholder="Ваш email" required>
+                    <input type="hidden" name="browser_id" value="${browserId}">
                     <textarea name="message" placeholder="${type === 'жалоба' ? 'Опишите проблему' : 'Предложите разбор слова'}" required></textarea>
                     <button type="submit">Отправить</button>
                 </form>
