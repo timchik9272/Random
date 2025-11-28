@@ -103,7 +103,7 @@
             width: 2px;
             background: #333;
             transform: rotate(-45deg);
-            transform-origin: top left;
+            transform-origin: bottom left;
         }
         .suffix .label::after {
             content: '';
@@ -114,7 +114,7 @@
             width: 2px;
             background: #333;
             transform: rotate(45deg);
-            transform-origin: top right;
+            transform-origin: bottom right;
         }
         .ending .word-part {
             border: 2px solid #333;
@@ -167,6 +167,14 @@
         .form-container button {
             width: 100%;
         }
+        .variants {
+            margin-top: 30px;
+            width: 100%;
+            text-align: left;
+        }
+        .variant {
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
@@ -176,7 +184,7 @@
     <div id="result"></div>
 
     <script>
-        // Мини-словарь
+        // Мини-словарь с сокращенными названиями и массивами для частей (для уменьшения размера)
         const miniDictionary = [
             {w:"домик",p:[["r","дом"],["s","ик"]]},
             {w:"перестройка",p:[["p","пере"],["r","строй"],["s","к"],["e","а"]]},
@@ -224,7 +232,7 @@
 
         let dictionary = miniDictionary;
 
-        // Пытаемся загрузить words.txt (минифицированный JSON без пробелов)
+        // Пытаемся загрузить words.txt
         fetch('words.txt')
             .then(response => {
                 if (!response.ok) {
@@ -316,6 +324,51 @@
             reportBtn.textContent = 'Жалоба на разбор';
             reportBtn.onclick = () => showForm('жалоба', query);
             resultDiv.appendChild(reportBtn);
+
+            // Добавление форм слова (пример для "подоконник")
+            if (query === 'подоконник') {
+                const variantsDiv = document.createElement('div');
+                variantsDiv.className = 'variants';
+                variantsDiv.innerHTML = '<h3>Формы слова:</h3>';
+
+                const variant1 = document.createElement('div');
+                variant1.className = 'variant';
+                variant1.innerHTML = '<p><strong>подоконника</strong></p>';
+                const variantEntry = {p: [["p","под"],["r","окон"],["s","ник"],["e","а"]]};
+                const variantContainer = document.createElement('div');
+                variantContainer.className = 'word-display';
+
+                let variantParseText = '';
+                variantEntry.p.forEach(part => {
+                    const t = part[0];
+                    const v = part[1];
+
+                    const morphemeDiv = document.createElement('div');
+                    morphemeDiv.className = 'morpheme ' + getClass(t);
+
+                    const label = document.createElement('div');
+                    label.className = 'label';
+
+                    const wordPart = document.createElement('span');
+                    wordPart.className = 'word-part';
+                    wordPart.textContent = v || '[нулевое]';
+
+                    morphemeDiv.appendChild(label);
+                    morphemeDiv.appendChild(wordPart);
+                    variantContainer.appendChild(morphemeDiv);
+
+                    variantParseText += getLabel(t) + ': ' + (v || '[нулевое]') + '\n';
+                });
+
+                variant1.appendChild(variantContainer);
+                const variantTextParse = document.createElement('div');
+                variantTextParse.className = 'text-parse';
+                variantTextParse.textContent = variantParseText;
+                variant1.appendChild(variantTextParse);
+                variantsDiv.appendChild(variant1);
+
+                resultDiv.appendChild(variantsDiv);
+            }
         }
 
         function displayNotFound(query) {
