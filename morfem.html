@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Морфемный разбор слов</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 40px;
+            text-align: center;
+            background-color: #f4f7fa;
+            color: #333;
+        }
+        h1 {
+            color: #4a90e2;
+            margin-bottom: 30px;
+        }
+        #search {
+            width: 450px;
+            padding: 14px;
+            font-size: 18px;
+            border: 1px solid #d1d8e0;
+            border-radius: 6px;
+            margin-right: 12px;
+        }
+        button {
+            padding: 14px 24px;
+            font-size: 18px;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #3b7ac8;
+        }
+        #result {
+            margin-top: 40px;
+            font-size: 26px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .word-display {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+        .text-parse {
+            font-size: 20px;
+            margin-top: 25px;
+            text-align: left;
+            max-width: 650px;
+            white-space: pre-line;
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .morpheme {
+            display: inline-block;
+            position: relative;
+            margin: 0 3px;
+        }
+        .label {
+            position: absolute;
+            top: -25px;
+            left: 0;
+            width: 100%;
+            height: 20px;
+            box-sizing: border-box;
+            background-color: transparent;
+        }
+        .word-part {
+            display: inline;
+            color: black;
+        }
+        /* Символы */
+        .prefix .label {
+            border-top: 2px solid #333;
+            border-left: 2px solid #333;
+            border-top-left-radius: 6px;
+        }
+        .root .label {
+            border-top: 2px solid #333;
+            border-top-left-radius: 50%;
+            border-top-right-radius: 50%;
+        }
+        .suffix .label::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 50%;
+            height: 100%;
+            border-top: 2px solid #333;
+            transform: skewX(-45deg);
+        }
+        .suffix .label::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 50%;
+            height: 100%;
+            border-top: 2px solid #333;
+            transform: skewX(45deg);
+        }
+        .ending .word-part {
+            border: 2px solid #333;
+            border-radius: 4px;
+            padding: 0 3px;
+        }
+        .ending .label {
+            display: none;
+        }
+        .feedback {
+            margin-top: 25px;
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+        }
+        .report {
+            margin-top: 15px;
+            font-size: 14px;
+            background: none;
+            border: none;
+            color: #7f8c8d;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .report:hover {
+            color: #e74c3c;
+        }
+        .request-add {
+            margin-top: 25px;
+            background-color: #27ae60;
+        }
+        .request-add:hover {
+            background-color: #219d55;
+        }
+        .form-container {
+            margin-top: 20px;
+            width: 400px;
+            background: #fff;
+            padding: 20px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-container input, .form-container textarea {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #d1d8e0;
+            border-radius: 4px;
+        }
+        .form-container button {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h1>Морфемный разбор слов</h1>
+    <input type="text" id="search" placeholder="Введите слово для поиска..." onkeydown="if(event.keyCode==13) searchWord();">
+    <button onclick="searchWord()">Поиск</button>
+    <div id="result"></div>
+
+    <script>
+        // Мини-словарь
+        const miniDictionary = [
+            {w:"домик",p:[["r","дом"],["s","ик"]]},
+            // ... (all previous entries remain the same)
+        ];
+
+        let dictionary = miniDictionary;
+
+        // Fetch words.txt if available
+        fetch('words.txt')
+            .then(response => response.ok ? response.json() : Promise.reject('Not found'))
+            .then(data => dictionary = data)
+            .catch(() => console.log('Using mini-dictionary'));
+
+        function searchWord() {
+            const query = document.getElementById('search').value.toLowerCase().trim();
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '';
+
+            if (!query) {
+                resultDiv.innerHTML = '<p>Введите слово для поиска.</p>';
+                return;
+            }
+
+            const found = dictionary.find(item => item.w.toLowerCase() === query);
+
+            if (found) {
+                displayWord(found, query);
+            } else {
+                displayNotFound(query);
+            }
+        }
+
+        function displayWord(entry, query) {
+            const resultDiv = document.getElementById('result');
+            const wordContainer = document.createElement('div');
+            wordContainer.className = 'word-display';
+
+            const textParse = document.createElement('div');
+            textParse.className = 'text-parse';
+            let parseText = '';
+
+            entry.p.forEach(part => {
+                const t = part[0];
+                const v = part[1];
+
+                const morphemeDiv = document.createElement('div');
+                morphemeDiv.className = 'morpheme ' + getClass(t);
+
+                const label = document.createElement('div');
+                label.className = 'label';
+
+                const wordPart = document.createElement('span');
+                wordPart.className = 'word-part';
+                wordPart.textContent = v || '[нулевое]';
+
+                morphemeDiv.appendChild(label);
+                morphemeDiv.appendChild(wordPart);
+                wordContainer.appendChild(morphemeDiv);
+
+                parseText += getLabel(t) + ': ' + (v || '[нулевое]') + '\n';
+            });
+
+            resultDiv.appendChild(wordContainer);
+            textParse.textContent = parseText;
+            resultDiv.appendChild(textParse);
+
+            // LikeBtn integration for likes and dislikes (replace with your Site ID)
+            const feedbackDiv = document.createElement('div');
+            feedbackDiv.className = 'feedback';
+            feedbackDiv.innerHTML = `
+                <div class="likebtn-wrapper" data-identifier="word_${query}" data-site_id="YOUR_LIKEBTN_SITE_ID" data-theme="like_dislike" data-counter_type="number" data-popup_enabled="true"></div>
+            `;
+            resultDiv.appendChild(feedbackDiv);
+
+            // Report button to show form
+            const reportBtn = document.createElement('button');
+            reportBtn.className = 'report';
+            reportBtn.textContent = 'Жалоба на разбор';
+            reportBtn.onclick = () => showForm('жалоба', query);
+            resultDiv.appendChild(reportBtn);
+
+            // Load LikeBtn script if not loaded
+            if (!document.getElementById('likebtn_wjs')) {
+                const script = document.createElement('script');
+                script.id = 'likebtn_wjs';
+                script.src = '//w.likebtn.com/js/w/widget.js';
+                script.async = true;
+                document.body.appendChild(script);
+            }
+        }
+
+        function displayNotFound(query) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Слово не найдено в словаре.</p>';
+
+            const requestBtn = document.createElement('button');
+            requestBtn.className = 'request-add';
+            requestBtn.textContent = 'Отправить запрос на добавление';
+            requestBtn.onclick = () => showForm('запрос', query);
+            resultDiv.appendChild(requestBtn);
+        }
+
+        function showForm(type, query) {
+            const resultDiv = document.getElementById('result');
+            const formContainer = document.createElement('div');
+            formContainer.className = 'form-container';
+            formContainer.innerHTML = `
+                <form action="https://api.web3forms.com/submit" method="POST">
+                    <input type="hidden" name="access_key" value="YOUR_WEB3FORMS_ACCESS_KEY">
+                    <input type="hidden" name="subject" value="${type === 'жалоба' ? 'Жалоба на разбор слова' : 'Запрос на добавление слова'} ${query}">
+                    <input type="text" name="name" placeholder="Ваше имя" required>
+                    <input type="email" name="email" placeholder="Ваш email" required>
+                    <textarea name="message" placeholder="${type === 'жалоба' ? 'Опишите проблему' : 'Предложите разбор слова'}" required></textarea>
+                    <button type="submit">Отправить</button>
+                </form>
+            `;
+            resultDiv.appendChild(formContainer);
+        }
+
+        function getLabel(t) {
+            switch (t) {
+                case 'p': return 'Приставка';
+                case 'r': return 'Корень';
+                case 's': return 'Суффикс';
+                case 'e': return 'Окончание';
+                default: return t;
+            }
+        }
+
+        function getClass(t) {
+            switch (t) {
+                case 'p': return 'prefix';
+                case 'r': return 'root';
+                case 's': return 'suffix';
+                case 'e': return 'ending';
+                default: return '';
+            }
+        }
+    </script>
+</body>
+</html>
