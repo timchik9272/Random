@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8" />
-<title>Медиа-Шеринг (Uploadcare)</title>
+<title>Загрузка и просмотр изображений</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script src="https://ucarecdn.com/libs/widget/3.x/uploadcare.full.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
@@ -27,7 +27,7 @@ body{
     padding: 30px;
     border-radius: var(--radius);
     max-width: 90%;
-    width: 600px; /* Шире для просмотра */
+    width: 600px;
     text-align: center;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
     display: flex;
@@ -82,6 +82,39 @@ button:hover {
     margin-bottom: 20px;
 }
 
+/* Стили для сохранённых ссылок */
+#saved-links-section {
+    width: 100%;
+    text-align: left;
+    margin-top: 30px;
+    border-top: 1px solid var(--gray);
+    padding-top: 20px;
+}
+#saved-links-list {
+    list-style: none;
+    padding: 0;
+}
+#saved-links-list li {
+    background: var(--bg);
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+#saved-links-list li span {
+    flex-grow: 1;
+    word-break: break-all;
+    font-size: 0.9em;
+    color: var(--gray);
+}
+#saved-links-list li a {
+    color: var(--accent);
+    text-decoration: none;
+    margin-left: 10px;
+}
+
 /* Стили для Просмотра (View UI) */
 #view-section {
     width: 100%;
@@ -98,33 +131,25 @@ button:hover {
     align-items: center;
     min-height: 200px;
 }
-/* Сглаженное изображение */
-img {
+img, video {
     max-width: 100%;
     max-height: 70vh;
     display: block;
     border-radius: var(--radius); 
     object-fit: contain;
 }
-video {
-    max-width: 100%;
-    max-height: 70vh;
-    display: block;
-    /* Убираем стандартные элементы управления для кастомного плеера */
-    /* controls: false; */ 
-    background-color: #000;
-}
 .error-message {
     padding: 15px;
-    background: var(--bg);
+    background: #500;
     border-radius: var(--radius);
     margin-top: 20px;
-    color: #f00;
+    color: #fff;
 }
 .controls {
     display: flex;
     gap: 10px;
     margin-top: 15px;
+    flex-wrap: wrap;
 }
 </style>
 </head>
@@ -144,10 +169,6 @@ video {
     
     <div id="upload-result-container" class="hidden">
       <div class="result-box">
-        <strong>Уникальный ID:</strong>
-        <p id="file-id-output"></p>
-      </div>
-      <div class="result-box">
         <strong>Ссылка для просмотра (Короткая):</strong>
         <p id="view-link-output"></p>
       </div>
@@ -156,6 +177,13 @@ video {
         <button onclick="window.open(document.getElementById('view-link-output').innerText, '_blank')"><i class="fa fa-eye"></i> Открыть Просмотр</button>
       </div>
     </div>
+
+    <div id="saved-links-section">
+        <h2>Сохранённые Ссылки</h2>
+        <ul id="saved-links-list"></ul>
+        <button id="clear-links-btn" class="hidden" onclick="clearSavedLinks()"><i class="fa fa-trash"></i> Очистить список</button>
+    </div>
+
   </div>
 
   <div id="view-section" class="hidden">
@@ -179,38 +207,95 @@ video {
 <script>
 // --- КОНСТАНТЫ И ИНИЦИАЛИЗАЦИЯ ---
 const uploadcarePublicKey = "c12f2c3e134f56024db8";
-const FILE_EXTENSIONS = {
-    image: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'],
-    video: ['mp4', 'mov', 'webm', 'ogg']
-};
-
 uploadcare.start({ publicKey: uploadcarePublicKey });
 
-// --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
+// --- LOCAL STORAGE ЛОГИКА ---
 
-// Функция для копирования текста
-function copyLink(elementId) {
-    const text = document.getElementById(elementId).innerText;
-    if (navigator.clipboard) {
-        navigator.clipboard.writeText(text).then(() => {
-            alert('Ссылка скопирована: ' + text);
-        }).catch(err => {
-            console.error('Ошибка копирования:', err);
-            alert('Не удалось скопировать. Скопируйте вручную: ' + text);
-        });
-    } else {
-        alert('Не удалось скопировать. Скопируйте вручную: ' + text);
+const STORAGE_KEY = 'uploadedLinks';
+
+function getSavedLinks() {
+    try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    } catch (e) {
+        console.error("Ошибка парсинга LocalStorage:", e);
+        return [];
     }
 }
 
-// Получение параметра ID из URL
+function saveLinkToLocalStorage(id, link) {
+    const links = getSavedLinks();
+    // Проверяем, чтобы не дублировать
+    if (links.some(item => item.id === id)) return; 
+
+    links.unshift({ id, link, timestamp: new Date().toISOString() });
+    // Храним только последние 10 ссылок
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(links.slice(0, 10)));
+}
+
+function renderSavedLinks() {
+    const links = getSavedLinks();
+    const listElement = document.getElementById('saved-links-list');
+    const clearBtn = document.getElementById('clear-links-btn');
+    listElement.innerHTML = '';
+
+    if (links.length === 0) {
+        listElement.innerHTML = '<p style="color:var(--gray);text-align:center;">Список пуст. Загрузите что-нибудь!</p>';
+        clearBtn.classList.add('hidden');
+        return;
+    }
+    
+    links.forEach(item => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+            <span>${item.id}</span>
+            <a href="${item.link}" target="_blank" title="Открыть"><i class="fa fa-external-link-alt"></i></a>
+            <button onclick="copyLink('${item.link.replace(/'/g, "\\'")}', true)" style="padding: 5px 10px;margin: 0;background:var(--bg-light);color:var(--text);"><i class="fa fa-copy"></i></button>
+        `;
+        listElement.appendChild(li);
+    });
+    
+    clearBtn.classList.remove('hidden');
+}
+
+function clearSavedLinks() {
+    if (confirm("Вы уверены, что хотите очистить список сохранённых ссылок?")) {
+        localStorage.removeItem(STORAGE_KEY);
+        renderSavedLinks();
+    }
+}
+
+// Перегрузка функции копирования для работы с текстовой строкой
+function copyLink(textOrElementId, isText = false) {
+    let textToCopy;
+    
+    if (isText) {
+        textToCopy = textOrElementId;
+    } else {
+        const element = document.getElementById(textOrElementId);
+        textToCopy = element ? element.innerText : textOrElementId;
+    }
+    
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            alert('Ссылка скопирована: ' + textToCopy);
+        }).catch(err => {
+            console.error('Ошибка копирования:', err);
+            alert('Не удалось скопировать. Скопируйте вручную: ' + textToCopy);
+        });
+    } else {
+        alert('Не удалось скопировать. Скопируйте вручную: ' + textToCopy);
+    }
+}
+
+// --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
+
 function getQueryVariable(variable) {
     const query = window.location.search.substring(1);
     const vars = query.split('&');
     for (let i = 0; i < vars.length; i++) {
         const pair = vars[i].split('=');
         if (pair[0] === variable) {
-            return pair[1];
+            return decodeURIComponent(pair[1]);
         }
     }
     return null;
@@ -238,8 +323,10 @@ document.getElementById('file-input').addEventListener('change', (e) => {
     // 3. Формирование короткой ссылки
     const viewLink = `${window.location.origin}${window.location.pathname}?id=${fileId}`; 
 
-    // 4. Обновление UI
-    document.getElementById('file-id-output').innerText = fileId;
+    // 4. Сохранение в LocalStorage и обновление UI
+    saveLinkToLocalStorage(fileId, viewLink);
+    renderSavedLinks(); // Обновление списка сохранённых ссылок
+
     document.getElementById('view-link-output').innerText = viewLink;
     
     document.getElementById('loading-status').classList.add('hidden');
@@ -255,63 +342,79 @@ document.getElementById('file-input').addEventListener('change', (e) => {
 
 // --- ЛОГИКА ПРОСМОТРА (View Logic) ---
 
-function initView(fileId) {
+function handleViewMode(fileId) {
     const mediaContent = document.getElementById('media-content');
-    const viewMessage = document.getElementById('view-message');
     const downloadBtn = document.getElementById('download-btn');
+    const viewMessage = document.getElementById('view-message');
     
-    // Прямая ссылка на файл, которую мы будем использовать для загрузки
+    // Прямая ссылка на файл
     const cdnUrl = `https://ucarecdn.com/${fileId}/`;
 
     viewMessage.classList.add('hidden');
     mediaContent.innerHTML = '';
     mediaContent.classList.remove('hidden');
     document.getElementById('view-controls').classList.remove('hidden');
+    document.getElementById('view-title').innerText = 'Загрузка медиа...';
     
     // Устанавливаем ссылку для скачивания
     downloadBtn.onclick = () => window.open(cdnUrl, '_blank'); 
+    
+    // 1. Пытаемся получить метаданные для точного определения типа
+    fetch(cdnUrl + 'json/')
+        .then(res => {
+            if (!res.ok) throw new Error('File metadata not found or failed to load.');
+            return res.json();
+        })
+        .then(data => {
+            const mimeType = data.mimeType || '';
 
-    // 1. Делаем запрос, чтобы определить тип файла (нужно для видео/изображения)
-    fetch(cdnUrl + 'json/').then(res => res.json()).then(data => {
-        
-        const filename = data.filename || '';
-        const ext = filename.split('.').pop().toLowerCase();
-        
-        let element;
-        let isMediaFound = true;
+            if (mimeType.startsWith('image/')) {
+                // Изображение: вставляем тег <img>
+                document.getElementById('view-title').innerText = 'Просмотр Изображения';
+                const element = document.createElement('img');
+                element.src = cdnUrl + 'resize/800x/'; // Оптимизация
+                element.alt = 'Загруженное изображение';
+                mediaContent.appendChild(element);
+                
+            } else if (mimeType.startsWith('video/')) {
+                // Видео: вставляем тег <video> с controls
+                document.getElementById('view-title').innerText = 'Просмотр Видео';
+                const element = document.createElement('video');
+                element.src = cdnUrl;
+                element.controls = true; // Кастомный плеер через controls=true
+                element.loop = true;
+                element.playsInline = true;
+                element.poster = cdnUrl + 'format/jpeg/quality/lighter/resize/800x/'; // Превью
+                mediaContent.appendChild(element);
 
-        if (FILE_EXTENSIONS.image.includes(ext) || data.mimeType.startsWith('image/')) {
-            // Это изображение
-            document.getElementById('view-title').innerText = 'Просмотр Изображения';
-            element = document.createElement('img');
-            element.src = cdnUrl + 'resize/800x/'; // Оптимизация размера для просмотра
-            element.alt = 'Загруженное изображение';
+            } else {
+                displayError('Неподдерживаемый или неопределенный тип медиа.');
+            }
+        })
+        .catch(e => {
+            console.warn('Ошибка при получении метаданных. Попытка загрузить как универсальное медиа:', e.message);
+            // 2. Если метаданные недоступны, используем универсальный подход
+            document.getElementById('view-title').innerText = 'Просмотр Медиа (Универсальный)';
             
-        } else if (FILE_EXTENSIONS.video.includes(ext) || data.mimeType.startsWith('video/')) {
-            // Это видео
-            document.getElementById('view-title').innerText = 'Просмотр Видео';
-            element = document.createElement('video');
-            element.src = cdnUrl;
-            element.controls = true; // Используем стандартный плеер для простоты
-            element.loop = true;
-            element.playsInline = true;
-            element.poster = cdnUrl + 'format/jpeg/quality/lighter/resize/800x/'; // Превью
-            
-        } else {
-            // Неизвестный тип
-            isMediaFound = false;
-            displayError('Неподдерживаемый тип медиа или файл не найден.');
-            
-        }
-
-        if (isMediaFound) {
-            mediaContent.appendChild(element);
-        }
-
-    }).catch(e => {
-        console.error('Ошибка при получении метаданных:', e);
-        displayError('Файл с таким ID не найден или произошла ошибка сети.');
-    });
+            // Пытаемся вставить видео
+            const videoElement = document.createElement('video');
+            videoElement.src = cdnUrl;
+            videoElement.controls = true;
+            videoElement.loop = true;
+            videoElement.playsInline = true;
+            videoElement.onerror = () => {
+                 // Если видео не загрузилось, пытаемся вставить изображение
+                 mediaContent.innerHTML = ''; // Очищаем от неудачного видео
+                 const imgElement = document.createElement('img');
+                 imgElement.src = cdnUrl + 'resize/800x/';
+                 imgElement.alt = 'Загруженное изображение';
+                 imgElement.onerror = () => {
+                    displayError('Не удалось загрузить медиа с данным ID. Проверьте ID или доступность файла.');
+                 };
+                 mediaContent.appendChild(imgElement);
+            };
+            mediaContent.appendChild(videoElement);
+        });
 }
 
 function displayError(message) {
@@ -333,11 +436,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Режим Просмотра
         document.getElementById('upload-section').classList.add('hidden');
         document.getElementById('view-section').classList.remove('hidden');
-        initView(fileId);
+        handleViewMode(fileId);
     } else {
         // Режим Загрузки
         document.getElementById('view-section').classList.add('hidden');
         document.getElementById('upload-section').classList.remove('hidden');
+        renderSavedLinks(); // Загрузка и отображение сохранённых ссылок
     }
 });
 </script>
