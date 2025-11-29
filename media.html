@@ -2,11 +2,12 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8" />
-<title>Загрузка Медиа и ID-Ссылка</title>
+<title>Медиа-Шеринг (Uploadcare)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script src="https://ucarecdn.com/libs/widget/3.x/uploadcare.full.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 <style>
+/* Общие стили */
 :root{--bg:#0e0e0e;--bg-light:#1e1e1e;--accent:#0088cc;--text:#fff;--gray:#888;--radius:14px;}
 body{
     margin: 0;
@@ -19,15 +20,24 @@ body{
     align-items: center;
     justify-content: center;
     padding: 20px;
+    box-sizing: border-box;
 }
 .container {
     background: var(--bg-light);
     padding: 30px;
     border-radius: var(--radius);
-    max-width: 400px;
-    width: 100%;
+    max-width: 90%;
+    width: 600px; /* Шире для просмотра */
     text-align: center;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+h1 {
+    color: var(--text);
+    margin-bottom: 20px;
+    font-size: 2em;
 }
 button {
     border: none;
@@ -39,10 +49,21 @@ button {
     font-weight: bold;
     cursor: pointer;
     transition: background 0.3s ease;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 button:hover {
     background: #0077b3;
+}
+.hidden {
+    display: none !important;
+}
+
+/* Стили для Загрузки (Upload UI) */
+#upload-section {
+    width: 100%;
 }
 .result-box {
     text-align: left;
@@ -57,92 +78,122 @@ button:hover {
     display: block;
     margin-bottom: 8px;
 }
-.hidden {
-    display: none;
+#upload-btn {
+    margin-bottom: 20px;
+}
+
+/* Стили для Просмотра (View UI) */
+#view-section {
+    width: 100%;
+}
+.media-wrapper {
+    width: 100%;
+    max-width: 100%;
+    margin-bottom: 20px;
+    background-color: #000;
+    border-radius: var(--radius);
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+}
+/* Сглаженное изображение */
+img {
+    max-width: 100%;
+    max-height: 70vh;
+    display: block;
+    border-radius: var(--radius); 
+    object-fit: contain;
+}
+video {
+    max-width: 100%;
+    max-height: 70vh;
+    display: block;
+    /* Убираем стандартные элементы управления для кастомного плеера */
+    /* controls: false; */ 
+    background-color: #000;
+}
+.error-message {
+    padding: 15px;
+    background: var(--bg);
+    border-radius: var(--radius);
+    margin-top: 20px;
+    color: #f00;
+}
+.controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
 }
 </style>
 </head>
 <body>
 
 <div class="container">
-  <h1>Загрузка Медиа</h1>
-  <button id="upload-btn" onclick="triggerImageUpload()">
-    <i class="fa fa-upload"></i> Загрузить Фото или Видео
-  </button>
-  <div id="loading-status" class="hidden">
-    <p>Загрузка... Пожалуйста, подождите.</p>
-  </div>
-  <div id="result-container" class="hidden">
-    <div class="result-box">
-      <strong>Уникальный ID (Короткая ссылка):</strong>
-      <p id="file-id"></p>
+  
+  <div id="upload-section" class="hidden">
+    <h1>Загрузка Медиа</h1>
+    <button id="upload-btn" onclick="triggerImageUpload()">
+      <i class="fa fa-upload"></i> Загрузить Фото или Видео
+    </button>
+    
+    <div id="loading-status" class="hidden">
+      <p>Загрузка... Пожалуйста, подождите.</p>
     </div>
-    <div class="result-box">
-      <strong>Прямая Uploadcare ссылка:</strong>
-      <p id="long-link"></p>
+    
+    <div id="upload-result-container" class="hidden">
+      <div class="result-box">
+        <strong>Уникальный ID:</strong>
+        <p id="file-id-output"></p>
+      </div>
+      <div class="result-box">
+        <strong>Ссылка для просмотра (Короткая):</strong>
+        <p id="view-link-output"></p>
+      </div>
+      <div class="controls">
+        <button onclick="copyLink('view-link-output')"><i class="fa fa-copy"></i> Копировать Ссылку</button>
+        <button onclick="window.open(document.getElementById('view-link-output').innerText, '_blank')"><i class="fa fa-eye"></i> Открыть Просмотр</button>
+      </div>
     </div>
-    <button onclick="copyLink('file-id')"><i class="fa fa-copy"></i> Копировать ID</button>
   </div>
+
+  <div id="view-section" class="hidden">
+    <h1 id="view-title">Просмотр Медиа</h1>
+    
+    <div id="media-content" class="media-wrapper hidden">
+      </div>
+    
+    <div id="view-message" class="error-message hidden"></div>
+
+    <div id="view-controls" class="controls hidden">
+      <button id="download-btn"><i class="fa fa-download"></i> Скачать</button>
+      <button onclick="window.location.href = window.location.origin + window.location.pathname;"><i class="fa fa-plus"></i> Загрузить ещё</button>
+    </div>
+  </div>
+
 </div>
 
 <input type="file" id="file-input" style="display:none;" accept="image/*,video/*">
 
 <script>
-// Публичный ключ Uploadcare из оригинального мессенджера
+// --- КОНСТАНТЫ И ИНИЦИАЛИЗАЦИЯ ---
 const uploadcarePublicKey = "c12f2c3e134f56024db8";
+const FILE_EXTENSIONS = {
+    image: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'],
+    video: ['mp4', 'mov', 'webm', 'ogg']
+};
+
 uploadcare.start({ publicKey: uploadcarePublicKey });
 
-// Функция для запуска загрузки
-function triggerImageUpload(){
-  document.getElementById('file-input').click();
-}
+// --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 
-// Обработчик события выбора файла
-document.getElementById('file-input').addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  // 1. Показываем статус загрузки
-  document.getElementById('loading-status').classList.remove('hidden');
-  document.getElementById('result-container').classList.add('hidden');
-  document.getElementById('upload-btn').disabled = true;
-
-  // 2. Загрузка файла в Uploadcare
-  uploadcare.fileFrom('object', file).done(info => {
-    const uploadedUrl = info.cdnUrl;
-    const fileId = info.uuid; // Используем UUID как "короткую ссылку"
-
-    // 3. Обновление UI
-    document.getElementById('file-id').innerText = fileId;
-    document.getElementById('long-link').innerText = uploadedUrl;
-    
-    document.getElementById('loading-status').classList.add('hidden');
-    document.getElementById('result-container').classList.remove('hidden');
-
-    resetUI(false); // Разблокируем кнопку
-  }).fail(error => {
-    alert('Ошибка при загрузке в Uploadcare: ' + error);
-    resetUI(false);
-  });
-});
-
-// Сброс интерфейса
-function resetUI(loading = true) {
-  if (loading) {
-      document.getElementById('loading-status').classList.remove('hidden');
-      document.getElementById('upload-btn').disabled = true;
-  } else {
-      document.getElementById('loading-status').classList.add('hidden');
-      document.getElementById('upload-btn').disabled = false;
-  }
-}
-
-// Функция копирования
+// Функция для копирования текста
 function copyLink(elementId) {
     const text = document.getElementById(elementId).innerText;
     if (navigator.clipboard) {
         navigator.clipboard.writeText(text).then(() => {
-            alert('ID скопирован: ' + text);
+            alert('Ссылка скопирована: ' + text);
         }).catch(err => {
             console.error('Ошибка копирования:', err);
             alert('Не удалось скопировать. Скопируйте вручную: ' + text);
@@ -151,6 +202,144 @@ function copyLink(elementId) {
         alert('Не удалось скопировать. Скопируйте вручную: ' + text);
     }
 }
+
+// Получение параметра ID из URL
+function getQueryVariable(variable) {
+    const query = window.location.search.substring(1);
+    const vars = query.split('&');
+    for (let i = 0; i < vars.length; i++) {
+        const pair = vars[i].split('=');
+        if (pair[0] === variable) {
+            return pair[1];
+        }
+    }
+    return null;
+}
+
+// --- ЛОГИКА ЗАГРУЗКИ (Upload Logic) ---
+
+function triggerImageUpload(){
+  document.getElementById('file-input').click();
+}
+
+document.getElementById('file-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // 1. Показываем статус загрузки
+  document.getElementById('loading-status').classList.remove('hidden');
+  document.getElementById('upload-result-container').classList.add('hidden');
+  document.getElementById('upload-btn').disabled = true;
+
+  // 2. Загрузка файла в Uploadcare
+  uploadcare.fileFrom('object', file).done(info => {
+    const fileId = info.uuid; 
+    
+    // 3. Формирование короткой ссылки
+    const viewLink = `${window.location.origin}${window.location.pathname}?id=${fileId}`; 
+
+    // 4. Обновление UI
+    document.getElementById('file-id-output').innerText = fileId;
+    document.getElementById('view-link-output').innerText = viewLink;
+    
+    document.getElementById('loading-status').classList.add('hidden');
+    document.getElementById('upload-result-container').classList.remove('hidden');
+
+    document.getElementById('upload-btn').disabled = false;
+  }).fail(error => {
+    alert('Ошибка при загрузке в Uploadcare: ' + error);
+    document.getElementById('loading-status').classList.add('hidden');
+    document.getElementById('upload-btn').disabled = false;
+  });
+});
+
+// --- ЛОГИКА ПРОСМОТРА (View Logic) ---
+
+function initView(fileId) {
+    const mediaContent = document.getElementById('media-content');
+    const viewMessage = document.getElementById('view-message');
+    const downloadBtn = document.getElementById('download-btn');
+    
+    // Прямая ссылка на файл, которую мы будем использовать для загрузки
+    const cdnUrl = `https://ucarecdn.com/${fileId}/`;
+
+    viewMessage.classList.add('hidden');
+    mediaContent.innerHTML = '';
+    mediaContent.classList.remove('hidden');
+    document.getElementById('view-controls').classList.remove('hidden');
+    
+    // Устанавливаем ссылку для скачивания
+    downloadBtn.onclick = () => window.open(cdnUrl, '_blank'); 
+
+    // 1. Делаем запрос, чтобы определить тип файла (нужно для видео/изображения)
+    fetch(cdnUrl + 'json/').then(res => res.json()).then(data => {
+        
+        const filename = data.filename || '';
+        const ext = filename.split('.').pop().toLowerCase();
+        
+        let element;
+        let isMediaFound = true;
+
+        if (FILE_EXTENSIONS.image.includes(ext) || data.mimeType.startsWith('image/')) {
+            // Это изображение
+            document.getElementById('view-title').innerText = 'Просмотр Изображения';
+            element = document.createElement('img');
+            element.src = cdnUrl + 'resize/800x/'; // Оптимизация размера для просмотра
+            element.alt = 'Загруженное изображение';
+            
+        } else if (FILE_EXTENSIONS.video.includes(ext) || data.mimeType.startsWith('video/')) {
+            // Это видео
+            document.getElementById('view-title').innerText = 'Просмотр Видео';
+            element = document.createElement('video');
+            element.src = cdnUrl;
+            element.controls = true; // Используем стандартный плеер для простоты
+            element.loop = true;
+            element.playsInline = true;
+            element.poster = cdnUrl + 'format/jpeg/quality/lighter/resize/800x/'; // Превью
+            
+        } else {
+            // Неизвестный тип
+            isMediaFound = false;
+            displayError('Неподдерживаемый тип медиа или файл не найден.');
+            
+        }
+
+        if (isMediaFound) {
+            mediaContent.appendChild(element);
+        }
+
+    }).catch(e => {
+        console.error('Ошибка при получении метаданных:', e);
+        displayError('Файл с таким ID не найден или произошла ошибка сети.');
+    });
+}
+
+function displayError(message) {
+    document.getElementById('media-content').classList.add('hidden');
+    document.getElementById('view-controls').classList.add('hidden');
+    const viewMessage = document.getElementById('view-message');
+    viewMessage.innerText = message;
+    viewMessage.classList.remove('hidden');
+    document.getElementById('view-title').innerText = 'Ошибка';
+}
+
+
+// --- ГЛАВНАЯ ФУНКЦИЯ ДЛЯ ОПРЕДЕЛЕНИЯ РЕЖИМА ---
+
+document.addEventListener('DOMContentLoaded', () => {
+    const fileId = getQueryVariable('id');
+    
+    if (fileId) {
+        // Режим Просмотра
+        document.getElementById('upload-section').classList.add('hidden');
+        document.getElementById('view-section').classList.remove('hidden');
+        initView(fileId);
+    } else {
+        // Режим Загрузки
+        document.getElementById('view-section').classList.add('hidden');
+        document.getElementById('upload-section').classList.remove('hidden');
+    }
+});
 </script>
 </body>
 </html>
