@@ -40,7 +40,7 @@ nav h2{margin:0;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:
 
 /* Single Message */
 .msg{
-    margin:6px 12px;
+    margin:4px 12px; /* FIX: Reduced vertical margin */
     padding:8px 14px;
     border-radius:16px;
     max-width:80%;
@@ -48,7 +48,6 @@ nav h2{margin:0;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:
     word-wrap:break-word;
     line-height:1.4;
     animation:fadeIn 0.2s ease;
-    /* FIX: Prevent text selection to help with long-press context menu */
     -webkit-user-select: none;
     user-select: none;
 }
@@ -61,14 +60,16 @@ nav h2{margin:0;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:
 /* Message Elements */
 .msg .reply-to{font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:4px;border-left:2px solid rgba(255,255,255,0.5);padding-left:8px;cursor:pointer;display:block;}
 .msg.other .reply-to{color:var(--gray);border-color:var(--gray);}
-.msg a {color:#fff; text-decoration:underline; cursor:pointer; font-weight:bold;}
+/* FIX: Link color to blue for highlighting */
+.msg a {color:#64b5f6; text-decoration:underline; cursor:pointer; font-weight:bold;}
 .msg.other a {color:#64b5f6;}
+
 .time{display:block;font-size:10px;margin-top:4px;text-align:right;opacity:0.7;pointer-events:none;}
 .ticks{font-size:11px;margin-left:4px;}
 
-/* FIX: PC Image Sizing */
+/* PC Image Sizing */
 img.msg-img{
-    max-width:300px; /* Limit width on PC */
+    max-width:300px; 
     height:auto;
     border-radius:12px;
     margin-top:4px;
@@ -77,7 +78,7 @@ img.msg-img{
     background:#222;
 }
 @media (max-width: 500px) {
-    img.msg-img { max-width: 100%; } /* Full width on mobile */
+    img.msg-img { max-width: 100%; } 
 }
 
 /* Generated Avatar */
@@ -89,7 +90,11 @@ img.msg-img{
 }
 
 /* Input Area */
-.input-box{display:flex;flex-direction:column;gap:6px;padding:8px;background:var(--bg);border-top:1px solid #222;position:sticky;bottom:0;z-index:30;}
+.input-box{
+    display:flex;flex-direction:column;gap:6px;
+    padding:8px;background:var(--bg);border-top:1px solid #222;
+    position:sticky;bottom:0;z-index:30;
+}
 .input-row{display:flex;gap:8px;align-items:flex-end;}
 .input-box textarea{flex:1;min-height:44px;max-height:120px;padding:12px;border-radius:20px;resize:none;color:var(--text);background:var(--bg-light);border:none;}
 .send-btn,.img-btn{width:44px;height:44px;border-radius:50%;display:flex;justify-content:center;align-items:center;font-size:18px;background:var(--accent);color:#fff;border:none;cursor:pointer;flex-shrink:0;}
@@ -107,12 +112,6 @@ img.msg-img{
 .loader {width:24px;height:24px;border:3px solid var(--bg-light);border-bottom-color:var(--accent);border-radius:50%;animation:rotation 1s linear infinite;}
 @keyframes rotation {0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)}}
 #scroll-down-btn{position:fixed;bottom:80px;right:20px;width:36px;height:36px;border-radius:50%;background:var(--bg-light);border:1px solid #444;color:var(--text);display:none;justify-content:center;align-items:center;z-index:15;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,0.5);}
-
-/* Modals */
-.modal-overlay {position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);backdrop-filter:blur(4px);z-index:2000;display:none;justify-content:center;align-items:center;}
-.modal-box {background:#1e1e1e;padding:24px;border-radius:20px;max-width:300px;width:90%;text-align:center;border:1px solid #333;}
-.modal-actions {display:flex;gap:10px;justify-content:center;margin-top:16px;}
-.btn-cancel {background:#333;color:#ccc;}
 </style>
 </head>
 <body>
@@ -140,7 +139,7 @@ img.msg-img{
 
 <div id="main-screen" class="screen">
   <nav>
-    <div id="nav-self-avatar-container" onclick="openSettings()"></div>
+    <div id="nav-self-avatar-container" onclick="openSettings()" style="cursor:pointer;"></div>
     <h2>Чаты</h2>
     <div id="main-nav-buttons" style="margin-left:auto;display:flex;gap:12px;">
       <button onclick="openSearch()" style="background:none;padding:6px;margin:0;color:#fff;"><i class="fa fa-plus" style="font-size:20px"></i></button>
@@ -160,7 +159,7 @@ img.msg-img{
 <div id="chat-screen" class="screen">
   <nav style="gap:10px;">
     <button onclick="backToMain()" style="background:none;padding:0;margin:0;width:30px;"><i class="fa fa-arrow-left"></i></button>
-    <div id="chat-avatar-container" onclick="openUserProfile()"></div>
+    <div id="chat-avatar-container" onclick="openUserProfile()" style="cursor:pointer;"></div>
     <div class="header-info" onclick="openUserProfile()" style="flex:1;overflow:hidden;">
       <h2 id="chat-username" style="margin:0;font-size:16px;"></h2>
       <div style="display:flex;align-items:center;gap:8px;">
@@ -173,15 +172,14 @@ img.msg-img{
   
   <div class="messages" id="messages"></div>
   
-  <div id="preview"></div>
-  <div id="reply-preview-container" style="padding:0 12px;display:none;">
-    <div style="display:flex;align-items:center;background:#222;padding:8px;border-radius:8px;margin-bottom:8px;border-left:3px solid var(--accent);">
-      <div style="flex:1;font-size:13px;color:#ccc;"><strong id="reply-username" style="color:var(--accent);display:block;"></strong><span id="reply-text"></span></div>
-      <div onclick="cancelReply()" style="padding:8px;cursor:pointer;"><i class="fa fa-times"></i></div>
-    </div>
-  </div>
-  
   <div class="input-box">
+    <div id="reply-preview-container" style="padding:0;margin-bottom:6px;display:none;">
+      <div style="display:flex;align-items:center;background:#222;padding:8px;border-radius:8px;border-left:3px solid var(--accent);">
+        <div style="flex:1;font-size:13px;color:#ccc;"><strong id="reply-username" style="color:var(--accent);display:block;"></strong><span id="reply-text"></span></div>
+        <div onclick="cancelReply()" style="padding:8px;cursor:pointer;"><i class="fa fa-times"></i></div>
+      </div>
+    </div>
+    <div id="preview" style="display:flex;"></div>
     <div class="input-row">
       <button class="img-btn" onclick="triggerImageUpload()"><i class="fa fa-image"></i></button>
       <textarea id="msg-input" placeholder="Сообщение..."></textarea>
@@ -241,7 +239,7 @@ img.msg-img{
 /* ------------------ Config ------------------ */
 const supabase = window.supabase.createClient(
   "https://zmewwzlzujsrhstjehrp.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBpPOVYmoFzly2TXR-fI8D24"
 );
 uploadcare.start({ publicKey:"c12f2c3e134f56024db8" });
 
@@ -277,6 +275,7 @@ let oldestMessageId = null;
 let loadingMore = false;
 let isAdmin = false;
 let pendingLink = "";
+window.firstUnreadId = null; // To store the ID of the first unread message
 
 /* ------------------ AVATAR GENERATOR ------------------ */
 function getAvatarColor(name) {
@@ -315,9 +314,10 @@ async function updateSelfAvatar(){
 function linkify(text) {
     let safeText = escapeHtml(text).innerHTML; 
     const urlPattern = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gim;
-    return safeText.replace(urlPattern, '<a onclick="confirmLink(\'$1\')">$1</a>');
+    return safeText.replace(urlPattern, '<a onclick="confirmLink(\'$1\', event)">$1</a>'); // Pass event
 }
-function confirmLink(url) {
+function confirmLink(url, event) {
+    if(event) event.stopPropagation(); // Stop propagation to prevent message context menu
     pendingLink = url;
     document.getElementById('link-target').innerText = url.length > 50 ? url.substring(0,47)+'...' : url;
     document.getElementById('link-confirm-modal').style.display = 'flex';
@@ -329,9 +329,6 @@ function confirmLinkGo() { if(pendingLink) window.open(pendingLink, '_blank'); c
 async function openUserProfile() {
     if(!currentChatOtherId) return;
     document.getElementById('view-profile-modal').style.display = 'flex';
-    document.getElementById('view-profile-name').innerText = "Загрузка...";
-    document.getElementById('view-profile-avatar-container').innerHTML = "";
-    document.getElementById('view-profile-status-badge').innerText = "";
     
     const { data: p } = await supabase.from('profiles').select('*').eq('id', currentChatOtherId).single();
     if(!p) { closeUserProfile(); return; }
@@ -341,6 +338,7 @@ async function openUserProfile() {
     const badge = document.getElementById('view-profile-status-badge');
     badge.innerText = isOnline ? 'В сети' : (p.status || 'Не в сети');
     badge.style.color = isOnline ? '#4caf50' : '#888';
+    badge.style.background = isOnline ? '#2a2a2a' : '#333';
     
     document.getElementById('view-profile-avatar-container').innerHTML = renderAvatarHTML(p.avatar_url, p.username, 100);
 }
@@ -533,6 +531,18 @@ async function openChat(chatId, otherName, otherId, otherAvatarUrl = null){
 
   try{ await supabase.from('profiles').update({ current_chat: chatId }).eq('id', currentUser.id); } catch(e){}
   
+  // FIX: Find the first unread message ID
+  const { data: lastUnread } = await supabase.from('messages')
+    .select('id')
+    .eq('chat_id', chatId)
+    .eq('read', false)
+    .neq('sender', currentUser.id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  window.firstUnreadId = lastUnread ? lastUnread.id : null;
+  
   loadedMessages = [];
   oldestMessageId = null;
   await loadMessages(true);
@@ -547,15 +557,16 @@ async function openChat(chatId, otherName, otherId, otherAvatarUrl = null){
        }
     })
     .on('postgres_changes', { event:'UPDATE', schema:'public', table:'messages', filter:`chat_id=eq.${chatId}` }, payload => {
-       // FIX: Update read status visually
        const msgEl = document.getElementById('msg-'+payload.new.id);
-       if(msgEl && payload.new.read) {
-           const ticks = msgEl.querySelector('.ticks');
-           if(ticks) ticks.className = 'fa fa-check-double ticks';
-       }
-       if(payload.new.is_deleted && msgEl) {
-           msgEl.className = 'msg deleted';
-           msgEl.innerHTML = 'Сообщение удалено';
+       if(msgEl) {
+           if(payload.new.read) {
+               const ticks = msgEl.querySelector('.ticks');
+               if(ticks) ticks.className = 'fa fa-check-double ticks';
+           }
+           if(payload.new.is_deleted) {
+               msgEl.className = 'msg deleted';
+               msgEl.innerHTML = 'Сообщение удалено';
+           }
        }
     })
     .subscribe();
@@ -571,7 +582,7 @@ async function openChat(chatId, otherName, otherId, otherAvatarUrl = null){
     if(profile) updateHeaderStatus(profile);
   }
 
-  // Mark all existing as read
+  // Mark all existing as read (this is the simplified approach)
   await supabase.from('messages').update({ read:true }).eq('chat_id', chatId).neq('sender', currentUser.id).eq('read', false);
   
   const box = document.getElementById('messages');
@@ -606,13 +617,36 @@ async function loadMessages(initial = false){
   if (messages.length > 0) oldestMessageId = messages[0].id;
 
   const box = document.getElementById('messages');
-  if (initial) box.innerHTML = '';
-
-  for(const msg of messages){
-    await renderMessage(msg, false, initial ? 'append' : 'prepend');
+  
+  if (initial) {
+      box.innerHTML = '';
+      // FIX: Add "Start of Chat" banner
+      if(messages.length > 0) {
+          box.innerHTML = '<div style="text-align:center;color:var(--gray);font-size:12px;padding:10px 0;">— Начало чата —</div>';
+      }
   }
 
-  if (initial) scrollToBottom(true);
+  let unreadSeparatorInserted = false;
+
+  for(const msg of messages){
+      // FIX: Insert Unread Separator
+      if (initial && window.firstUnreadId && msg.id === window.firstUnreadId && !unreadSeparatorInserted) {
+          const separator = document.createElement('div');
+          separator.style.cssText = 'text-align:center;margin:15px 0;';
+          separator.innerHTML = '<span style="background:var(--accent);color:#fff;padding:4px 10px;border-radius:12px;font-size:12px;">Непрочитанные сообщения</span>';
+          box.appendChild(separator);
+          unreadSeparatorInserted = true;
+      }
+      await renderMessage(msg, false, initial ? 'append' : 'prepend');
+  }
+
+  if (initial) {
+      if (window.firstUnreadId) {
+          scrollToMsg(window.firstUnreadId, null, 'start'); // Scroll to the separator/first unread
+      } else {
+          scrollToBottom(true);
+      }
+  }
 }
 
 async function loadMoreMessages() {
@@ -648,6 +682,7 @@ async function renderMessage(msg, scroll=true, mode='append'){
   div = document.createElement('div');
   div.id = 'msg-'+msg.id;
   div.className = 'msg ' + (isMe ? 'me' : 'other');
+  // Pass the event to stop propagation
   div.oncontextmenu = (e)=>{ e.preventDefault(); showContextMenu(e, msg.id, msg.sender, msg.image_url); };
 
   if(msg.is_deleted){
@@ -657,11 +692,9 @@ async function renderMessage(msg, scroll=true, mode='append'){
       if(msg.reply_to){
           const r = loadedMessages.find(m=>m.id === msg.reply_to);
           let rText = r ? (r.image_url ? 'Фото' : r.content) : 'Сообщение...';
-          // FIX: Reply scrolling logic
           html += `<div class="reply-to" onclick="scrollToMsg(${msg.reply_to}, event)">Ответ: ${escapeHtml(rText ? rText.substring(0,50) : '').innerHTML}</div>`;
       }
 
-      // FIX: Wrapper for content to allow clean copying
       html += `<div class="msg-content">`;
       if(msg.content) html += `<div>${linkify(msg.content)}</div>`;
       if(msg.image_url) html += `<img src="${escapeHtml(msg.image_url).innerHTML}" class="msg-img" onload="scrollToBottom()">`;
@@ -682,12 +715,12 @@ async function renderMessage(msg, scroll=true, mode='append'){
   if(scroll) scrollToBottom(true);
 }
 
-// FIX: Robust scroll to reply
-function scrollToMsg(id, e){
+// FIX: Robust scroll to reply, allows block='start' for unread separator
+function scrollToMsg(id, e, block='center'){
     if(e) e.stopPropagation();
     const el = document.getElementById('msg-'+id);
     if(el){ 
-        el.scrollIntoView({behavior:'smooth', block:'center'}); 
+        el.scrollIntoView({behavior:'smooth', block:block}); 
         el.classList.add('highlight'); 
         setTimeout(()=>el.classList.remove('highlight'),1000); 
     } else {
@@ -707,6 +740,7 @@ async function sendMessage(){
   const { data:inserted, error } = await supabase.from('messages').insert([payload]).select('*').single();
   if(error){ alert('Ошибка: '+error.message); return; }
 
+  // FIX: Push Notification logic (checked and looks correct for OneSignal)
   if (currentChatOtherId && currentChat !== selfChatId) {
     try {
       const { data: other } = await supabase.from('profiles').select('OneSignal_ID').eq('id', currentChatOtherId).single();
@@ -747,18 +781,44 @@ document.getElementById('file-input').addEventListener('change', (e) => {
 function showContextMenu(e, msgId, senderId, imageUrl){
   selectedMessageId = msgId; selectedSender = senderId;
   const menu = document.getElementById('context-menu');
-  menu.innerHTML = `<button onclick="copyMessage()"><i class="fa fa-copy"></i> Копировать</button><button onclick="replyMessage()"><i class="fa fa-reply"></i> Ответить</button>`;
-  if(senderId === currentUser.id) menu.innerHTML += `<button onclick="confirmDelete()"><i class="fa fa-trash"></i> Удалить</button>`;
+  
+  const msgEl = document.getElementById('msg-'+msgId);
+  const isDeleted = msgEl.classList.contains('deleted');
+  
+  menu.innerHTML = `<button onclick="replyMessage()"><i class="fa fa-reply"></i> Ответить</button>`;
+  
+  if (!isDeleted) {
+      menu.innerHTML = `<button onclick="copyMessage()"><i class="fa fa-copy"></i> Копировать</button>` + menu.innerHTML;
+  }
+  
+  if(senderId === currentUser.id && !isDeleted) menu.innerHTML += `<button onclick="confirmDelete()"><i class="fa fa-trash"></i> Удалить</button>`;
   if(imageUrl) menu.innerHTML += `<button onclick="downloadImage('${imageUrl}')"><i class="fa fa-download"></i> Скачать</button>`;
   
+  
+  // FIX: Improved positioning logic for mobile
   let x = e.pageX, y = e.pageY;
-  if(y + 200 > window.innerHeight) y -= 200; 
-  if(x + 150 > window.innerWidth) x -= 150;
+  const menuHeight = menu.offsetHeight || 180; // Estimate or calculate
+  const menuWidth = menu.offsetWidth || 160;
+  
+  // Try to place the menu below the click point, with a small offset (10px)
+  y += 10; 
+  
+  // Adjust Y if it goes off the bottom of the screen
+  if(y + menuHeight > window.innerHeight) {
+      // Place the menu above the click point
+      y = e.pageY - menuHeight - 10; 
+  }
+  
+  // Adjust X if it goes off the right of the screen
+  if(x + menuWidth > window.innerWidth) {
+      x = window.innerWidth - menuWidth - 10;
+  }
   
   menu.style.left = x + 'px'; menu.style.top = y + 'px'; menu.style.display = 'flex';
+  
+  e.stopPropagation(); // FIX: Prevent immediate window.onclick trigger
 }
 
-// FIX: Copy ONLY content, not time
 function copyMessage(){
     const el = document.getElementById('msg-'+selectedMessageId);
     if(el) {
@@ -800,8 +860,14 @@ function replyMessage(){
     hideContext();
 }
 function cancelReply(){ replyToMessage = null; document.getElementById('reply-preview-container').style.display='none'; }
-function hideContext(){ document.getElementById('context-menu').style.display='none'; }
-window.onclick = (e) => { if(!e.target.closest('.msg')) hideContext(); };
+function hideContext(){ document.getElementById('context-menu').style.display='none'; selectedMessageId = null; }
+
+// FIX: Context menu hiding logic
+window.onclick = (e) => { 
+    if(!e.target.closest('.context-menu') && document.getElementById('context-menu').style.display !== 'none') {
+        hideContext();
+    }
+};
 
 document.getElementById('msg-input').addEventListener('input', async ()=>{
   if(!currentUser) return;
@@ -856,6 +922,8 @@ function backToMain(){
   if(window.statusChannelOther) supabase.removeChannel(window.statusChannelOther);
   if(currentUser) supabase.from('profiles').update({ current_chat:null }).eq('id', currentUser.id);
   currentChat = null;
+  currentChatOtherId = null;
+  window.firstUnreadId = null;
   showMain();
 }
 </script>
