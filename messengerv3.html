@@ -2,14 +2,14 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8" />
-<title>MiniMessenger Final</title>
+<title>MiniMessenger Ultimate</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <script src="https://ucarecdn.com/libs/widget/3.x/uploadcare.full.min.js"></script>
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 <style>
-:root{--bg:#0f0f0f;--bg-light:#1e1e1e;--accent:#0088cc;--text:#fff;--gray:#888;--radius:16px;--danger:#e53935;--link-blue:#64b5f6;}
+:root{--bg:#0f0f0f;--bg-light:#1e1e1e;--accent:#0088cc;--text:#fff;--gray:#888;--radius:16px;--danger:#e53935;}
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
 .screen{display:none;flex-direction:column;height:100vh;width:100%;}
@@ -28,31 +28,42 @@ nav h2{margin:0;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:
 
 /* Chat List */
 .chat-list{flex:1;overflow-y:auto;padding-bottom:20px;}
-/* FIX: Reduced padding for less spacing */
-.chat-item{padding:10px 16px;border-bottom:1px solid #1a1a1a;cursor:pointer;display:flex;align-items:center;transition:background 0.2s;}
+.chat-item{padding:12px 16px;border-bottom:1px solid #1a1a1a;cursor:pointer;display:flex;align-items:center;transition:background 0.2s;}
 .chat-item:active{background:#1a1a1a;}
 .chat-item .info{display:flex;flex-direction:column;flex:1;min-width:0;margin-left:12px;}
 .chat-item .last{display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:13px;color:var(--gray);}
 .unread-badge{background:var(--accent);color:#fff;border-radius:12px;min-width:22px;height:22px;display:flex;justify-content:center;align-items:center;font-size:11px;font-weight:bold;padding:0 6px;}
 
 /* Messages Container */
-.messages{flex:1;overflow-y:auto;padding-bottom:90px;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;padding-top:10px;}
+.messages{flex:1;overflow-y:auto;padding-bottom:10px;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;padding-top:10px;}
+
+/* Start of Chat Badge */
+.start-chat-badge { text-align:center; color:var(--gray); font-size:12px; margin: 20px 0; opacity:0.6; }
+
+/* Unread Separator */
+.unread-sep {
+    text-align: center;
+    color: var(--danger);
+    background: rgba(229, 57, 53, 0.1);
+    font-size: 12px;
+    padding: 5px;
+    margin: 10px 0;
+    border-radius: 8px;
+    font-weight: bold;
+}
 
 /* Single Message */
 .msg{
-    margin:6px 12px;
+    margin:4px 12px; /* Reduced vertical margin */
     padding:8px 14px;
     border-radius:16px;
     max-width:80%;
     position:relative;
     word-wrap:break-word;
     line-height:1.4;
-    animation:fadeIn 0.2s ease;
     -webkit-user-select: none;
     user-select: none;
 }
-@keyframes fadeIn { from{opacity:0;transform:translateY(5px);} to{opacity:1;transform:translateY(0);} }
-
 .msg.me{background:var(--accent);margin-left:auto;color:#fff;border-bottom-right-radius:2px;}
 .msg.other{background:var(--bg-light);color:var(--text);border-bottom-left-radius:2px;}
 .msg.deleted{font-style:italic;color:var(--gray);background:transparent;border:1px dashed #333;}
@@ -60,17 +71,14 @@ nav h2{margin:0;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:
 /* Message Elements */
 .msg .reply-to{font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:4px;border-left:2px solid rgba(255,255,255,0.5);padding-left:8px;cursor:pointer;display:block;}
 .msg.other .reply-to{color:var(--gray);border-color:var(--gray);}
-
-/* FIX: Link Highlighting */
-.msg a {color:var(--link-blue); text-decoration:underline; cursor:pointer; font-weight:bold;}
-.msg.other a {color:var(--link-blue);}
-
-.time{display:block;font-size:10px;margin-top:4px;text-align:right;opacity:0.7;pointer-events:none;}
+.msg a {color:#fff; text-decoration:underline; cursor:pointer; font-weight:bold;}
+.msg.other a {color:#64b5f6;}
+.time{display:block;font-size:10px;margin-top:2px;text-align:right;opacity:0.7;pointer-events:none;}
 .ticks{font-size:11px;margin-left:4px;}
 
-/* FIX: PC Image Sizing */
+/* Images */
 img.msg-img{
-    max-width:300px; /* Limit width on PC */
+    max-width:300px;
     height:auto;
     border-radius:12px;
     margin-top:4px;
@@ -78,9 +86,7 @@ img.msg-img{
     cursor:pointer;
     background:#222;
 }
-@media (max-width: 500px) {
-    img.msg-img { max-width: 100%; } /* Full width on mobile */
-}
+@media (max-width: 500px) { img.msg-img { max-width: 100%; } }
 
 /* Generated Avatar */
 .gen-avatar {
@@ -91,13 +97,16 @@ img.msg-img{
 }
 
 /* Input Area */
-/* FIX: Changed to fixed position for better mobile keyboard handling */
-.input-box{
-    display:flex;flex-direction:column;gap:6px;padding:8px;
-    background:var(--bg);border-top:1px solid #222;
-    position:fixed; /* Changed from sticky to fixed */
-    bottom:0;left:0;right:0;width:100%;
-    z-index:30;
+.input-box{display:flex;flex-direction:column;gap:0;padding:8px;background:var(--bg);border-top:1px solid #222;position:sticky;bottom:0;z-index:30;}
+.reply-preview-box {
+    display:none; /* Toggled via JS */
+    align-items:center;
+    background:#222;
+    padding:8px;
+    border-radius:12px 12px 0 0;
+    margin: 0 4px;
+    border-left:3px solid var(--accent);
+    margin-bottom: 4px;
 }
 .input-row{display:flex;gap:8px;align-items:flex-end;}
 .input-box textarea{flex:1;min-height:44px;max-height:120px;padding:12px;border-radius:20px;resize:none;color:var(--text);background:var(--bg-light);border:none;}
@@ -105,12 +114,7 @@ img.msg-img{
 .img-btn{background:var(--bg-light);color:var(--gray);}
 
 /* Context Menu */
-.context-menu{
-    position:fixed; /* FIX: Changed to fixed for better mobile positioning */
-    background:rgba(30,30,30,0.98);backdrop-filter:blur(10px);border:1px solid #444;
-    border-radius:12px;display:none;flex-direction:column;z-index:9999;
-    box-shadow:0 8px 30px rgba(0,0,0,0.6);min-width:160px;overflow:hidden;
-}
+.context-menu{position:absolute;background:rgba(30,30,30,0.98);backdrop-filter:blur(10px);border:1px solid #444;border-radius:12px;display:none;flex-direction:column;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,0.6);min-width:160px;overflow:hidden;}
 .context-menu button{background:none;border:none;color:var(--text);padding:12px 16px;text-align:left;cursor:pointer;margin:0;font-weight:normal;border-radius:0;border-bottom:1px solid #3a3a3a;font-size:14px;}
 .context-menu button:last-child{border-bottom:none;}
 .context-menu button:active{background:var(--accent);}
@@ -120,27 +124,7 @@ img.msg-img{
 .loader-container {display:flex;justify-content:center;padding:20px;}
 .loader {width:24px;height:24px;border:3px solid var(--bg-light);border-bottom-color:var(--accent);border-radius:50%;animation:rotation 1s linear infinite;}
 @keyframes rotation {0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)}}
-#scroll-down-btn{position:fixed;bottom:80px;right:20px;width:36px;height:36px;border-radius:50%;background:var(--bg-light);border:1px solid #444;color:var(--text);display:none;justify-content:center;align-items:center;z-index:15;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,0.5);}
-
-/* Unread and Chat Start Separators */
-.unread-separator, .chat-start-separator {
-    text-align: center;
-    margin: 15px 0;
-    position: sticky;
-    top: 10px;
-    z-index: 10;
-}
-.unread-separator span, .chat-start-separator span {
-    background: rgba(0,136,204,0.7);
-    color: #fff;
-    padding: 5px 10px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: bold;
-}
-.chat-start-separator span {
-    background: rgba(50, 50, 50, 0.7);
-}
+#scroll-down-btn{position:fixed;bottom:90px;right:20px;width:36px;height:36px;border-radius:50%;background:var(--bg-light);border:1px solid #444;color:var(--text);display:none;justify-content:center;align-items:center;z-index:15;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,0.5);}
 
 /* Modals */
 .modal-overlay {position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);backdrop-filter:blur(4px);z-index:2000;display:none;justify-content:center;align-items:center;}
@@ -210,13 +194,11 @@ img.msg-img{
   <div id="preview"></div>
   
   <div class="input-box">
-    <div id="reply-preview-container" style="padding:0 12px;display:none;">
-      <div style="display:flex;align-items:center;background:#222;padding:8px;border-radius:8px;margin-bottom:8px;border-left:3px solid var(--accent);">
-        <div style="flex:1;font-size:13px;color:#ccc;"><strong id="reply-username" style="color:var(--accent);display:block;"></strong><span id="reply-text"></span></div>
-        <div onclick="cancelReply()" style="padding:8px;cursor:pointer;"><i class="fa fa-times"></i></div>
-      </div>
+    <div id="reply-preview-container" class="reply-preview-box">
+      <div style="flex:1;font-size:13px;color:#ccc;"><strong id="reply-username" style="color:var(--accent);display:block;"></strong><span id="reply-text"></span></div>
+      <div onclick="cancelReply()" style="padding:8px;cursor:pointer;"><i class="fa fa-times"></i></div>
     </div>
-    
+
     <div class="input-row">
       <button class="img-btn" onclick="triggerImageUpload()"><i class="fa fa-image"></i></button>
       <textarea id="msg-input" placeholder="Сообщение..."></textarea>
@@ -235,6 +217,11 @@ img.msg-img{
     
     <div id="profile-info" style="margin:20px 0;text-align:left;width:100%;background:var(--bg-light);padding:16px;border-radius:12px;"></div>
     
+    <div id="push-status-area" style="margin-bottom:16px;">
+        <div id="push-status-text" style="color:var(--gray);font-size:13px;margin-bottom:8px;"></div>
+        <button id="enable-push-btn" onclick="enablePush()" style="background:var(--accent);display:none;">Включить уведомления</button>
+    </div>
+
     <button onclick="logout()" style="width:100%;background:#333;margin-top:auto;">Выйти</button>
     <button onclick="deleteAccount()" style="width:100%;background:transparent;color:#e53935;border:1px solid #e53935;margin-top:12px;">Удалить аккаунт</button>
   </div>
@@ -245,7 +232,7 @@ img.msg-img{
   <div id="user-list" style="flex:1;overflow-y:auto;padding:12px;"></div>
 </div>
 
-<div id="context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
+<div id="context-menu" class="context-menu"></div>
 
 <input type="file" id="file-input" style="display:none;" accept="image/*">
 <input type="file" id="avatar-input" style="display:none;" accept="image/*">
@@ -253,10 +240,10 @@ img.msg-img{
 <div id="link-confirm-modal" class="modal-overlay">
   <div class="modal-box">
     <h3>Переход по ссылке</h3>
-    <p>Вы действительно хотите перейти по внешней ссылке?<br><br><b id="link-target" style="color:var(--accent);word-break:break-all;"></b></p>
+    <p>Вы действительно хотите перейти по ссылке?<br><br><b id="link-target" style="color:var(--accent);word-break:break-all;"></b></p>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeLinkModal()">Отмена</button>
-      <button onclick="confirmLinkGo()">Открыть</button>
+      <button onclick="confirmLinkGo()">Перейти</button>
     </div>
   </div>
 </div>
@@ -285,9 +272,10 @@ OneSignalDeferred.push(async function(OneSignal) {
   await OneSignal.init({
     appId: "2e324874-a45f-4a70-ac36-130ef8af56a7",
     safari_web_id: "web.onesignal.auto.0d123f70-12e5-49b1-a758-f1abcc853120",
-    notifyButton: { enable: true },
+    notifyButton: { enable: false }, // Using custom button
   });
   OneSignal.User.PushSubscription.addEventListener('change', async (event) => {
+    updatePushStatusUI();
     if (currentUser) {
       const onesignalId = event.current.optedIn ? OneSignal.User.onesignalId : null;
       await supabase.from('profiles').update({ OneSignal_ID: onesignalId }).eq('id', currentUser.id);
@@ -312,7 +300,8 @@ let oldestMessageId = null;
 let loadingMore = false;
 let isAdmin = false;
 let pendingLink = "";
-let intersectionObserver = null;
+// Observer for read receipts
+let readObserver = null;
 
 /* ------------------ AVATAR GENERATOR ------------------ */
 function getAvatarColor(name) {
@@ -349,22 +338,26 @@ async function updateSelfAvatar(){
 
 /* ------------------ Link Handling ------------------ */
 function linkify(text) {
-    const d = document.createElement('div');
-    d.textContent = text;
-    let safeText = d.innerHTML;
-    const urlPattern = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gim;
-    return safeText.replace(urlPattern, '<a onclick="confirmLink(event, \'$1\')">$1</a>');
+    let safeText = escapeHtml(text).innerHTML; 
+    // New Regex to catch google.com without https
+    const urlPattern = /((?:https?:\/\/|www\.)[^\s]+|[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.[a-z]{2,}(?:\/[^\s]*)?)/gim;
+    return safeText.replace(urlPattern, (match) => {
+        let fullUrl = match;
+        if (!match.match(/^https?:\/\//i)) {
+            fullUrl = 'http://' + match;
+        }
+        return `<a onclick="confirmLink('${fullUrl}')">${match}</a>`;
+    });
 }
-function confirmLink(event, url) {
-    event.stopPropagation(); // Stop context menu from closing immediately
+function confirmLink(url) {
     pendingLink = url;
-    document.getElementById('link-target').innerText = url.length > 50 ? url.substring(0,47)+'...' : url;
+    document.getElementById('link-target').innerText = url.length > 40 ? url.substring(0,37)+'...' : url;
     document.getElementById('link-confirm-modal').style.display = 'flex';
 }
 function closeLinkModal() { document.getElementById('link-confirm-modal').style.display = 'none'; pendingLink = ""; }
 function confirmLinkGo() { if(pendingLink) window.open(pendingLink, '_blank'); closeLinkModal(); }
 
-/* ------------------ Profile Viewing ------------------ */
+/* ------------------ Profile & Push ------------------ */
 async function openUserProfile() {
     if(!currentChatOtherId) return;
     document.getElementById('view-profile-modal').style.display = 'flex';
@@ -384,6 +377,29 @@ async function openUserProfile() {
     document.getElementById('view-profile-avatar-container').innerHTML = renderAvatarHTML(p.avatar_url, p.username, 100);
 }
 function closeUserProfile() { document.getElementById('view-profile-modal').style.display = 'none'; }
+
+async function enablePush(){
+    OneSignalDeferred.push(async function(OneSignal) {
+        await OneSignal.User.PushSubscription.optIn();
+    });
+}
+
+function updatePushStatusUI(){
+    OneSignalDeferred.push(async function(OneSignal) {
+        const optedIn = OneSignal.User.PushSubscription.optedIn;
+        const statusText = document.getElementById('push-status-text');
+        const btn = document.getElementById('enable-push-btn');
+        if(optedIn){
+            statusText.innerText = "Пуш-уведомления: Включены ✅";
+            statusText.style.color = "#4caf50";
+            btn.style.display = "none";
+        } else {
+            statusText.innerText = "Пуш-уведомления: Выключены ❌";
+            statusText.style.color = "#e53935";
+            btn.style.display = "inline-block";
+        }
+    });
+}
 
 /* ------------------ Auth ------------------ */
 async function signUp(){
@@ -439,6 +455,8 @@ async function loadProfile(){
   const deleteBtn = document.getElementById('delete-avatar-btn');
   if (data.avatar_url) deleteBtn.style.display = 'inline-block';
   else deleteBtn.style.display = 'none';
+  
+  updatePushStatusUI();
 }
 async function deleteAccount(){
   if(!currentUser) return; if(!confirm('Удалить аккаунт безвозвратно?')) return;
@@ -574,13 +592,16 @@ async function openChat(chatId, otherName, otherId, otherAvatarUrl = null){
   
   loadedMessages = [];
   oldestMessageId = null;
+  // Reset IntersectionObserver
+  if(readObserver) readObserver.disconnect();
+  readObserver = new IntersectionObserver(handleReadIntersection, { threshold: 0.5 });
+
   await loadMessages(true);
 
   if(msgSubscription) supabase.removeChannel(msgSubscription);
   msgSubscription = supabase.channel('room-'+chatId)
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages', filter:`chat_id=eq.${chatId}` }, payload => {
        renderMessage(payload.new, true, 'append');
-       // New message will be marked read by the IntersectionObserver
     })
     .on('postgres_changes', { event:'UPDATE', schema:'public', table:'messages', filter:`chat_id=eq.${chatId}` }, payload => {
        const msgEl = document.getElementById('msg-'+payload.new.id);
@@ -605,27 +626,27 @@ async function openChat(chatId, otherName, otherId, otherAvatarUrl = null){
     const { data:profile } = await supabase.from('profiles').select('*').eq('id', otherId).single();
     if(profile) updateHeaderStatus(profile);
   }
+
+  // NOTE: removed "Mark all as read immediately". Now done via Observer.
 }
 
-function createIntersectionObserver() {
-    if (intersectionObserver) intersectionObserver.disconnect();
-    
-    // Mark message as read when it is 50% visible (rootMargin can be adjusted)
-    intersectionObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const msgId = entry.target.id.split('-')[1];
-                const message = loadedMessages.find(m => m.id === parseInt(msgId));
-
-                if (message && message.sender !== currentUser.id && !message.read) {
-                    supabase.from('messages').update({ read: true }).eq('id', message.id).then(()=>{
-                        message.read = true; // Update local state immediately
-                    });
-                    intersectionObserver.unobserve(entry.target);
-                }
+// Observer Callback
+function handleReadIntersection(entries, observer) {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            const msgId = entry.target.getAttribute('data-id');
+            const isRead = entry.target.getAttribute('data-read') === 'true';
+            const sender = entry.target.getAttribute('data-sender');
+            
+            // If it's visible, someone else sent it, and it's not read yet -> Mark Read
+            if (msgId && !isRead && sender !== currentUser.id) {
+                supabase.from('messages').update({ read: true }).eq('id', msgId).then(() => {
+                    entry.target.setAttribute('data-read', 'true');
+                });
+                observer.unobserve(entry.target);
             }
-        });
-    }, { threshold: 0.5, root: document.getElementById('messages') });
+        }
+    });
 }
 
 function updateHeaderStatus(profile){
@@ -647,47 +668,53 @@ async function loadMessages(initial = false){
   if (!data) return;
 
   const messages = data.reverse();
+  
+  // Logic for Start of Chat
+  if(messages.length < limit) {
+      // This means we reached the beginning
+      const box = document.getElementById('messages');
+      if (!document.getElementById('start-chat-badge')) {
+          const badge = document.createElement('div');
+          badge.id = 'start-chat-badge';
+          badge.className = 'start-chat-badge';
+          badge.innerText = "Начало чата";
+          if(initial) box.innerHTML = ''; // clear loader
+          box.prepend(badge);
+      }
+  } else if (initial) {
+      document.getElementById('messages').innerHTML = ''; // clear loader
+  }
+
   if (!initial) loadedMessages = messages.concat(loadedMessages);
   else loadedMessages = messages;
 
   if (messages.length > 0) oldestMessageId = messages[0].id;
 
-  const box = document.getElementById('messages');
-  if (initial) box.innerHTML = '';
-  
-  const firstUnreadId = messages.find(m => m.sender !== currentUser.id && m.read === false)?.id;
-  let unreadSeparatorRendered = false;
-  let unreadScrollTarget = null;
-  
-  createIntersectionObserver();
-
-  for(const msg of messages){
-    const msgEl = await renderMessage(msg, false, initial ? 'append' : 'prepend');
-    
-    if (msg.sender !== currentUser.id) intersectionObserver.observe(msgEl);
-    
-    // FIX: Unread Separator and Scroll Target
-    if (initial && msg.id === firstUnreadId && !unreadSeparatorRendered) {
-        const separator = document.createElement('div');
-        separator.className = 'unread-separator';
-        separator.innerHTML = '<span>Непрочитанные сообщения</span>';
-        box.insertBefore(separator, msgEl);
-        unreadScrollTarget = msgEl;
-        unreadSeparatorRendered = true;
-    }
+  // Logic for Unread Separator
+  let firstUnreadId = null;
+  if (initial) {
+      const firstUnread = messages.find(m => !m.read && m.sender !== currentUser.id);
+      if (firstUnread) firstUnreadId = firstUnread.id;
   }
 
-  // FIX: Start of Chat Separator
-  if (initial && messages.length < limit) {
-      const startSeparator = document.createElement('div');
-      startSeparator.className = 'chat-start-separator';
-      startSeparator.innerHTML = '<span>Начало чата</span>';
-      box.insertBefore(startSeparator, box.firstChild);
+  const box = document.getElementById('messages');
+  for(const msg of messages){
+      if(initial && firstUnreadId && msg.id === firstUnreadId){
+          const sep = document.createElement('div');
+          sep.className = 'unread-sep';
+          sep.id = 'unread-sep';
+          sep.innerText = "--- Непрочитанные сообщения ---";
+          if(mode === 'prepend') box.insertBefore(sep, box.firstChild);
+          else box.appendChild(sep);
+      }
+      // Trick for prepend mode to keep order? Actually standard is append for initial
+      await renderMessage(msg, false, initial ? 'append' : 'prepend');
   }
 
   if (initial) {
-      if (unreadScrollTarget) {
-          setTimeout(() => unreadScrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+      const sep = document.getElementById('unread-sep');
+      if (sep) {
+          sep.scrollIntoView({block: "center", behavior: "auto"});
       } else {
           scrollToBottom(true);
       }
@@ -719,15 +746,20 @@ function scrollToBottom(force=false) {
 
 async function renderMessage(msg, scroll=true, mode='append'){
   const box = document.getElementById('messages');
-  
   let div = document.getElementById('msg-'+msg.id);
-  if(div && mode !== 'prepend') return div; 
+  if(div && mode !== 'prepend') return; 
 
   const isMe = msg.sender === currentUser.id;
   div = document.createElement('div');
   div.id = 'msg-'+msg.id;
   div.className = 'msg ' + (isMe ? 'me' : 'other');
-  div.oncontextmenu = (e)=>{ e.preventDefault(); showContextMenu(e, msg.id, msg.sender, msg.image_url); };
+  
+  // Attributes for Observer
+  div.setAttribute('data-id', msg.id);
+  div.setAttribute('data-read', msg.read);
+  div.setAttribute('data-sender', msg.sender);
+  
+  div.oncontextmenu = (e)=>{ e.preventDefault(); e.stopPropagation(); showContextMenu(e, msg.id, msg.sender, msg.image_url); };
 
   if(msg.is_deleted){
     div.className='msg deleted'; div.innerText='Сообщение удалено';
@@ -753,11 +785,19 @@ async function renderMessage(msg, scroll=true, mode='append'){
       div.innerHTML = html;
   }
 
-  if (mode === 'prepend') box.insertBefore(div, box.firstChild);
+  if (mode === 'prepend') {
+      // Need to insert after 'start-chat-badge' if exists? 
+      // Simplified: just insert after first child if it is badge, else first
+      const badge = document.getElementById('start-chat-badge');
+      if(badge) box.insertBefore(div, badge.nextSibling);
+      else box.insertBefore(div, box.firstChild);
+  }
   else box.appendChild(div);
 
+  // Observe for read status
+  if(!isMe && !msg.read) readObserver.observe(div);
+
   if(scroll) scrollToBottom(true);
-  return div;
 }
 
 function scrollToMsg(id, e){
@@ -784,24 +824,28 @@ async function sendMessage(){
   const { data:inserted, error } = await supabase.from('messages').insert([payload]).select('*').single();
   if(error){ alert('Ошибка: '+error.message); return; }
 
-  // FIX: Push Notification Logic
+  // FIX: Push Logic using OneSignal REST API
   if (currentChatOtherId && currentChat !== selfChatId) {
     try {
       const { data: other } = await supabase.from('profiles').select('OneSignal_ID').eq('id', currentChatOtherId).single();
       if (other?.OneSignal_ID) {
+        const myName = currentUser.user_metadata?.username || "Пользователь";
         fetch('https://api.onesignal.com/notifications', {
           method: 'POST',
-          headers: { 'Content-Type':'application/json', 'Authorization':'Basic os_v2_app_fyzeq5fel5fhblbwcmhprl2wu6lmvbhhg2yusnurzqbdl26s4nvjpkdyi5ku5j6m7yp24ajpxutjl6vxfh5gdrfqcvd2f3zblof5vya' },
+          headers: { 
+              'Content-Type':'application/json', 
+              'Authorization':'Basic os_v2_app_fyzeq5fel5fhblbwcmhprl2wu6lmvbhhg2yusnurzqbdl26s4nvjpkdyi5ku5j6m7yp24ajpxutjl6vxfh5gdrfqcvd2f3zblof5vya' 
+          },
           body: JSON.stringify({
             app_id: "2e324874-a45f-4a70-ac36-130ef8af56a7",
             include_aliases: { onesignal_id: [other.OneSignal_ID] },
             target_channel: "push",
-            headings: { en: currentUser.user_metadata?.username || 'Сообщение' },
-            contents: { en: text || (selectedImageUrl ? 'Фото' : 'Сообщение') }
+            headings: { en: myName },
+            contents: { en: text || (selectedImageUrl ? 'Отправил фото' : 'Сообщение') }
           })
         });
       }
-    } catch(e){}
+    } catch(e){ console.error(e); }
   }
 
   document.getElementById('msg-input').value = '';
@@ -821,28 +865,21 @@ document.getElementById('file-input').addEventListener('change', (e) => {
   });
 });
 
-/* ------------------ Context Menu & Actions ------------------ */
+/* ------------------ Context Menu ------------------ */
 function showContextMenu(e, msgId, senderId, imageUrl){
   selectedMessageId = msgId; selectedSender = senderId;
   const menu = document.getElementById('context-menu');
-  
-  // Stop propagation on menu to prevent immediate closure via window.onclick
-  menu.onclick = (event) => event.stopPropagation();
-  
   menu.innerHTML = `<button onclick="copyMessage()"><i class="fa fa-copy"></i> Копировать</button><button onclick="replyMessage()"><i class="fa fa-reply"></i> Ответить</button>`;
   if(senderId === currentUser.id) menu.innerHTML += `<button onclick="confirmDelete()"><i class="fa fa-trash"></i> Удалить</button>`;
   if(imageUrl) menu.innerHTML += `<button onclick="downloadImage('${imageUrl}')"><i class="fa fa-download"></i> Скачать</button>`;
   
-  // FIX: Use clientX/Y and fixed positioning for better mobile positioning
-  let x = e.clientX, y = e.clientY;
-  const menuWidth = 160;
-  const menuHeight = menu.children.length * 40 + 20; 
-
-  if(x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 10;
-  if(y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 10;
+  let x = e.pageX, y = e.pageY;
+  // Mobile adjustment: show ABOVE finger
+  const menuHeight = 160; 
+  if(y + menuHeight > window.innerHeight) y -= menuHeight; 
+  if(x + 160 > window.innerWidth) x -= 160;
   
-  menu.style.left = x + 'px'; menu.style.top = y + 'px'; 
-  menu.style.display = 'flex';
+  menu.style.left = x + 'px'; menu.style.top = y + 'px'; menu.style.display = 'flex';
 }
 
 function copyMessage(){
@@ -879,20 +916,23 @@ function replyMessage(){
     const el = document.getElementById('msg-'+selectedMessageId);
     if(!el) return;
     replyToMessage = { id: selectedMessageId };
-    document.getElementById('reply-preview-container').style.display='block';
+    document.getElementById('reply-preview-container').style.display='flex'; // Flex to show
     document.getElementById('reply-username').innerText = "Ответ";
     const contentDiv = el.querySelector('.msg-content');
     document.getElementById('reply-text').innerText = (contentDiv ? contentDiv.innerText : el.innerText).substring(0,30)+'...';
     hideContext();
+    document.getElementById('msg-input').focus();
 }
 function cancelReply(){ replyToMessage = null; document.getElementById('reply-preview-container').style.display='none'; }
 function hideContext(){ document.getElementById('context-menu').style.display='none'; }
-// FIX: Context menu closes on ANY click outside it
-window.onclick = (e) => {
-    if (!e.target.closest('#context-menu')) {
+
+// Global click to close context menu immediately
+window.addEventListener('click', (e) => {
+    const menu = document.getElementById('context-menu');
+    if (menu.style.display === 'flex' && !menu.contains(e.target)) {
         hideContext();
     }
-};
+});
 
 document.getElementById('msg-input').addEventListener('input', async ()=>{
   if(!currentUser) return;
@@ -946,10 +986,9 @@ function backToMain(){
   if(msgSubscription) supabase.removeChannel(msgSubscription);
   if(window.statusChannelOther) supabase.removeChannel(window.statusChannelOther);
   if(currentUser) supabase.from('profiles').update({ current_chat:null }).eq('id', currentUser.id);
-  if(intersectionObserver) intersectionObserver.disconnect();
   currentChat = null;
   showMain();
 }
 </script>
 </body>
-        </html>
+</html>
