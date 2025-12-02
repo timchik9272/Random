@@ -9,7 +9,7 @@
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 <style>
-:root{--bg:#0f0f0f;--bg-light:#1e1e1e;--accent:#0088cc;--text:#fff;--gray:#888;--radius:16px;--danger:#e53935;}
+:root{--bg:#0f0f0f;--bg-light:#1e1e1e;--accent:#0088cc;--text:#fff;--gray:#888;--radius:16px;--danger:#e53935;--link-blue:#64b5f6;}
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
 .screen{display:none;flex-direction:column;height:100vh;width:100%;}
@@ -28,14 +28,14 @@ nav h2{margin:0;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:
 
 /* Chat List */
 .chat-list{flex:1;overflow-y:auto;padding-bottom:20px;}
-.chat-item{padding:12px 16px;border-bottom:1px solid #1a1a1a;cursor:pointer;display:flex;align-items:center;transition:background 0.2s;}
+/* FIX: Reduced padding for less spacing */
+.chat-item{padding:10px 16px;border-bottom:1px solid #1a1a1a;cursor:pointer;display:flex;align-items:center;transition:background 0.2s;}
 .chat-item:active{background:#1a1a1a;}
 .chat-item .info{display:flex;flex-direction:column;flex:1;min-width:0;margin-left:12px;}
 .chat-item .last{display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:13px;color:var(--gray);}
 .unread-badge{background:var(--accent);color:#fff;border-radius:12px;min-width:22px;height:22px;display:flex;justify-content:center;align-items:center;font-size:11px;font-weight:bold;padding:0 6px;}
 
 /* Messages Container */
-/* FIX: Padding bottom increased so input doesn't hide last message */
 .messages{flex:1;overflow-y:auto;padding-bottom:90px;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;padding-top:10px;}
 
 /* Single Message */
@@ -48,7 +48,6 @@ nav h2{margin:0;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:
     word-wrap:break-word;
     line-height:1.4;
     animation:fadeIn 0.2s ease;
-    /* FIX: Prevent text selection to help with long-press context menu */
     -webkit-user-select: none;
     user-select: none;
 }
@@ -61,8 +60,11 @@ nav h2{margin:0;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:
 /* Message Elements */
 .msg .reply-to{font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:4px;border-left:2px solid rgba(255,255,255,0.5);padding-left:8px;cursor:pointer;display:block;}
 .msg.other .reply-to{color:var(--gray);border-color:var(--gray);}
-.msg a {color:#fff; text-decoration:underline; cursor:pointer; font-weight:bold;}
-.msg.other a {color:#64b5f6;}
+
+/* FIX: Link Highlighting */
+.msg a {color:var(--link-blue); text-decoration:underline; cursor:pointer; font-weight:bold;}
+.msg.other a {color:var(--link-blue);}
+
 .time{display:block;font-size:10px;margin-top:4px;text-align:right;opacity:0.7;pointer-events:none;}
 .ticks{font-size:11px;margin-left:4px;}
 
@@ -89,14 +91,26 @@ img.msg-img{
 }
 
 /* Input Area */
-.input-box{display:flex;flex-direction:column;gap:6px;padding:8px;background:var(--bg);border-top:1px solid #222;position:sticky;bottom:0;z-index:30;}
+/* FIX: Changed to fixed position for better mobile keyboard handling */
+.input-box{
+    display:flex;flex-direction:column;gap:6px;padding:8px;
+    background:var(--bg);border-top:1px solid #222;
+    position:fixed; /* Changed from sticky to fixed */
+    bottom:0;left:0;right:0;width:100%;
+    z-index:30;
+}
 .input-row{display:flex;gap:8px;align-items:flex-end;}
 .input-box textarea{flex:1;min-height:44px;max-height:120px;padding:12px;border-radius:20px;resize:none;color:var(--text);background:var(--bg-light);border:none;}
 .send-btn,.img-btn{width:44px;height:44px;border-radius:50%;display:flex;justify-content:center;align-items:center;font-size:18px;background:var(--accent);color:#fff;border:none;cursor:pointer;flex-shrink:0;}
 .img-btn{background:var(--bg-light);color:var(--gray);}
 
 /* Context Menu */
-.context-menu{position:absolute;background:rgba(30,30,30,0.98);backdrop-filter:blur(10px);border:1px solid #444;border-radius:12px;display:none;flex-direction:column;z-index:9999;box-shadow:0 8px 30px rgba(0,0,0,0.6);min-width:160px;overflow:hidden;}
+.context-menu{
+    position:fixed; /* FIX: Changed to fixed for better mobile positioning */
+    background:rgba(30,30,30,0.98);backdrop-filter:blur(10px);border:1px solid #444;
+    border-radius:12px;display:none;flex-direction:column;z-index:9999;
+    box-shadow:0 8px 30px rgba(0,0,0,0.6);min-width:160px;overflow:hidden;
+}
 .context-menu button{background:none;border:none;color:var(--text);padding:12px 16px;text-align:left;cursor:pointer;margin:0;font-weight:normal;border-radius:0;border-bottom:1px solid #3a3a3a;font-size:14px;}
 .context-menu button:last-child{border-bottom:none;}
 .context-menu button:active{background:var(--accent);}
@@ -107,6 +121,26 @@ img.msg-img{
 .loader {width:24px;height:24px;border:3px solid var(--bg-light);border-bottom-color:var(--accent);border-radius:50%;animation:rotation 1s linear infinite;}
 @keyframes rotation {0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)}}
 #scroll-down-btn{position:fixed;bottom:80px;right:20px;width:36px;height:36px;border-radius:50%;background:var(--bg-light);border:1px solid #444;color:var(--text);display:none;justify-content:center;align-items:center;z-index:15;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,0.5);}
+
+/* Unread and Chat Start Separators */
+.unread-separator, .chat-start-separator {
+    text-align: center;
+    margin: 15px 0;
+    position: sticky;
+    top: 10px;
+    z-index: 10;
+}
+.unread-separator span, .chat-start-separator span {
+    background: rgba(0,136,204,0.7);
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+}
+.chat-start-separator span {
+    background: rgba(50, 50, 50, 0.7);
+}
 
 /* Modals */
 .modal-overlay {position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);backdrop-filter:blur(4px);z-index:2000;display:none;justify-content:center;align-items:center;}
@@ -174,14 +208,15 @@ img.msg-img{
   <div class="messages" id="messages"></div>
   
   <div id="preview"></div>
-  <div id="reply-preview-container" style="padding:0 12px;display:none;">
-    <div style="display:flex;align-items:center;background:#222;padding:8px;border-radius:8px;margin-bottom:8px;border-left:3px solid var(--accent);">
-      <div style="flex:1;font-size:13px;color:#ccc;"><strong id="reply-username" style="color:var(--accent);display:block;"></strong><span id="reply-text"></span></div>
-      <div onclick="cancelReply()" style="padding:8px;cursor:pointer;"><i class="fa fa-times"></i></div>
-    </div>
-  </div>
   
   <div class="input-box">
+    <div id="reply-preview-container" style="padding:0 12px;display:none;">
+      <div style="display:flex;align-items:center;background:#222;padding:8px;border-radius:8px;margin-bottom:8px;border-left:3px solid var(--accent);">
+        <div style="flex:1;font-size:13px;color:#ccc;"><strong id="reply-username" style="color:var(--accent);display:block;"></strong><span id="reply-text"></span></div>
+        <div onclick="cancelReply()" style="padding:8px;cursor:pointer;"><i class="fa fa-times"></i></div>
+      </div>
+    </div>
+    
     <div class="input-row">
       <button class="img-btn" onclick="triggerImageUpload()"><i class="fa fa-image"></i></button>
       <textarea id="msg-input" placeholder="Сообщение..."></textarea>
@@ -210,7 +245,7 @@ img.msg-img{
   <div id="user-list" style="flex:1;overflow-y:auto;padding:12px;"></div>
 </div>
 
-<div id="context-menu" class="context-menu"></div>
+<div id="context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 
 <input type="file" id="file-input" style="display:none;" accept="image/*">
 <input type="file" id="avatar-input" style="display:none;" accept="image/*">
@@ -218,7 +253,7 @@ img.msg-img{
 <div id="link-confirm-modal" class="modal-overlay">
   <div class="modal-box">
     <h3>Переход по ссылке</h3>
-    <p>Открыть внешний сайт?<br><br><b id="link-target" style="color:var(--accent);word-break:break-all;"></b></p>
+    <p>Вы действительно хотите перейти по внешней ссылке?<br><br><b id="link-target" style="color:var(--accent);word-break:break-all;"></b></p>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeLinkModal()">Отмена</button>
       <button onclick="confirmLinkGo()">Открыть</button>
@@ -277,6 +312,7 @@ let oldestMessageId = null;
 let loadingMore = false;
 let isAdmin = false;
 let pendingLink = "";
+let intersectionObserver = null;
 
 /* ------------------ AVATAR GENERATOR ------------------ */
 function getAvatarColor(name) {
@@ -313,11 +349,14 @@ async function updateSelfAvatar(){
 
 /* ------------------ Link Handling ------------------ */
 function linkify(text) {
-    let safeText = escapeHtml(text).innerHTML; 
+    const d = document.createElement('div');
+    d.textContent = text;
+    let safeText = d.innerHTML;
     const urlPattern = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gim;
-    return safeText.replace(urlPattern, '<a onclick="confirmLink(\'$1\')">$1</a>');
+    return safeText.replace(urlPattern, '<a onclick="confirmLink(event, \'$1\')">$1</a>');
 }
-function confirmLink(url) {
+function confirmLink(event, url) {
+    event.stopPropagation(); // Stop context menu from closing immediately
     pendingLink = url;
     document.getElementById('link-target').innerText = url.length > 50 ? url.substring(0,47)+'...' : url;
     document.getElementById('link-confirm-modal').style.display = 'flex';
@@ -541,13 +580,9 @@ async function openChat(chatId, otherName, otherId, otherAvatarUrl = null){
   msgSubscription = supabase.channel('room-'+chatId)
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages', filter:`chat_id=eq.${chatId}` }, payload => {
        renderMessage(payload.new, true, 'append');
-       // If I am receiving a message and I am in the chat, mark it as read immediately
-       if(payload.new.sender !== currentUser.id) {
-           supabase.from('messages').update({ read: true }).eq('id', payload.new.id).then(()=>{});
-       }
+       // New message will be marked read by the IntersectionObserver
     })
     .on('postgres_changes', { event:'UPDATE', schema:'public', table:'messages', filter:`chat_id=eq.${chatId}` }, payload => {
-       // FIX: Update read status visually
        const msgEl = document.getElementById('msg-'+payload.new.id);
        if(msgEl && payload.new.read) {
            const ticks = msgEl.querySelector('.ticks');
@@ -570,15 +605,27 @@ async function openChat(chatId, otherName, otherId, otherAvatarUrl = null){
     const { data:profile } = await supabase.from('profiles').select('*').eq('id', otherId).single();
     if(profile) updateHeaderStatus(profile);
   }
+}
 
-  // Mark all existing as read
-  await supabase.from('messages').update({ read:true }).eq('chat_id', chatId).neq('sender', currentUser.id).eq('read', false);
-  
-  const box = document.getElementById('messages');
-  box.onscroll = () => {
-    if (box.scrollTop === 0 && !loadingMore && oldestMessageId) loadMoreMessages();
-    toggleScrollDownBtn();
-  };
+function createIntersectionObserver() {
+    if (intersectionObserver) intersectionObserver.disconnect();
+    
+    // Mark message as read when it is 50% visible (rootMargin can be adjusted)
+    intersectionObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const msgId = entry.target.id.split('-')[1];
+                const message = loadedMessages.find(m => m.id === parseInt(msgId));
+
+                if (message && message.sender !== currentUser.id && !message.read) {
+                    supabase.from('messages').update({ read: true }).eq('id', message.id).then(()=>{
+                        message.read = true; // Update local state immediately
+                    });
+                    intersectionObserver.unobserve(entry.target);
+                }
+            }
+        });
+    }, { threshold: 0.5, root: document.getElementById('messages') });
 }
 
 function updateHeaderStatus(profile){
@@ -607,12 +654,44 @@ async function loadMessages(initial = false){
 
   const box = document.getElementById('messages');
   if (initial) box.innerHTML = '';
+  
+  const firstUnreadId = messages.find(m => m.sender !== currentUser.id && m.read === false)?.id;
+  let unreadSeparatorRendered = false;
+  let unreadScrollTarget = null;
+  
+  createIntersectionObserver();
 
   for(const msg of messages){
-    await renderMessage(msg, false, initial ? 'append' : 'prepend');
+    const msgEl = await renderMessage(msg, false, initial ? 'append' : 'prepend');
+    
+    if (msg.sender !== currentUser.id) intersectionObserver.observe(msgEl);
+    
+    // FIX: Unread Separator and Scroll Target
+    if (initial && msg.id === firstUnreadId && !unreadSeparatorRendered) {
+        const separator = document.createElement('div');
+        separator.className = 'unread-separator';
+        separator.innerHTML = '<span>Непрочитанные сообщения</span>';
+        box.insertBefore(separator, msgEl);
+        unreadScrollTarget = msgEl;
+        unreadSeparatorRendered = true;
+    }
   }
 
-  if (initial) scrollToBottom(true);
+  // FIX: Start of Chat Separator
+  if (initial && messages.length < limit) {
+      const startSeparator = document.createElement('div');
+      startSeparator.className = 'chat-start-separator';
+      startSeparator.innerHTML = '<span>Начало чата</span>';
+      box.insertBefore(startSeparator, box.firstChild);
+  }
+
+  if (initial) {
+      if (unreadScrollTarget) {
+          setTimeout(() => unreadScrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+      } else {
+          scrollToBottom(true);
+      }
+  }
 }
 
 async function loadMoreMessages() {
@@ -642,7 +721,7 @@ async function renderMessage(msg, scroll=true, mode='append'){
   const box = document.getElementById('messages');
   
   let div = document.getElementById('msg-'+msg.id);
-  if(div && mode !== 'prepend') return; 
+  if(div && mode !== 'prepend') return div; 
 
   const isMe = msg.sender === currentUser.id;
   div = document.createElement('div');
@@ -657,11 +736,9 @@ async function renderMessage(msg, scroll=true, mode='append'){
       if(msg.reply_to){
           const r = loadedMessages.find(m=>m.id === msg.reply_to);
           let rText = r ? (r.image_url ? 'Фото' : r.content) : 'Сообщение...';
-          // FIX: Reply scrolling logic
           html += `<div class="reply-to" onclick="scrollToMsg(${msg.reply_to}, event)">Ответ: ${escapeHtml(rText ? rText.substring(0,50) : '').innerHTML}</div>`;
       }
 
-      // FIX: Wrapper for content to allow clean copying
       html += `<div class="msg-content">`;
       if(msg.content) html += `<div>${linkify(msg.content)}</div>`;
       if(msg.image_url) html += `<img src="${escapeHtml(msg.image_url).innerHTML}" class="msg-img" onload="scrollToBottom()">`;
@@ -680,9 +757,9 @@ async function renderMessage(msg, scroll=true, mode='append'){
   else box.appendChild(div);
 
   if(scroll) scrollToBottom(true);
+  return div;
 }
 
-// FIX: Robust scroll to reply
 function scrollToMsg(id, e){
     if(e) e.stopPropagation();
     const el = document.getElementById('msg-'+id);
@@ -707,6 +784,7 @@ async function sendMessage(){
   const { data:inserted, error } = await supabase.from('messages').insert([payload]).select('*').single();
   if(error){ alert('Ошибка: '+error.message); return; }
 
+  // FIX: Push Notification Logic
   if (currentChatOtherId && currentChat !== selfChatId) {
     try {
       const { data: other } = await supabase.from('profiles').select('OneSignal_ID').eq('id', currentChatOtherId).single();
@@ -747,18 +825,26 @@ document.getElementById('file-input').addEventListener('change', (e) => {
 function showContextMenu(e, msgId, senderId, imageUrl){
   selectedMessageId = msgId; selectedSender = senderId;
   const menu = document.getElementById('context-menu');
+  
+  // Stop propagation on menu to prevent immediate closure via window.onclick
+  menu.onclick = (event) => event.stopPropagation();
+  
   menu.innerHTML = `<button onclick="copyMessage()"><i class="fa fa-copy"></i> Копировать</button><button onclick="replyMessage()"><i class="fa fa-reply"></i> Ответить</button>`;
   if(senderId === currentUser.id) menu.innerHTML += `<button onclick="confirmDelete()"><i class="fa fa-trash"></i> Удалить</button>`;
   if(imageUrl) menu.innerHTML += `<button onclick="downloadImage('${imageUrl}')"><i class="fa fa-download"></i> Скачать</button>`;
   
-  let x = e.pageX, y = e.pageY;
-  if(y + 200 > window.innerHeight) y -= 200; 
-  if(x + 150 > window.innerWidth) x -= 150;
+  // FIX: Use clientX/Y and fixed positioning for better mobile positioning
+  let x = e.clientX, y = e.clientY;
+  const menuWidth = 160;
+  const menuHeight = menu.children.length * 40 + 20; 
+
+  if(x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 10;
+  if(y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 10;
   
-  menu.style.left = x + 'px'; menu.style.top = y + 'px'; menu.style.display = 'flex';
+  menu.style.left = x + 'px'; menu.style.top = y + 'px'; 
+  menu.style.display = 'flex';
 }
 
-// FIX: Copy ONLY content, not time
 function copyMessage(){
     const el = document.getElementById('msg-'+selectedMessageId);
     if(el) {
@@ -801,7 +887,12 @@ function replyMessage(){
 }
 function cancelReply(){ replyToMessage = null; document.getElementById('reply-preview-container').style.display='none'; }
 function hideContext(){ document.getElementById('context-menu').style.display='none'; }
-window.onclick = (e) => { if(!e.target.closest('.msg')) hideContext(); };
+// FIX: Context menu closes on ANY click outside it
+window.onclick = (e) => {
+    if (!e.target.closest('#context-menu')) {
+        hideContext();
+    }
+};
 
 document.getElementById('msg-input').addEventListener('input', async ()=>{
   if(!currentUser) return;
@@ -855,9 +946,10 @@ function backToMain(){
   if(msgSubscription) supabase.removeChannel(msgSubscription);
   if(window.statusChannelOther) supabase.removeChannel(window.statusChannelOther);
   if(currentUser) supabase.from('profiles').update({ current_chat:null }).eq('id', currentUser.id);
+  if(intersectionObserver) intersectionObserver.disconnect();
   currentChat = null;
   showMain();
 }
 </script>
 </body>
-</html>
+        </html>
