@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Блок на блок!</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+      /* Prevent scrolling while playing */
+      body {
+        overscroll-behavior: none;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        background-color: #0f172a; /* slate-900 */
+        color: white;
+      }
+      
+      /* Custom Animations */
+      @keyframes pop {
+        0% { transform: scale(0.5); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      @keyframes clear-flash {
+        0% { background-color: rgba(255, 255, 255, 0.8); transform: scale(1.05); }
+        100% { background-color: transparent; transform: scale(1); }
+      }
+      @keyframes shake-light {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-2px) rotate(-1deg); }
+        75% { transform: translateX(2px) rotate(1deg); }
+      }
+      @keyframes shake-medium {
+        0%, 100% { transform: translateX(0); }
+        20% { transform: translateX(-4px) rotate(-2deg); }
+        40% { transform: translateX(4px) rotate(2deg); }
+        60% { transform: translateX(-4px) rotate(-2deg); }
+        80% { transform: translateX(4px) rotate(2deg); }
+      }
+      @keyframes shake-heavy {
+        0%, 100% { transform: translate(0, 0); }
+        10% { transform: translate(-5px, -5px) rotate(-3deg); }
+        30% { transform: translate(5px, 5px) rotate(3deg); }
+        50% { transform: translate(-5px, 5px) rotate(-3deg); }
+        70% { transform: translate(5px, -5px) rotate(3deg); }
+        90% { transform: translate(-2px, 2px) rotate(0); }
+      }
+      @keyframes text-pop {
+        0% { transform: scale(0.5) translateY(20px); opacity: 0; }
+        50% { transform: scale(1.5) translateY(-20px); opacity: 1; }
+        100% { transform: scale(1) translateY(-40px); opacity: 0; }
+      }
+      
+      .animate-pop { animation: pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+      .animate-clear { animation: clear-flash 0.3s ease-out forwards; }
+      .shake-light { animation: shake-light 0.3s ease-in-out; }
+      .shake-medium { animation: shake-medium 0.4s ease-in-out; }
+      .shake-heavy { animation: shake-heavy 0.5s ease-in-out; }
+      .text-popup { animation: text-pop 1s ease-out forwards; }
+      
+      /* Utility for text stroke */
+      .text-popup {
+        -webkit-text-stroke: 1px black;
+      }
+      
+      /* Safe area for mobile */
+      .safe-top {
+          padding-top: env(safe-area-inset-top, 20px);
+      }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // --- ICONS (SVG Replaced for Lucide) ---
+        const IconBase = ({ size = 24, className = "", children, ...props }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" stroke="currentColor" 
+                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" 
+                className={className} 
+                {...props}
+            >
+                {children}
+            </svg>
+        );
+
+        const Play = (props) => <IconBase {...props}><polygon points="5 3 19 12 5 21 5 3"></polygon></IconBase>;
+        const Pause = (props) => <IconBase {...props}><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></IconBase>;
+        const RotateCcw = (props) => <IconBase {...props}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></IconBase>;
+        const Volume2 = (props) => <IconBase {...props}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></IconBase>;
+        const VolumeX = (props) => <IconBase {...props}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></IconBase>;
+        const Home = (props) => <IconBase {...props}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></IconBase>;
+        const Bomb = (props) => <IconBase {...props}><circle cx="11" cy="13" r="9"></circle><path d="M14.35 4.65 16.3 2.7a2.41 2.41 0 0 1 3.4 0h0a2.41 2.41 0 0 1 0 3.4l-1.95 1.95"></path><path d="m22 2-1.5 1.5"></path></IconBase>;
+
+        // --- AUDIO UTILS (Synthesized to avoid external files) ---
+        class SoundManager {
+            constructor() {
+                this.ctx = null;
+                this.isMuted = false;
+                this.init();
+            }
+
+            init() {
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) this.ctx = new AudioContext();
+                } catch (e) { console.error("Audio not supported"); }
+            }
+
+            toggleMute() {
+                this.isMuted = !this.isMuted;
+                if (!this.isMuted && this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playTone(freq, type, duration, vol = 0.1) {
+                if (this.isMuted || !this.ctx) return;
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+                
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            }
+
+            playPop() { this.playTone(600, 'sine', 0.1, 0.05); }
+            playClick() { this.playTone(800, 'triangle', 0.05, 0.03); }
+            
+            playClear(count) {
+                if (this.isMuted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                [0, 1, 2].forEach((i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.frequency.setValueAtTime(400 + (i * 200) + (count * 100), now + i*0.05);
+                    gain.gain.setValueAtTime(0.1, now + i*0.05);
+                    gain.gain.linearRampToValueAtTime(0, now + i*0.05 + 0.2);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + i*0.05);
+                    osc.stop(now + i*0.05 + 0.2);
+                });
+            }
+
+            playGameOver() {
+                if (this.isMuted || !this.ctx) return;
+                this.playTone(300, 'sawtooth', 0.5, 0.1);
+                setTimeout(() => this.playTone(200, 'sawtooth', 0.5, 0.1), 300);
+            }
+        }
+        
+        const soundManager = new SoundManager();
+
+        // --- CONSTANTS ---
+        const GRID_SIZE = 8;
+        const INITIAL_BOMB_TIMER = 9;
+        const COLORS = [
+            '#ef4444', '#f97316', '#eab308', '#22c55e', 
+            '#06b6d4', '#3b82f6', '#a855f7', '#ec4899'
+        ];
+        // Shapes 0=Empty, 1=Filled
+        const RAW_SHAPES = [
+            [[1]], // Dot
+            [[1, 1]], // 2-Line H
+            [[1], [1]], // 2-Line V
+            [[1, 1, 1]], // 3-Line H
+            [[1], [1], [1]], // 3-Line V
+            [[1, 1, 1, 1]], // 4-Line H
+            [[1], [1], [1], [1]], // 4-Line V
+            [[1, 1], [1, 1]], // Square
+            [[1, 0], [1, 0], [1, 1]], // L
+            [[0, 1], [0, 1], [1, 1]], // J
+            [[1, 1, 1], [0, 1, 0]], // T
+            [[1, 1, 0], [0, 1, 1]], // Z
+            [[0, 1, 1], [1, 1, 0]], // S
+            [[1, 1], [1, 0]], // Small corner
+            [[1, 1], [0, 1]], // Small corner inv
+            [[1, 0, 0], [1, 0, 0], [1, 1, 1]], // Big L
+        ];
+
+        const generateRandomBlock = () => {
+            const shapeIdx = Math.floor(Math.random() * RAW_SHAPES.length);
+            const colorIdx = Math.floor(Math.random() * COLORS.length);
+            return {
+                id: Math.random().toString(36).substr(2, 9),
+                matrix: RAW_SHAPES[shapeIdx],
+                color: COLORS[colorIdx],
+            };
+        };
+
+        const createEmptyGrid = () => 
+            Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(null));
+
+        const GameMode = { CLASSIC: 'CLASSIC', BOMB: 'BOMB' };
+        const GameState = { MENU: 'MENU', PLAYING: 'PLAYING', PAUSED: 'PAUSED', GAME_OVER: 'GAME_OVER' };
+
+        // --- COMPONENT: BLOCK ---
+        const Block = ({ shape, size, className = '', onPointerDown, style }) => {
+            const rows = shape.matrix.length;
+            const cols = shape.matrix[0].length;
+            const width = cols * size;
+            const height = rows * size;
+
+            return (
+                <div 
+                    className={`relative touch-none select-none ${className}`} 
+                    style={{ width, height, ...style }}
+                    onPointerDown={onPointerDown}
+                >
+                {shape.matrix.map((row, r) => (
+                    row.map((cell, c) => {
+                    if (!cell) return null;
+                    return (
+                        <div
+                        key={`${r}-${c}`}
+                        className="absolute border border-white/20 rounded-sm shadow-sm"
+                        style={{
+                            top: r * size,
+                            left: c * size,
+                            width: size,
+                            height: size,
+                            backgroundColor: shape.color,
+                            boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.3), 0 2px 4px rgba(0,0,0,0.2)'
+                        }}
+                        />
+                    );
+                    })
+                ))}
+                </div>
+            );
+        };
+
+        // --- MAIN APP COMPONENT ---
+        const App = () => {
+            // State
+            const [gameState, setGameState] = useState(GameState.MENU);
+            const [gameMode, setGameMode] = useState(GameMode.CLASSIC);
+            const [grid, setGrid] = useState(createEmptyGrid());
+            const [dockBlocks, setDockBlocks] = useState([null, null, null]);
+            const [score, setScore] = useState(0);
+            const [bestScore, setBestScore] = useState(0);
+            const [isMuted, setIsMuted] = useState(soundManager.isMuted);
+
+            // Animation State
+            const [clearingRows, setClearingRows] = useState([]);
+            const [clearingCols, setClearingCols] = useState([]);
+            const [shakeClass, setShakeClass] = useState('');
+            const [comboText, setComboText] = useState(null);
+
+            // Drag State
+            const [dragBlock, setDragBlock] = useState(null);
+            const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
+            
+            // Refs
+            const gridRef = useRef(null);
+            const [cellSize, setCellSize] = useState(0);
+
+            // Initialize Game
+            const startGame = (mode) => {
+                soundManager.playClick();
+                setGameMode(mode);
+                setGrid(createEmptyGrid());
+                setScore(0);
+                setDockBlocks([generateRandomBlock(), generateRandomBlock(), generateRandomBlock()]);
+                setGameState(GameState.PLAYING);
+                setClearingRows([]);
+                setClearingCols([]);
+            };
+
+            const returnToMenu = () => {
+                soundManager.playClick();
+                setGameState(GameState.MENU);
+            };
+
+            const togglePause = () => {
+                soundManager.playClick();
+                if (gameState === GameState.PLAYING) setGameState(GameState.PAUSED);
+                else if (gameState === GameState.PAUSED) setGameState(GameState.PLAYING);
+            };
+
+            const toggleMute = () => {
+                soundManager.toggleMute();
+                setIsMuted(soundManager.isMuted);
+            };
+
+            // Responsive Cell Size
+            useEffect(() => {
+                const handleResize = () => {
+                    if (gridRef.current) {
+                        const width = gridRef.current.clientWidth;
+                        setCellSize(width / GRID_SIZE);
+                    }
+                };
+                // Initial calculation
+                setTimeout(handleResize, 100); 
+                window.addEventListener('resize', handleResize);
+                return () => window.removeEventListener('resize', handleResize);
+            }, [gameState]);
+
+            // Best score
+            useEffect(() => {
+                const saved = localStorage.getItem('blockBlastBest');
+                if (saved) setBestScore(parseInt(saved, 10));
+            }, []);
+
+            useEffect(() => {
+                if (score > bestScore) {
+                    setBestScore(score);
+                    localStorage.setItem('blockBlastBest', score.toString());
+                }
+            }, [score, bestScore]);
+
+            // Logic: Can Place?
+            const canPlace = (shape, gx, gy, currentGrid) => {
+                for (let r = 0; r < shape.matrix.length; r++) {
+                    for (let c = 0; c < shape.matrix[r].length; c++) {
+                        if (shape.matrix[r][c] === 1) {
+                            const targetX = gx + c;
+                            const targetY = gy + r;
+                            if (
+                                targetX < 0 || targetX >= GRID_SIZE ||
+                                targetY < 0 || targetY >= GRID_SIZE ||
+                                currentGrid[targetY][targetX] !== null
+                            ) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                return true;
+            };
+
+            // Logic: Check Game Over
+            const checkGameOver = useCallback((currentGrid, currentDock) => {
+                if (clearingRows.length > 0 || clearingCols.length > 0) return false;
+
+                // Check bombs
+                if (gameMode === GameMode.BOMB) {
+                    for(let r=0; r<GRID_SIZE; r++){
+                        for(let c=0; c<GRID_SIZE; c++){
+                            const cell = currentGrid[r][c];
+                            if(cell && cell.isBomb && cell.bombTimer !== undefined && cell.bombTimer <= 0){
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                const availableShapes = currentDock.filter(b => b !== null);
+                if (availableShapes.length === 0) return false;
+
+                for (const shape of availableShapes) {
+                    for (let y = 0; y < GRID_SIZE; y++) {
+                        for (let x = 0; x < GRID_SIZE; x++) {
+                            if (canPlace(shape, x, y, currentGrid)) return false;
+                        }
+                    }
+                }
+                return true;
+            }, [gameMode, clearingRows, clearingCols]);
+
+            // Drag Start
+            const handleDragStart = (e, shape, index) => {
+                if (gameState !== GameState.PLAYING) return;
+                if (clearingRows.length > 0 || clearingCols.length > 0) return;
+                
+                e.preventDefault();
+                e.stopPropagation();
+                if(e.target.releasePointerCapture && e.pointerId) {
+                    e.target.releasePointerCapture(e.pointerId);
+                }
+
+                const clientX = e.clientX;
+                const clientY = e.clientY;
+                
+                const shapeWidth = shape.matrix[0].length * cellSize;
+                const shapeHeight = shape.matrix.length * cellSize;
+
+                setDragBlock({
+                    shape,
+                    index,
+                    startX: clientX,
+                    startY: clientY,
+                    offsetX: -shapeWidth / 2,
+                    offsetY: -shapeHeight * 1.5,
+                });
+                setDragPos({ x: clientX, y: clientY });
+                
+                soundManager.playPop();
+            };
+
+            // Pointer Move / Up
+            useEffect(() => {
+                const handleMove = (e) => {
+                    if (dragBlock) {
+                        e.preventDefault();
+                        setDragPos({ x: e.clientX, y: e.clientY });
+                    }
+                };
+
+                const handleUp = (e) => {
+                    if (dragBlock) {
+                        e.preventDefault();
+                        dropBlock(e.clientX, e.clientY);
+                    }
+                };
+
+                if (dragBlock) {
+                    window.addEventListener('pointermove', handleMove);
+                    window.addEventListener('pointerup', handleUp);
+                }
+
+                return () => {
+                    window.removeEventListener('pointermove', handleMove);
+                    window.removeEventListener('pointerup', handleUp);
+                };
+            }, [dragBlock, grid, dockBlocks]);
+
+            // Drop Logic
+            const dropBlock = (x, y) => {
+                if (!dragBlock || !gridRef.current) return;
+
+                const rect = gridRef.current.getBoundingClientRect();
+                const visualX = x + dragBlock.offsetX;
+                const visualY = y + dragBlock.offsetY;
+
+                const gx = Math.round((visualX - rect.left) / cellSize);
+                const gy = Math.round((visualY - rect.top) / cellSize);
+
+                if (canPlace(dragBlock.shape, gx, gy, grid)) {
+                    const newGrid = grid.map(row => [...row]);
+                    let cellsPlaced = 0;
+
+                    dragBlock.shape.matrix.forEach((row, r) => {
+                        row.forEach((val, c) => {
+                            if (val === 1) {
+                                newGrid[gy + r][gx + c] = {
+                                    filled: true,
+                                    color: dragBlock.shape.color,
+                                    id: `${Date.now()}-${r}-${c}`,
+                                    isBomb: false
+                                };
+                                cellsPlaced++;
+                            }
+                        });
+                    });
+
+                    // Bomb Logic (Spawn)
+                    if (gameMode === GameMode.BOMB && Math.random() < 0.2) {
+                        const possibleCoords = [];
+                        dragBlock.shape.matrix.forEach((row, r) => {
+                            row.forEach((val, c) => {
+                                if (val === 1) possibleCoords.push({r: gy + r, c: gx + c});
+                            });
+                        });
+                        if (possibleCoords.length > 0) {
+                            const rand = possibleCoords[Math.floor(Math.random() * possibleCoords.length)];
+                            const cell = newGrid[rand.r][rand.c];
+                            if (cell) {
+                                cell.isBomb = true;
+                                cell.bombTimer = INITIAL_BOMB_TIMER;
+                            }
+                        }
+                    }
+
+                    // Bomb Logic (Tick)
+                    if (gameMode === GameMode.BOMB) {
+                        for(let r=0; r<GRID_SIZE; r++){
+                            for(let c=0; c<GRID_SIZE; c++){
+                                const cell = newGrid[r][c];
+                                if (cell && cell.isBomb && cell.bombTimer !== undefined) {
+                                    cell.bombTimer -= 1;
+                                }
+                            }
+                        }
+                    }
+
+                    soundManager.playPop();
+
+                    const rowsToClear = [];
+                    const colsToClear = [];
+
+                    for (let r = 0; r < GRID_SIZE; r++) {
+                        if (newGrid[r].every(cell => cell !== null)) rowsToClear.push(r);
+                    }
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        if (newGrid.map(row => row[c]).every(cell => cell !== null)) colsToClear.push(c);
+                    }
+
+                    const totalLines = rowsToClear.length + colsToClear.length;
+                    
+                    const newDock = [...dockBlocks];
+                    newDock[dragBlock.index] = null;
+                    if (newDock.every(b => b === null)) {
+                        setDockBlocks([generateRandomBlock(), generateRandomBlock(), generateRandomBlock()]);
+                    } else {
+                        setDockBlocks(newDock);
+                    }
+
+                    setGrid(newGrid);
+
+                    if (totalLines > 0) {
+                        soundManager.playClear(totalLines);
+                        setClearingRows(rowsToClear);
+                        setClearingCols(colsToClear);
+                        
+                        if (totalLines >= 3) setShakeClass('shake-heavy');
+                        else if (totalLines === 2) setShakeClass('shake-medium');
+                        else setShakeClass('shake-light');
+
+                        let text = "";
+                        if (totalLines === 2) text = "ДВОЙНОЙ!";
+                        if (totalLines === 3) text = "ТРОЙНОЙ!";
+                        if (totalLines >= 4) text = "ЭПИЧНО!";
+                        
+                        if (text) {
+                            setComboText({ text, id: Date.now() });
+                            setTimeout(() => setComboText(null), 1000);
+                        }
+
+                        setTimeout(() => {
+                            setGrid(prevGrid => {
+                                const g = prevGrid.map(row => [...row]);
+                                rowsToClear.forEach(r => {
+                                    for(let c=0; c<GRID_SIZE; c++) g[r][c] = null;
+                                });
+                                colsToClear.forEach(c => {
+                                    for(let r=0; r<GRID_SIZE; r++) g[r][c] = null;
+                                });
+                                return g;
+                            });
+                            setClearingRows([]);
+                            setClearingCols([]);
+                            setShakeClass('');
+
+                            const lineScore = totalLines * 100 * (totalLines > 1 ? totalLines : 1);
+                            setScore(s => s + cellsPlaced * 10 + lineScore);
+                        }, 300);
+
+                    } else {
+                        setScore(s => s + cellsPlaced * 10);
+                    }
+
+                }
+                
+                setDragBlock(null);
+            };
+
+            // Game Over Check
+            useEffect(() => {
+                if (gameState !== GameState.PLAYING) return;
+                if (clearingRows.length > 0 || clearingCols.length > 0) return;
+
+                if (checkGameOver(grid, dockBlocks)) {
+                    const timer = setTimeout(() => {
+                        setGameState(GameState.GAME_OVER);
+                        soundManager.playGameOver();
+                    }, 500);
+                    return () => clearTimeout(timer);
+                }
+            }, [grid, dockBlocks, gameState, checkGameOver, clearingRows, clearingCols]);
+
+            // Dock Scale Helper
+            const getDockScale = (block) => {
+                if (!cellSize) return 0.6;
+                const shapeWidth = block.matrix[0].length * cellSize;
+                const maxSlotWidth = (window.innerWidth - 32) / 3; 
+                const scale = Math.min(1, (maxSlotWidth - 10) / shapeWidth);
+                return scale;
+            };
+
+            // Render Cells
+            const renderGridCells = () => {
+                const cells = [];
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        const cell = grid[r][c];
+                        const isClearing = clearingRows.includes(r) || clearingCols.includes(c);
+                        
+                        // Ghost Piece Logic
+                        let isGhost = false;
+                        let ghostColor = '';
+                        if (dragBlock && !isClearing && cellSize > 0 && gridRef.current) {
+                            const rect = gridRef.current.getBoundingClientRect();
+                            const visualX = dragPos.x + dragBlock.offsetX;
+                            const visualY = dragPos.y + dragBlock.offsetY;
+                            const gx = Math.round((visualX - rect.left) / cellSize);
+                            const gy = Math.round((visualY - rect.top) / cellSize);
+                            
+                            if (r >= gy && r < gy + dragBlock.shape.matrix.length) {
+                                const matrixR = r - gy;
+                                if (c >= gx && c < gx + dragBlock.shape.matrix[0].length) {
+                                    const matrixC = c - gx;
+                                    if (dragBlock.shape.matrix[matrixR] && dragBlock.shape.matrix[matrixR][matrixC] === 1) {
+                                        if (canPlace(dragBlock.shape, gx, gy, grid)) {
+                                            isGhost = true;
+                                            ghostColor = dragBlock.shape.color;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        cells.push(
+                            <div
+                                key={`${r}-${c}`}
+                                className={`relative border border-white/5 transition-colors duration-75 ${isClearing ? 'animate-clear z-20' : ''}`}
+                                style={{
+                                    width: cellSize,
+                                    height: cellSize,
+                                    backgroundColor: cell ? cell.color : (isGhost ? `${ghostColor}40` : 'transparent'),
+                                }}
+                            >
+                                {cell && !isClearing && <div className="absolute inset-0 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3)] pointer-events-none" />}
+                                {cell?.isBomb && (
+                                    <div className="absolute inset-0 flex items-center justify-center animate-pulse z-10">
+                                        <Bomb size={cellSize * 0.6} className="text-white drop-shadow-md" />
+                                        <span className="absolute text-white font-bold text-xs mt-1 drop-shadow-md">{cell.bombTimer}</span>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    }
+                }
+                return cells;
+            };
+
+            // ---- RENDER VIEWS ----
+
+            if (gameState === GameState.MENU) {
+                return (
+                    <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-white p-4 space-y-8">
+                        <h1 className="text-6xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-br from-cyan-400 to-purple-600 drop-shadow-lg text-center leading-tight">
+                            БЛОК<br/>НА БЛОК!
+                        </h1>
+                        <div className="space-y-4 w-full max-w-xs">
+                            <button 
+                                onClick={() => startGame(GameMode.CLASSIC)}
+                                className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl text-xl font-bold shadow-lg shadow-blue-500/20 transform hover:scale-105 transition-all"
+                            >
+                                Классика
+                            </button>
+                            <button 
+                                onClick={() => startGame(GameMode.BOMB)}
+                                className="w-full py-4 bg-red-600 hover:bg-red-500 rounded-2xl text-xl font-bold shadow-lg shadow-red-500/20 transform hover:scale-105 transition-all flex items-center justify-center gap-2"
+                            >
+                                <Bomb size={24} /> Приключение
+                            </button>
+                        </div>
+                        <div className="text-slate-400 text-sm">Рекорд: {bestScore}</div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className={`flex flex-col h-screen bg-slate-900 text-white overflow-hidden ${shakeClass}`}>
+                    
+                    {/* Header */}
+                    <div className="flex items-center justify-between p-4 pt-6 safe-top bg-slate-800/50 backdrop-blur-sm">
+                        <div className="flex flex-col">
+                            <span className="text-xs text-slate-400 uppercase font-bold tracking-wider">Счёт</span>
+                            <span className="text-3xl font-black font-mono leading-none">{score}</span>
+                        </div>
+                        
+                        <div className="flex items-center space-x-4">
+                            <div className="flex flex-col text-right hidden sm:flex">
+                                <span className="text-xs text-slate-400 uppercase font-bold tracking-wider">Рекорд</span>
+                                <span className="text-xl font-bold font-mono leading-none">{Math.max(score, bestScore)}</span>
+                            </div>
+                            <button onClick={togglePause} className="p-3 bg-slate-700 rounded-full hover:bg-slate-600 transition-colors">
+                                <Pause size={24} className="text-slate-200"/>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Grid Container */}
+                    <div className="flex-1 flex items-center justify-center p-4 relative">
+                        <div 
+                            ref={gridRef}
+                            className="relative bg-slate-800 rounded-lg shadow-2xl overflow-hidden border-2 border-slate-700"
+                            style={{
+                                width: '100%',
+                                maxWidth: '500px',
+                                aspectRatio: '1/1',
+                                display: 'grid',
+                                gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`,
+                                gridTemplateRows: `repeat(${GRID_SIZE}, 1fr)`,
+                            }}
+                        >
+                            {renderGridCells()}
+                            
+                            {/* Popup Text */}
+                            {comboText && (
+                                <div key={comboText.id} className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
+                                    <div className="text-5xl font-black text-yellow-400 drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)] text-popup stroke-black text-center">
+                                        {comboText.text}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Dock Area */}
+                    <div className="h-48 pb-8 px-4 flex items-center justify-center space-x-2 bg-slate-800/30">
+                        {dockBlocks.map((block, i) => (
+                            <div key={i} className="flex-1 flex items-center justify-center h-full relative overflow-hidden">
+                                {block && (
+                                    <div 
+                                        className={`transition-opacity duration-200 ${dragBlock?.index === i ? 'opacity-0' : 'opacity-100'}`}
+                                        style={{ 
+                                            transform: `scale(${getDockScale(block)})`,
+                                            transformOrigin: 'center center'
+                                        }} 
+                                    >
+                                        <Block 
+                                            shape={block} 
+                                            size={cellSize || 40}
+                                            onPointerDown={(e) => handleDragStart(e, block, i)}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Dragged Block Layer */}
+                    {dragBlock && (
+                        <div 
+                            className="fixed pointer-events-none z-50 will-change-transform"
+                            style={{
+                                left: 0,
+                                top: 0,
+                                transform: `translate(${dragPos.x + dragBlock.offsetX}px, ${dragPos.y + dragBlock.offsetY}px)`
+                            }}
+                        >
+                            <Block shape={dragBlock.shape} size={cellSize} className="opacity-90 shadow-2xl scale-110" />
+                        </div>
+                    )}
+
+                    {/* Paused Modal */}
+                    {gameState === GameState.PAUSED && (
+                        <div className="absolute inset-0 z-50 bg-slate-900/90 backdrop-blur-md flex flex-col items-center justify-center space-y-6">
+                            <h2 className="text-4xl font-black text-white">ПАУЗА</h2>
+                            <button onClick={togglePause} className="p-6 bg-green-500 rounded-full shadow-lg hover:scale-110 transition-transform">
+                                <Play size={40} />
+                            </button>
+                            <div className="flex space-x-4">
+                                <button onClick={toggleMute} className="p-4 bg-slate-700 rounded-full hover:bg-slate-600">
+                                    {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                                </button>
+                                <button onClick={returnToMenu} className="p-4 bg-slate-700 rounded-full hover:bg-slate-600">
+                                    <Home size={24} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Game Over Modal */}
+                    {gameState === GameState.GAME_OVER && (
+                        <div className="absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center space-y-8 animate-in fade-in duration-300">
+                            <div className="text-center space-y-2">
+                                <h2 className="text-5xl font-black text-red-500 drop-shadow-lg leading-tight">ИГРА<br/>ОКОНЧЕНА</h2>
+                                <p className="text-slate-400 text-lg">Повезет в следующий раз!</p>
+                            </div>
+                            
+                            <div className="bg-slate-800 p-6 rounded-2xl w-64 text-center shadow-xl border border-slate-700">
+                                <div className="text-xs uppercase text-slate-500 font-bold mb-1">Итоговый счёт</div>
+                                <div className="text-4xl font-mono font-bold text-white mb-4">{score}</div>
+                                
+                                {score >= bestScore && score > 0 && (
+                                    <div className="inline-block bg-yellow-500/20 text-yellow-400 px-3 py-1 rounded-full text-sm font-bold animate-pulse">
+                                        НОВЫЙ РЕКОРД!
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex flex-col space-y-3 w-64">
+                                <button 
+                                    onClick={() => startGame(gameMode)}
+                                    className="w-full py-4 bg-white text-slate-900 hover:bg-slate-200 rounded-xl text-lg font-bold shadow-lg transform hover:scale-105 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <RotateCcw size={20} /> Заново
+                                </button>
+                                <button 
+                                    onClick={returnToMenu}
+                                    className="w-full py-4 bg-slate-800 hover:bg-slate-700 rounded-xl text-lg font-bold shadow-lg transform hover:scale-105 transition-all"
+                                >
+                                    Меню
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- RENDER ---
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
