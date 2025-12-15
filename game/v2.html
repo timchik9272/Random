@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Block Blast Pro</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <script src="https://unpkg.com/lucide-react@0.263.1/dist/umd/lucide-react.min.js"></script>
+
+    <style>
+      /* Prevent scrolling while playing */
+      body {
+        overscroll-behavior: none;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        background-color: #0f172a; /* slate-900 fallback */
+        color: white;
+      }
+
+      /* Custom Animations */
+      @keyframes pop {
+        0% { transform: scale(0.5); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      @keyframes clear-flash {
+        0% { background-color: rgba(255, 255, 255, 0.8); transform: scale(1.05); }
+        100% { background-color: transparent; transform: scale(1); }
+      }
+      @keyframes shake-light {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-2px) rotate(-1deg); }
+        75% { transform: translateX(2px) rotate(1deg); }
+      }
+      @keyframes shake-medium {
+        0%, 100% { transform: translateX(0); }
+        20% { transform: translateX(-4px) rotate(-2deg); }
+        40% { transform: translateX(4px) rotate(2deg); }
+        60% { transform: translateX(-4px) rotate(-2deg); }
+        80% { transform: translateX(4px) rotate(2deg); }
+      }
+      @keyframes shake-heavy {
+        0%, 100% { transform: translate(0, 0); }
+        10% { transform: translate(-5px, -5px) rotate(-3deg); }
+        30% { transform: translate(5px, 5px) rotate(3deg); }
+        50% { transform: translate(-5px, 5px) rotate(-3deg); }
+        70% { transform: translate(5px, -5px) rotate(3deg); }
+        90% { transform: translate(-2px, 2px) rotate(0); }
+      }
+      @keyframes text-pop {
+        0% { transform: scale(0.5) translateY(20px); opacity: 0; }
+        50% { transform: scale(1.5) translateY(-20px); opacity: 1; }
+        100% { transform: scale(1) translateY(-40px); opacity: 0; }
+      }
+      @keyframes score-bump {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.5); color: #fbbf24; }
+        100% { transform: scale(1); }
+      }
+      
+      .animate-pop { animation: pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+      .animate-clear { animation: clear-flash 0.3s ease-out forwards; }
+      .shake-light { animation: shake-light 0.3s ease-in-out; }
+      .shake-medium { animation: shake-medium 0.4s ease-in-out; }
+      .shake-heavy { animation: shake-heavy 0.5s ease-in-out; }
+      .text-popup { animation: text-pop 1s ease-out forwards; }
+      .score-bump { animation: score-bump 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // --- IMPORTS & SETUP ---
+        const { useState, useEffect, useRef, useCallback } = React;
+        
+        // Destructure Icons from Lucide UMD
+        const { 
+            Play, Pause, RotateCcw, Volume2, VolumeX, Home, Bomb, 
+            ShoppingCart, Calendar, CheckCircle, Lock, Coins, Loader2, 
+            Heart, History, Trash2 
+        } = lucideReact;
+
+        // --- TYPES / ENUMS (Converted to JS Objects) ---
+        
+        const GameMode = {
+            CLASSIC: 'CLASSIC',
+            ADVENTURE: 'ADVENTURE',
+        };
+
+        const GameState = {
+            MENU: 'MENU',
+            PLAYING: 'PLAYING',
+            PAUSED: 'PAUSED',
+            GAME_OVER: 'GAME_OVER',
+        };
+
+        const QuestType = {
+            PLAY_GAMES: 'PLAY_GAMES',
+            SCORE_POINTS: 'SCORE_POINTS',
+            CLEAR_LINES: 'CLEAR_LINES',
+        };
+
+        // --- CONSTANTS ---
+
+        const GRID_SIZE = 8;
+        const INITIAL_BOMB_TIMER = 9;
+        const DAILY_LOGIN_REWARD = 100;
+        const REVIVE_COST = 50;
+        const COINS_PER_100_SCORE = 2;
+
+        const STYLES = {
+            'default': {
+                id: 'default',
+                name: 'Классика',
+                price: 0,
+                description: 'Стандартный яркий стиль',
+                previewColor: '#3b82f6',
+                palette: [
+                    '#ef4444', '#f97316', '#eab308', '#22c55e', 
+                    '#06b6d4', '#3b82f6', '#a855f7', '#ec4899',
+                ]
+            },
+            'gold': {
+                id: 'gold',
+                name: 'Роскошь',
+                price: 50, 
+                description: 'Премиальный золотой стиль',
+                previewColor: '#d97706',
+                palette: [
+                    '#78350f', '#92400e', '#b45309', '#d97706', 
+                    '#f59e0b', '#fbbf24', '#fcd34d', '#451a03',
+                ]
+            }
+        };
+
+        const QUEST_TEMPLATES = [
+            { id: 'q1', type: QuestType.PLAY_GAMES, target: 3, reward: 50, description: 'Сыграть 3 игры' },
+            { id: 'q2', type: QuestType.SCORE_POINTS, target: 1000, reward: 100, description: 'Набрать 1000 очков' },
+            { id: 'q3', type: QuestType.CLEAR_LINES, target: 20, reward: 75, description: 'Очистить 20 линий' },
+        ];
+
+        // Shapes Definition
+        const RAW_SHAPES = [
+            [[1]], // Dot
+            [[1, 1]], // 2-Line H
+            [[1], [1]], // 2-Line V
+            [[1, 1, 1]], // 3-Line H
+            [[1], [1], [1]], // 3-Line V
+            [[1, 1, 1, 1]], // 4-Line H
+            [[1], [1], [1], [1]], // 4-Line V
+            [[1, 1], [1, 1]], // Square
+            [[1, 0], [1, 0], [1, 1]], // L
+            [[0, 1], [0, 1], [1, 1]], // J
+            [[1, 1, 1], [0, 1, 0]], // T
+            [[1, 1, 0], [0, 1, 1]], // Z
+            [[0, 1, 1], [1, 1, 0]], // S
+            [[1, 1], [1, 0]], // Small corner
+            [[1, 1], [0, 1]], // Small corner inv
+            [[1, 0, 0], [1, 0, 0], [1, 1, 1]], // Big L
+        ];
+
+        const generateRandomBlock = (palette = STYLES['default'].palette) => {
+            const shapeIdx = Math.floor(Math.random() * RAW_SHAPES.length);
+            const colorIdx = Math.floor(Math.random() * palette.length);
+            return {
+                id: Math.random().toString(36).substr(2, 9),
+                matrix: RAW_SHAPES[shapeIdx],
+                color: palette[colorIdx],
+            };
+        };
+
+        const createEmptyGrid = () => Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(null));
+
+        const STORAGE_KEY_HIGHSCORE = (mode) => `blockBlastBest_${mode}`;
+        const STORAGE_KEY_PLAYER = 'blockBlastPlayerState_v1';
+
+        const INITIAL_PLAYER_STATE = {
+            coins: 0,
+            inventory: ['default'],
+            currentStyleId: 'default',
+            lastLoginDate: '',
+            dailyRewardClaimed: false,
+            dailyQuests: [],
+            lastQuestDate: '',
+            transactions: [],
+            stats: {
+                gamesPlayed: 0,
+                totalLinesCleared: 0,
+                totalScore: 0
+            }
+        };
+
+        // --- AUDIO MANAGER ---
+
+        class WebAudioSoundManager {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+                try {
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContextClass) {
+                        this.ctx = new AudioContextClass();
+                    }
+                } catch (e) {
+                    console.error("Web Audio API not supported");
+                }
+            }
+
+            get isMuted() { return this.muted; }
+
+            toggleMute() { this.muted = !this.muted; }
+
+            playTone(freq, type, duration, startTime = 0) {
+                if (this.muted || !this.ctx) return;
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime + startTime);
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime + startTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + startTime + duration);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(this.ctx.currentTime + startTime);
+                osc.stop(this.ctx.currentTime + startTime + duration);
+            }
+
+            playPop() { this.playTone(400, 'sine', 0.1); }
+            playClick() { this.playTone(800, 'triangle', 0.05); }
+
+            playClear(combo) {
+                if (this.muted || !this.ctx) return;
+                const baseFreq = 400;
+                for(let i = 0; i < Math.min(combo, 5); i++) {
+                    this.playTone(baseFreq * (1 + i * 0.25), 'sine', 0.3, i * 0.05);
+                }
+            }
+
+            playGameOver() {
+                if (this.muted || !this.ctx) return;
+                this.playTone(300, 'sawtooth', 0.3, 0);
+                this.playTone(250, 'sawtooth', 0.3, 0.2);
+                this.playTone(200, 'sawtooth', 0.5, 0.4);
+            }
+        }
+        const soundManager = new WebAudioSoundManager();
+
+        // --- COMPONENTS ---
+
+        // 1. Block Component
+        const Block = ({ shape, size, className, onPointerDown, style }) => {
+            const rows = shape.matrix.length;
+            const cols = shape.matrix[0].length;
+            const width = cols * size;
+            const height = rows * size;
+
+            return (
+                <div 
+                    className={`relative touch-none select-none ${className || ''}`} 
+                    style={{ width, height, ...style }}
+                    onPointerDown={onPointerDown}
+                >
+                    {shape.matrix.map((row, r) => (
+                        row.map((cell, c) => {
+                            if (!cell) return null;
+                            return (
+                                <div
+                                    key={`${r}-${c}`}
+                                    className="absolute border border-white/20 rounded-sm shadow-sm"
+                                    style={{
+                                        top: r * size,
+                                        left: c * size,
+                                        width: size,
+                                        height: size,
+                                        backgroundColor: shape.color,
+                                        boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.3), 0 2px 4px rgba(0,0,0,0.2)'
+                                    }}
+                                />
+                            );
+                        })
+                    ))}
+                </div>
+            );
+        };
+
+        // 2. Rolling Score Component
+        const Digit = ({ value }) => {
+            return (
+                <div className="relative h-8 w-5 overflow-hidden sm:h-10 sm:w-6">
+                    <div
+                        className="absolute left-0 top-0 flex flex-col transition-transform duration-500 ease-in-out"
+                        style={{ transform: `translateY(-${parseInt(value) * 10}%)` }}
+                    >
+                        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                            <div key={n} className="flex h-8 w-5 items-center justify-center sm:h-10 sm:w-6">
+                                <span className="text-3xl font-black font-mono leading-none sm:text-4xl">{n}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const RollingScore = ({ score }) => {
+            const digits = score.toString().split('');
+            return (
+                <div className="flex items-center justify-center overflow-hidden">
+                    {digits.map((digit, index) => {
+                        const powerOfTen = digits.length - 1 - index;
+                        return <Digit key={powerOfTen} value={digit} />;
+                    })}
+                </div>
+            );
+        };
+
+        // --- MAIN APP COMPONENT ---
+
+        const App = () => {
+            // --- Game State ---
+            const [gameState, setGameState] = useState(GameState.MENU);
+            const [gameMode, setGameMode] = useState(GameMode.CLASSIC);
+            const [grid, setGrid] = useState(createEmptyGrid());
+            const [dockBlocks, setDockBlocks] = useState([null, null, null]);
+            const [score, setScore] = useState(0);
+            
+            // --- Player & Economy State ---
+            const [playerState, setPlayerState] = useState(INITIAL_PLAYER_STATE);
+            const [bestScores, setBestScores] = useState({
+                [GameMode.CLASSIC]: 0,
+                [GameMode.ADVENTURE]: 0
+            });
+
+            // --- UI Modals State ---
+            const [activeModal, setActiveModal] = useState('NONE');
+            const [isCheckingNet, setIsCheckingNet] = useState(false);
+            const [netError, setNetError] = useState('');
+
+            // --- Audio & Visuals State ---
+            const [isMuted, setIsMuted] = useState(soundManager.isMuted);
+            const [isGameOverAnimating, setIsGameOverAnimating] = useState(false);
+            const [clearingRows, setClearingRows] = useState([]);
+            const [clearingCols, setClearingCols] = useState([]);
+            const [shakeClass, setShakeClass] = useState('');
+            const [comboText, setComboText] = useState(null);
+            const [comboCount, setComboCount] = useState(0);
+
+            // --- Drag State ---
+            const [dragBlock, setDragBlock] = useState(null);
+            const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
+
+            // Refs
+            const gridRef = useRef(null);
+            const [cellSize, setCellSize] = useState(0);
+
+            // --- Helpers ---
+            const getCurrentStyle = () => STYLES[playerState.currentStyleId] || STYLES['default'];
+
+            // --- Persistence & Initialization ---
+            useEffect(() => {
+                // Load Scores
+                const classic = localStorage.getItem(STORAGE_KEY_HIGHSCORE(GameMode.CLASSIC));
+                const adventure = localStorage.getItem(STORAGE_KEY_HIGHSCORE(GameMode.ADVENTURE));
+                setBestScores({
+                    [GameMode.CLASSIC]: classic ? parseInt(classic, 10) : 0,
+                    [GameMode.ADVENTURE]: adventure ? parseInt(adventure, 10) : 0
+                });
+
+                // Load Player State
+                const savedPlayer = localStorage.getItem(STORAGE_KEY_PLAYER);
+                if (savedPlayer) {
+                    try {
+                        const parsed = JSON.parse(savedPlayer);
+                        const merged = { ...INITIAL_PLAYER_STATE, ...parsed };
+                        
+                        if (!merged.transactions) merged.transactions = [];
+
+                        // Check Daily Reset
+                        const today = new Date().toISOString().split('T')[0];
+                        if (merged.lastLoginDate !== today) {
+                            merged.dailyRewardClaimed = false;
+                            merged.lastLoginDate = today;
+                        }
+                        if (merged.lastQuestDate !== today) {
+                            merged.lastQuestDate = today;
+                            merged.dailyQuests = QUEST_TEMPLATES.map(t => ({
+                                ...t, current: 0, claimed: false
+                            }));
+                        }
+                        setPlayerState(merged);
+                    } catch (e) {
+                        console.error("Failed to parse player state", e);
+                        setPlayerState(INITIAL_PLAYER_STATE);
+                    }
+                } else {
+                    const today = new Date().toISOString().split('T')[0];
+                    setPlayerState({
+                        ...INITIAL_PLAYER_STATE,
+                        lastLoginDate: today,
+                        lastQuestDate: today,
+                        dailyQuests: QUEST_TEMPLATES.map(t => ({ ...t, current: 0, claimed: false }))
+                    });
+                }
+            }, []);
+
+            // Save Player State on Change
+            useEffect(() => {
+                localStorage.setItem(STORAGE_KEY_PLAYER, JSON.stringify(playerState));
+            }, [playerState]);
+
+            // Update best score
+            useEffect(() => {
+                if (score > bestScores[gameMode]) {
+                    setBestScores(prev => ({ ...prev, [gameMode]: score }));
+                    localStorage.setItem(STORAGE_KEY_HIGHSCORE(gameMode), score.toString());
+                }
+            }, [score, gameMode, bestScores]);
+
+            // --- Economy Helpers ---
+            const addTransaction = (amount, description) => {
+                const type = amount > 0 ? 'EARN' : 'SPEND';
+                const newTransaction = {
+                    id: Date.now().toString(),
+                    date: Date.now(),
+                    amount: Math.abs(amount),
+                    type,
+                    description
+                };
+                setPlayerState(prev => ({
+                    ...prev,
+                    coins: prev.coins + amount,
+                    transactions: [newTransaction, ...prev.transactions]
+                }));
+            };
+
+            const calculatePendingCoins = (currentScore) => {
+                return Math.floor(currentScore / 100) * COINS_PER_100_SCORE;
+            };
+
+            const endSessionAndAwardCoins = (currentScore) => {
+                const coins = calculatePendingCoins(currentScore);
+                if (coins > 0) {
+                    addTransaction(coins, `Игра: ${currentScore} очков`);
+                }
+            };
+
+            // --- Internet Check ---
+            const checkInternet = async () => {
+                setIsCheckingNet(true);
+                setNetError('');
+                try {
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                    if (!navigator.onLine) throw new Error("Проверьте интернет");
+                    setIsCheckingNet(false);
+                    return true;
+                } catch (e) {
+                    setIsCheckingNet(false);
+                    setNetError('Требуется интернет!');
+                    return false;
+                }
+            };
+
+            // --- Game Logic ---
+            const updateQuestProgress = (type, amount) => {
+                setPlayerState(prev => ({
+                    ...prev,
+                    dailyQuests: prev.dailyQuests.map(q => {
+                        if (q.type === type && !q.claimed) {
+                            return { ...q, current: Math.min(q.target, q.current + amount) };
+                        }
+                        return q;
+                    })
+                }));
+            };
+
+            const startGame = (mode) => {
+                soundManager.playClick();
+                setGameMode(mode);
+                setGrid(createEmptyGrid());
+                setScore(0);
+                const style = getCurrentStyle();
+                setDockBlocks([
+                    generateRandomBlock(style.palette), 
+                    generateRandomBlock(style.palette), 
+                    generateRandomBlock(style.palette)
+                ]);
+                setGameState(GameState.PLAYING);
+                setClearingRows([]);
+                setClearingCols([]);
+                setComboCount(0);
+                setIsGameOverAnimating(false);
+                
+                setPlayerState(prev => ({
+                    ...prev,
+                    stats: { ...prev.stats, gamesPlayed: prev.stats.gamesPlayed + 1 }
+                }));
+                updateQuestProgress(QuestType.PLAY_GAMES, 1);
+            };
+
+            const handleRestart = () => {
+                endSessionAndAwardCoins(score);
+                startGame(gameMode);
+            };
+
+            const handleReturnToMenu = () => {
+                endSessionAndAwardCoins(score);
+                soundManager.playClick();
+                setGameState(GameState.MENU);
+                setIsGameOverAnimating(false);
+                setActiveModal('NONE');
+            };
+
+            const togglePause = () => {
+                soundManager.playClick();
+                if (gameState === GameState.PLAYING) setGameState(GameState.PAUSED);
+                else if (gameState === GameState.PAUSED) setGameState(GameState.PLAYING);
+            };
+
+            const toggleMute = () => {
+                soundManager.toggleMute();
+                setIsMuted(soundManager.isMuted);
+            };
+
+            // Revive Mechanic
+            const handleRevive = () => {
+                if (playerState.coins < REVIVE_COST) return;
+                soundManager.playClear(3);
+                addTransaction(-REVIVE_COST, 'Возрождение');
+                
+                // 1. Clear 50% of filled blocks
+                setGrid(prev => prev.map(row => row.map(cell => {
+                    if (!cell) return null;
+                    return Math.random() > 0.5 ? null : cell;
+                })));
+
+                // 2. Reset Bomb Timers if Adventure
+                if (gameMode === GameMode.ADVENTURE) {
+                    setGrid(prev => prev.map(row => row.map(cell => {
+                        if (cell && cell.isBomb) {
+                            return { ...cell, bombTimer: INITIAL_BOMB_TIMER };
+                        }
+                        return cell;
+                    })));
+                }
+
+                setGameState(GameState.PLAYING);
+                setIsGameOverAnimating(false);
+            };
+
+            const handleResetProgress = () => {
+                if(confirm("Вы уверены? Весь прогресс будет удален.")) {
+                    setPlayerState(INITIAL_PLAYER_STATE);
+                    localStorage.removeItem(STORAGE_KEY_PLAYER);
+                    localStorage.removeItem(STORAGE_KEY_HIGHSCORE(GameMode.CLASSIC));
+                    localStorage.removeItem(STORAGE_KEY_HIGHSCORE(GameMode.ADVENTURE));
+                    setBestScores({ [GameMode.CLASSIC]: 0, [GameMode.ADVENTURE]: 0 });
+                    alert("Прогресс сброшен.");
+                }
+            };
+
+            // Resize handler
+            useEffect(() => {
+                const handleResize = () => {
+                    if (gridRef.current) {
+                        const width = gridRef.current.clientWidth;
+                        setCellSize(width / GRID_SIZE);
+                    }
+                };
+                handleResize();
+                window.addEventListener('resize', handleResize);
+                return () => window.removeEventListener('resize', handleResize);
+            }, [gameState, activeModal]);
+
+            const canPlace = (shape, gx, gy, currentGrid) => {
+                for (let r = 0; r < shape.matrix.length; r++) {
+                    for (let c = 0; c < shape.matrix[r].length; c++) {
+                        if (shape.matrix[r][c] === 1) {
+                            const targetX = gx + c;
+                            const targetY = gy + r;
+                            if (
+                                targetX < 0 || targetX >= GRID_SIZE ||
+                                targetY < 0 || targetY >= GRID_SIZE ||
+                                currentGrid[targetY][targetX] !== null
+                            ) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                return true;
+            };
+
+            const checkGameOver = useCallback((currentGrid, currentDock) => {
+                if (clearingRows.length > 0 || clearingCols.length > 0) return false;
+
+                if (gameMode === GameMode.ADVENTURE) {
+                    for(let r=0; r<GRID_SIZE; r++){
+                        for(let c=0; c<GRID_SIZE; c++){
+                            const cell = currentGrid[r][c];
+                            if(cell?.isBomb && (cell.bombTimer !== undefined && cell.bombTimer <= 0)){
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                const availableShapes = currentDock.filter(b => b !== null);
+                if (availableShapes.length === 0) return false;
+
+                for (const shape of availableShapes) {
+                    for (let y = 0; y < GRID_SIZE; y++) {
+                        for (let x = 0; x < GRID_SIZE; x++) {
+                            if (canPlace(shape, x, y, currentGrid)) return false;
+                        }
+                    }
+                }
+                return true;
+            }, [gameMode, clearingRows, clearingCols]);
+
+            // Drag Handlers
+            const handleDragStart = (e, shape, index) => {
+                if (gameState !== GameState.PLAYING || isGameOverAnimating) return;
+                if (clearingRows.length > 0 || clearingCols.length > 0) return;
+                
+                e.preventDefault();
+                e.stopPropagation();
+                if(e.target.releasePointerCapture) {
+                    e.target.releasePointerCapture(e.pointerId);
+                }
+
+                const clientX = e.clientX;
+                const clientY = e.clientY;
+                
+                const shapeWidth = shape.matrix[0].length * cellSize;
+                const shapeHeight = shape.matrix.length * cellSize;
+                
+                setDragBlock({
+                    shape,
+                    index,
+                    startX: clientX,
+                    startY: clientY,
+                    offsetX: -shapeWidth / 2, 
+                    offsetY: -shapeHeight * 1.5,
+                });
+                setDragPos({ x: clientX, y: clientY });
+                soundManager.playPop();
+            };
+
+            useEffect(() => {
+                const handleMove = (e) => {
+                    if (dragBlock) {
+                        e.preventDefault();
+                        setDragPos({ x: e.clientX, y: e.clientY });
+                    }
+                };
+
+                const handleUp = (e) => {
+                    if (dragBlock) {
+                        e.preventDefault();
+                        dropBlock(e.clientX, e.clientY);
+                    }
+                };
+
+                if (dragBlock) {
+                    window.addEventListener('pointermove', handleMove);
+                    window.addEventListener('pointerup', handleUp);
+                }
+
+                return () => {
+                    window.removeEventListener('pointermove', handleMove);
+                    window.removeEventListener('pointerup', handleUp);
+                };
+            }, [dragBlock, grid, dockBlocks]);
+
+            const dropBlock = (x, y) => {
+                if (!dragBlock || !gridRef.current) return;
+                const rect = gridRef.current.getBoundingClientRect();
+                const visualX = x + dragBlock.offsetX;
+                const visualY = y + dragBlock.offsetY;
+                const relX = visualX - rect.left;
+                const relY = visualY - rect.top;
+                const gx = Math.round(relX / cellSize);
+                const gy = Math.round(relY / cellSize);
+
+                if (canPlace(dragBlock.shape, gx, gy, grid)) {
+                    const newGrid = grid.map(row => [...row]);
+                    let cellsPlaced = 0;
+
+                    dragBlock.shape.matrix.forEach((row, r) => {
+                        row.forEach((val, c) => {
+                            if (val === 1) {
+                                newGrid[gy + r][gx + c] = {
+                                    filled: true,
+                                    color: dragBlock.shape.color,
+                                    id: `${Date.now()}-${r}-${c}`,
+                                    isBomb: false
+                                };
+                                cellsPlaced++;
+                            }
+                        });
+                    });
+
+                    // Adventure Logic
+                    if (gameMode === GameMode.ADVENTURE && Math.random() < 0.2) {
+                        const possibleCoords = [];
+                        dragBlock.shape.matrix.forEach((row, r) => {
+                            row.forEach((val, c) => {
+                                if (val === 1) possibleCoords.push({r: gy + r, c: gx + c});
+                            });
+                        });
+                        if (possibleCoords.length > 0) {
+                            const rand = possibleCoords[Math.floor(Math.random() * possibleCoords.length)];
+                            const cell = newGrid[rand.r][rand.c];
+                            if (cell) {
+                                cell.isBomb = true;
+                                cell.bombTimer = INITIAL_BOMB_TIMER;
+                            }
+                        }
+                    }
+                    if (gameMode === GameMode.ADVENTURE) {
+                        for(let r=0; r<GRID_SIZE; r++){
+                            for(let c=0; c<GRID_SIZE; c++){
+                                const cell = newGrid[r][c];
+                                if (cell && cell.isBomb && cell.bombTimer !== undefined) {
+                                    cell.bombTimer -= 1;
+                                }
+                            }
+                        }
+                    }
+
+                    soundManager.playPop();
+                    const rowsToClear = [];
+                    const colsToClear = [];
+                    for (let r = 0; r < GRID_SIZE; r++) {
+                        if (newGrid[r].every(cell => cell !== null)) rowsToClear.push(r);
+                    }
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        if (newGrid.map(row => row[c]).every(cell => cell !== null)) colsToClear.push(c);
+                    }
+
+                    const totalLines = rowsToClear.length + colsToClear.length;
+                    const currentStyle = getCurrentStyle();
+                    const newDock = [...dockBlocks];
+                    newDock[dragBlock.index] = null;
+                    if (newDock.every(b => b === null)) {
+                        setDockBlocks([
+                            generateRandomBlock(currentStyle.palette), 
+                            generateRandomBlock(currentStyle.palette), 
+                            generateRandomBlock(currentStyle.palette)
+                        ]);
+                    } else {
+                        setDockBlocks(newDock);
+                    }
+
+                    setGrid(newGrid);
+                    let pointsGained = cellsPlaced * 10;
+
+                    if (totalLines > 0) {
+                        soundManager.playClear(totalLines);
+                        setClearingRows(rowsToClear);
+                        setClearingCols(colsToClear);
+                        
+                        const newCombo = comboCount + 1;
+                        setComboCount(newCombo);
+                        
+                        if (totalLines >= 3) setShakeClass('shake-heavy');
+                        else if (totalLines === 2) setShakeClass('shake-medium');
+                        else setShakeClass('shake-light');
+
+                        const texts = [];
+                        if (totalLines === 2) texts.push("ДВОЙНОЙ!");
+                        else if (totalLines === 3) texts.push("ТРОЙНОЙ!");
+                        else if (totalLines === 4) texts.push("ЧЕТВЕРНОЙ!");
+                        else if (totalLines === 5) texts.push("ПЯТЕРНОЙ!");
+                        else if (totalLines >= 6) texts.push("ЛЕГЕНДАРНО!");
+                        if (newCombo > 1) {
+                            texts.push(`КОМБО x${newCombo}`);
+                        }
+                        
+                        if (texts.length > 0) {
+                            setComboText({ text: texts.join('\n'), id: Date.now() });
+                            setTimeout(() => setComboText(null), 1200);
+                        }
+
+                        setTimeout(() => {
+                            setGrid(prevGrid => {
+                                const g = prevGrid.map(row => [...row]);
+                                rowsToClear.forEach(r => {
+                                    for(let c=0; c<GRID_SIZE; c++) g[r][c] = null;
+                                });
+                                colsToClear.forEach(c => {
+                                    for(let r=0; r<GRID_SIZE; r++) g[r][c] = null;
+                                });
+                                return g;
+                            });
+                            setClearingRows([]);
+                            setClearingCols([]);
+                            setShakeClass('');
+
+                            const lineScore = totalLines * 100 * (totalLines > 1 ? totalLines : 1);
+                            const comboBonus = (newCombo - 1) * 20;
+                            const totalTurnScore = cellsPlaced * 10 + lineScore + comboBonus;
+                            
+                            setScore(s => s + totalTurnScore);
+                            
+                            updateQuestProgress(QuestType.CLEAR_LINES, totalLines);
+                            updateQuestProgress(QuestType.SCORE_POINTS, totalTurnScore);
+                            setPlayerState(prev => ({
+                                ...prev,
+                                stats: { 
+                                    ...prev.stats, 
+                                    totalLinesCleared: prev.stats.totalLinesCleared + totalLines,
+                                    totalScore: prev.stats.totalScore + totalTurnScore
+                                }
+                            }));
+                        }, 300);
+
+                    } else {
+                        setComboCount(0);
+                        setScore(s => s + pointsGained);
+                        updateQuestProgress(QuestType.SCORE_POINTS, pointsGained);
+                        setPlayerState(prev => ({
+                            ...prev,
+                            stats: { ...prev.stats, totalScore: prev.stats.totalScore + pointsGained }
+                        }));
+                    }
+                }
+                setDragBlock(null);
+            };
+
+            useEffect(() => {
+                if (gameState !== GameState.PLAYING) return;
+                if (clearingRows.length > 0 || clearingCols.length > 0) return;
+                if (isGameOverAnimating) return;
+
+                if (checkGameOver(grid, dockBlocks)) {
+                    setIsGameOverAnimating(true);
+                    soundManager.playGameOver();
+                }
+            }, [grid, dockBlocks, gameState, checkGameOver, clearingRows, clearingCols, isGameOverAnimating]);
+
+            useEffect(() => {
+                if (isGameOverAnimating) {
+                    const timer = setTimeout(() => {
+                        setGameState(GameState.GAME_OVER);
+                    }, 1500);
+                    return () => clearTimeout(timer);
+                }
+            }, [isGameOverAnimating]);
+
+            // --- Action Handlers (Shop, Quests, Login) ---
+            const handleClaimDaily = async () => {
+                if (playerState.dailyRewardClaimed) return;
+                const online = await checkInternet();
+                if (!online) return;
+
+                soundManager.playClear(2); 
+                addTransaction(DAILY_LOGIN_REWARD, 'Ежедневный вход');
+                setPlayerState(prev => ({ ...prev, dailyRewardClaimed: true }));
+                setTimeout(() => setActiveModal('NONE'), 1000);
+            };
+
+            const handleClaimQuest = async (questId, reward) => {
+                const online = await checkInternet();
+                if (!online) return;
+
+                soundManager.playClear(1);
+                addTransaction(reward, 'Квест выполнен');
+                setPlayerState(prev => ({
+                    ...prev,
+                    dailyQuests: prev.dailyQuests.map(q => q.id === questId ? { ...q, claimed: true } : q)
+                }));
+            };
+
+            const handleBuyStyle = (style) => {
+                if (playerState.coins >= style.price && !playerState.inventory.includes(style.id)) {
+                    soundManager.playClick();
+                    addTransaction(-style.price, `Покупка: ${style.name}`);
+                    setPlayerState(prev => ({
+                        ...prev,
+                        inventory: [...prev.inventory, style.id]
+                    }));
+                }
+            };
+
+            const handleEquipStyle = (styleId) => {
+                soundManager.playClick();
+                setPlayerState(prev => ({
+                    ...prev,
+                    currentStyleId: styleId
+                }));
+            };
+
+
+            // --- Render Helpers ---
+
+            const renderGrid = () => {
+                let ghostInfo = null;
+                let previewRows = [];
+                let previewCols = [];
+
+                if (dragBlock && cellSize > 0 && gridRef.current && clearingRows.length === 0 && clearingCols.length === 0 && !isGameOverAnimating) {
+                    const rect = gridRef.current.getBoundingClientRect();
+                    const visualX = dragPos.x + dragBlock.offsetX;
+                    const visualY = dragPos.y + dragBlock.offsetY;
+                    const gx = Math.round((visualX - rect.left) / cellSize);
+                    const gy = Math.round((visualY - rect.top) / cellSize);
+                    
+                    if (canPlace(dragBlock.shape, gx, gy, grid)) {
+                        ghostInfo = { gx, gy, valid: true };
+                        const affectedRows = new Set();
+                        const affectedCols = new Set();
+                        const tempGrid = grid.map(r => [...r]);
+                        dragBlock.shape.matrix.forEach((row, r) => {
+                            row.forEach((val, c) => {
+                                if (val === 1) {
+                                    tempGrid[gy + r][gx + c] = { filled: true, color: 'temp' };
+                                    affectedRows.add(gy + r);
+                                    affectedCols.add(gx + c);
+                                }
+                            });
+                        });
+                        affectedRows.forEach(r => {
+                            if (tempGrid[r].every(cell => cell !== null)) previewRows.push(r);
+                        });
+                        affectedCols.forEach(c => {
+                            if (tempGrid.map(row => row[c]).every(cell => cell !== null)) previewCols.push(c);
+                        });
+                    }
+                }
+
+                const cells = [];
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        const cell = grid[r][c];
+                        const isClearing = clearingRows.includes(r) || clearingCols.includes(c);
+                        const isPreviewClearing = previewRows.includes(r) || previewCols.includes(c);
+                        
+                        let isGhost = false;
+                        let ghostColor = '';
+                        if (ghostInfo && ghostInfo.valid) {
+                            if (r >= ghostInfo.gy && r < ghostInfo.gy + dragBlock.shape.matrix.length) {
+                                const matrixR = r - ghostInfo.gy;
+                                if (c >= ghostInfo.gx && c < ghostInfo.gx + dragBlock.shape.matrix[0].length) {
+                                    const matrixC = c - ghostInfo.gx;
+                                    if (dragBlock.shape.matrix[matrixR][matrixC] === 1) {
+                                        isGhost = true;
+                                        ghostColor = dragBlock.shape.color;
+                                    }
+                                }
+                            }
+                        }
+
+                        const gameOverDelay = (r + c) * 0.05;
+                        const gameOverStyle = isGameOverAnimating ? {
+                            filter: 'grayscale(100%) brightness(0.4)',
+                            transform: 'scale(0.9)',
+                            transition: `all 0.5s ease-out ${gameOverDelay}s`
+                        } : {};
+
+                        cells.push(
+                            <div
+                                key={`${r}-${c}`}
+                                className={`relative border border-white/5 transition-all duration-75 
+                                    ${isClearing ? 'animate-clear z-20' : ''} 
+                                    ${isPreviewClearing ? 'shadow-[0_0_15px_rgba(255,255,255,0.7)] z-10 brightness-150 border-white/40' : ''}
+                                `}
+                                style={{
+                                    width: cellSize,
+                                    height: cellSize,
+                                    backgroundColor: cell 
+                                        ? cell.color 
+                                        : (isGhost ? `${ghostColor}40` : 'transparent'),
+                                    ...gameOverStyle
+                                }}
+                            >
+                                {cell && !isClearing && <div className="absolute inset-0 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3)] pointer-events-none" />}
+                                
+                                {isPreviewClearing && (
+                                    <div className="absolute inset-0 bg-white/40 pointer-events-none animate-pulse" />
+                                )}
+
+                                {cell?.isBomb && (
+                                    <div className="absolute inset-0 flex items-center justify-center animate-pulse z-10">
+                                        <Bomb size={cellSize * 0.6} className="text-white drop-shadow-md" />
+                                        <span className="absolute text-white font-bold text-xs mt-1 drop-shadow-md">{cell.bombTimer}</span>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    }
+                }
+                return cells;
+            };
+
+            const getDockScale = (block) => {
+                if (!cellSize) return 0.5;
+                const shapeWidth = block.matrix[0].length * cellSize;
+                const maxSlotWidth = (window.innerWidth - 32) / 3;
+                const scale = Math.min(0.55, (maxSlotWidth - 10) / shapeWidth);
+                return scale;
+            };
+
+
+            if (gameState === GameState.MENU) {
+                return (
+                    <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-white p-4 space-y-8 relative overflow-hidden">
+                        
+                        {/* Currency Display */}
+                        <button 
+                            onClick={() => setActiveModal('HISTORY')}
+                            className="absolute top-4 right-4 flex items-center space-x-2 bg-slate-800/80 px-4 py-2 rounded-full shadow-lg border border-slate-700 hover:scale-105 active:scale-95 transition-all z-20"
+                        >
+                            <Coins size={20} className="text-yellow-400" />
+                            <span className="font-bold font-mono">{playerState.coins}</span>
+                        </button>
+
+                        {/* Sidebar Buttons (Left) */}
+                        <div className="absolute left-4 top-24 flex flex-col space-y-4 z-20">
+                            {/* Daily Login */}
+                            <button 
+                                onClick={() => setActiveModal('DAILY')}
+                                className="relative p-3 bg-slate-800 rounded-xl border border-slate-700 shadow-lg hover:scale-110 transition-transform group"
+                            >
+                                <Calendar size={24} className={playerState.dailyRewardClaimed ? "text-slate-400" : "text-green-400 animate-pulse"} />
+                                {!playerState.dailyRewardClaimed && (
+                                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-bounce" />
+                                )}
+                                <span className="absolute left-full ml-2 px-2 py-1 bg-black/80 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                    Ежедневный вход
+                                </span>
+                            </button>
+
+                            {/* Quests */}
+                            <button 
+                                onClick={() => setActiveModal('QUESTS')}
+                                className="relative p-3 bg-slate-800 rounded-xl border border-slate-700 shadow-lg hover:scale-110 transition-transform group"
+                            >
+                                <CheckCircle size={24} className="text-blue-400" />
+                                {playerState.dailyQuests.some(q => q.current >= q.target && !q.claimed) && (
+                                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-bounce" />
+                                )}
+                                <span className="absolute left-full ml-2 px-2 py-1 bg-black/80 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                    Квесты
+                                </span>
+                            </button>
+
+                            {/* Shop */}
+                            <button 
+                                onClick={() => setActiveModal('SHOP')}
+                                className="p-3 bg-slate-800 rounded-xl border border-slate-700 shadow-lg hover:scale-110 transition-transform group"
+                            >
+                                <ShoppingCart size={24} className="text-purple-400" />
+                                <span className="absolute left-full ml-2 px-2 py-1 bg-black/80 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                    Магазин
+                                </span>
+                            </button>
+                        </div>
+
+                        <h1 className="text-6xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-br from-cyan-400 to-purple-600 drop-shadow-lg text-center leading-tight z-10">
+                            BLOCK<br/>BLAST
+                        </h1>
+                        <div className="space-y-4 w-full max-w-xs z-10">
+                            <button 
+                                onClick={() => startGame(GameMode.CLASSIC)}
+                                className="w-full relative overflow-hidden py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl text-xl font-bold shadow-lg shadow-blue-500/20 transform hover:scale-105 transition-all"
+                            >
+                                <div className="absolute top-1 right-2 text-[10px] text-blue-200 opacity-80">Рекорд: {bestScores[GameMode.CLASSIC]}</div>
+                                Классика
+                            </button>
+                            <button 
+                                onClick={() => startGame(GameMode.ADVENTURE)}
+                                className="w-full relative overflow-hidden py-4 bg-red-600 hover:bg-red-500 rounded-2xl text-xl font-bold shadow-lg shadow-red-500/20 transform hover:scale-105 transition-all flex items-center justify-center gap-2"
+                            >
+                                <div className="absolute top-1 right-2 text-[10px] text-red-200 opacity-80">Рекорд: {bestScores[GameMode.ADVENTURE]}</div>
+                                <Bomb size={24} /> Приключение
+                            </button>
+                        </div>
+
+                        {/* Debug / Reset Button */}
+                        <button 
+                            onClick={handleResetProgress}
+                            className="absolute bottom-4 text-xs text-slate-600 hover:text-slate-400 flex items-center gap-1"
+                        >
+                            <Trash2 size={12} /> Сброс прогресса (Debug)
+                        </button>
+
+                        {/* --- MODALS --- */}
+
+                        {/* DAILY LOGIN MODAL */}
+                        {activeModal === 'DAILY' && (
+                            <div className="absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center p-4">
+                                <div className="bg-slate-800 p-6 rounded-3xl w-full max-w-sm border border-slate-700 shadow-2xl relative">
+                                    <button onClick={() => setActiveModal('NONE')} className="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
+                                    <h2 className="text-2xl font-bold text-center mb-6 flex items-center justify-center gap-2">
+                                        <Calendar className="text-green-400" /> Ежедневная награда
+                                    </h2>
+                                    
+                                    <div className="flex flex-col items-center space-y-6">
+                                        <div className="relative">
+                                            <div className="absolute inset-0 bg-yellow-400/20 blur-xl rounded-full" />
+                                            <Coins size={80} className="text-yellow-400 relative z-10 drop-shadow-lg" />
+                                        </div>
+                                        <div className="text-4xl font-black text-white">+{DAILY_LOGIN_REWARD}</div>
+                                        
+                                        <button 
+                                            disabled={playerState.dailyRewardClaimed || isCheckingNet}
+                                            onClick={handleClaimDaily}
+                                            className={`w-full py-3 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2 ${
+                                                playerState.dailyRewardClaimed 
+                                                ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                                                : 'bg-green-600 hover:bg-green-500 text-white shadow-lg hover:scale-105'
+                                            }`}
+                                        >
+                                            {isCheckingNet ? <Loader2 className="animate-spin" /> : null}
+                                            {playerState.dailyRewardClaimed ? 'Уже получено' : 'Получить'}
+                                        </button>
+                                        {netError && <div className="text-red-400 text-sm animate-pulse">{netError}</div>}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* QUESTS MODAL */}
+                        {activeModal === 'QUESTS' && (
+                            <div className="absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center p-4">
+                                <div className="bg-slate-800 p-6 rounded-3xl w-full max-w-sm border border-slate-700 shadow-2xl relative">
+                                    <button onClick={() => setActiveModal('NONE')} className="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
+                                    <h2 className="text-2xl font-bold text-center mb-6 flex items-center justify-center gap-2">
+                                        <CheckCircle className="text-blue-400" /> Ежедневные квесты
+                                    </h2>
+                                    
+                                    <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+                                        {playerState.dailyQuests.map(quest => (
+                                            <div key={quest.id} className="bg-slate-900 p-4 rounded-xl border border-slate-700">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div className="text-sm font-bold text-slate-200">{quest.description}</div>
+                                                    <div className="flex items-center gap-1 text-yellow-400 font-mono font-bold text-sm">
+                                                        <Coins size={12} /> {quest.reward}
+                                                    </div>
+                                                </div>
+                                                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-3">
+                                                    <div 
+                                                        className="bg-blue-500 h-full transition-all duration-500"
+                                                        style={{ width: `${Math.min(100, (quest.current / quest.target) * 100)}%` }}
+                                                    />
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs text-slate-500">{quest.current} / {quest.target}</span>
+                                                    <button
+                                                        disabled={quest.current < quest.target || quest.claimed || isCheckingNet}
+                                                        onClick={() => handleClaimQuest(quest.id, quest.reward)}
+                                                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                                                            quest.claimed 
+                                                            ? 'bg-slate-800 text-slate-500' 
+                                                            : quest.current >= quest.target
+                                                                ? 'bg-yellow-500 text-slate-900 hover:bg-yellow-400 hover:scale-105 shadow-md'
+                                                                : 'bg-slate-700 text-slate-500'
+                                                        }`}
+                                                    >
+                                                        {isCheckingNet && quest.current >= quest.target && !quest.claimed ? <Loader2 size={12} className="animate-spin" /> : null}
+                                                        {quest.claimed ? 'Получено' : 'Забрать'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {netError && <div className="text-red-400 text-center mt-4 text-sm animate-pulse">{netError}</div>}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* SHOP MODAL */}
+                        {activeModal === 'SHOP' && (
+                            <div className="absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center p-4">
+                                <div className="bg-slate-800 p-6 rounded-3xl w-full max-w-sm border border-slate-700 shadow-2xl relative h-[80vh] flex flex-col">
+                                    <button onClick={() => setActiveModal('NONE')} className="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
+                                    <div className="flex justify-between items-center mb-6 pr-8">
+                                        <h2 className="text-2xl font-bold flex items-center gap-2">
+                                            <ShoppingCart className="text-purple-400" /> Магазин
+                                        </h2>
+                                        <div className="flex items-center gap-1 bg-slate-900 px-3 py-1 rounded-full">
+                                            <Coins size={16} className="text-yellow-400" />
+                                            <span className="font-mono text-sm">{playerState.coins}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                                        {Object.values(STYLES).map(style => {
+                                            const isOwned = playerState.inventory.includes(style.id);
+                                            const isEquipped = playerState.currentStyleId === style.id;
+                                            
+                                            return (
+                                                <div key={style.id} className={`bg-slate-900 p-4 rounded-xl border ${isEquipped ? 'border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]' : 'border-slate-700'} relative overflow-hidden`}>
+                                                    <div className="flex gap-4">
+                                                        {/* Preview Box */}
+                                                        <div className="w-20 h-20 bg-slate-800 rounded-lg flex items-center justify-center p-2 relative">
+                                                            {/* Mini Grid Representation */}
+                                                            <div className="grid grid-cols-2 gap-1 w-full h-full">
+                                                                <div className="rounded-sm" style={{ backgroundColor: style.palette[0] }}></div>
+                                                                <div className="rounded-sm" style={{ backgroundColor: style.palette[2] }}></div>
+                                                                <div className="rounded-sm" style={{ backgroundColor: style.palette[5] }}></div>
+                                                                <div className="rounded-sm" style={{ backgroundColor: style.palette[7] }}></div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className="flex-1 flex flex-col justify-between">
+                                                            <div>
+                                                                <h3 className="font-bold text-white">{style.name}</h3>
+                                                                <p className="text-xs text-slate-400 leading-tight mt-1">{style.description}</p>
+                                                            </div>
+                                                            
+                                                            <div className="mt-3 flex justify-end">
+                                                                {isOwned ? (
+                                                                    <button 
+                                                                        onClick={() => handleEquipStyle(style.id)}
+                                                                        disabled={isEquipped}
+                                                                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                                                            isEquipped 
+                                                                                ? 'bg-green-900/50 text-green-400 border border-green-500/50 cursor-default'
+                                                                                : 'bg-slate-700 hover:bg-slate-600 text-white'
+                                                                        }`}
+                                                                    >
+                                                                        {isEquipped ? 'Выбрано' : 'Выбрать'}
+                                                                    </button>
+                                                                ) : (
+                                                                    <button 
+                                                                        onClick={() => handleBuyStyle(style)}
+                                                                        disabled={playerState.coins < style.price}
+                                                                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                                                                            playerState.coins >= style.price
+                                                                            ? 'bg-yellow-600 hover:bg-yellow-500 text-white shadow-md'
+                                                                            : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                                                                        }`}
+                                                                    >
+                                                                        {playerState.coins < style.price && <Lock size={12} />}
+                                                                        <Coins size={12} className={playerState.coins >= style.price ? "text-yellow-200" : ""} />
+                                                                        {style.price}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TRANSACTION HISTORY MODAL */}
+                        {activeModal === 'HISTORY' && (
+                            <div className="absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center p-4">
+                                <div className="bg-slate-800 p-6 rounded-3xl w-full max-w-sm border border-slate-700 shadow-2xl relative h-[70vh] flex flex-col">
+                                    <button onClick={() => setActiveModal('NONE')} className="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
+                                    <h2 className="text-2xl font-bold flex items-center gap-2 mb-4">
+                                        <History className="text-slate-400" /> История
+                                    </h2>
+                                    
+                                    <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                                        {playerState.transactions.length === 0 && (
+                                            <div className="text-center text-slate-500 mt-10">История пуста</div>
+                                        )}
+                                        {playerState.transactions.map((tx) => (
+                                            <div key={tx.id} className="bg-slate-900 p-3 rounded-xl border border-slate-700 flex justify-between items-center">
+                                                <div>
+                                                    <div className="font-bold text-sm text-slate-200">{tx.description}</div>
+                                                    <div className="text-xs text-slate-500">{new Date(tx.date).toLocaleTimeString()}</div>
+                                                </div>
+                                                <div className={`font-mono font-bold ${tx.type === 'EARN' ? 'text-green-400' : 'text-red-400'}`}>
+                                                    {tx.type === 'EARN' ? '+' : '-'}{tx.amount}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                    </div>
+                );
+            }
+
+            return (
+                <div className={`flex flex-col h-screen bg-slate-900 text-white overflow-hidden ${shakeClass}`}>
+                    
+                    {/* Header */}
+                    <div className="relative flex items-center justify-center p-4 pt-6 safe-top bg-slate-800/50 backdrop-blur-sm h-24">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 hidden sm:flex flex-col">
+                            <span className="text-xs text-slate-400 uppercase font-bold tracking-wider">Рекорд</span>
+                            <span className="text-xl font-bold font-mono leading-none">{Math.max(score, bestScores[gameMode])}</span>
+                        </div>
+
+                        <div className="flex flex-col items-center z-10">
+                            <span className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Счёт</span>
+                            <RollingScore score={score} />
+                        </div>
+                        
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                            <button onClick={togglePause} className="p-3 bg-slate-700 rounded-full hover:bg-slate-600 transition-colors">
+                                <Pause size={24} fill="currentColor" className="text-slate-200"/>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Grid Container */}
+                    <div className="flex-1 flex items-center justify-center p-4 relative">
+                        <div 
+                            ref={gridRef}
+                            className="relative bg-slate-800 rounded-lg shadow-2xl overflow-hidden border-2 border-slate-700"
+                            style={{
+                                width: '100%',
+                                maxWidth: '500px',
+                                aspectRatio: '1/1',
+                                display: 'grid',
+                                gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`,
+                                gridTemplateRows: `repeat(${GRID_SIZE}, 1fr)`,
+                            }}
+                        >
+                            {renderGrid()}
+                            
+                            {comboText && !isGameOverAnimating && (
+                                <div key={comboText.id} className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 px-4">
+                                    <div className="text-4xl sm:text-5xl font-black text-yellow-400 drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)] text-popup stroke-black text-center whitespace-pre-line leading-tight">
+                                        {comboText.text}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Dock Area */}
+                    <div className="h-48 pb-8 px-4 flex items-center justify-center space-x-2 bg-slate-800/30">
+                        {dockBlocks.map((block, i) => (
+                            <div key={i} className="flex-1 flex items-center justify-center h-full relative overflow-hidden">
+                                {block && (
+                                    <div 
+                                        className={`transition-opacity duration-200 ${dragBlock?.index === i ? 'opacity-0' : 'opacity-100'}`}
+                                        style={{ 
+                                            transform: `scale(${getDockScale(block)})`,
+                                            transformOrigin: 'center center'
+                                        }} 
+                                    >
+                                        <Block 
+                                            shape={block} 
+                                            size={cellSize || 40}
+                                            onPointerDown={(e) => handleDragStart(e, block, i)}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Dragged Block Layer */}
+                    {dragBlock && (
+                        <div 
+                            className="fixed pointer-events-none z-50 will-change-transform"
+                            style={{
+                                left: 0,
+                                top: 0,
+                                transform: `translate(${dragPos.x + dragBlock.offsetX}px, ${dragPos.y + dragBlock.offsetY}px)`
+                            }}
+                        >
+                            <Block shape={dragBlock.shape} size={cellSize} className="opacity-90 drop-shadow-2xl scale-110" />
+                        </div>
+                    )}
+
+                    {/* Paused Modal */}
+                    {gameState === GameState.PAUSED && (
+                        <div className="absolute inset-0 z-50 bg-slate-900/90 backdrop-blur-md flex flex-col items-center justify-center space-y-6">
+                            <h2 className="text-4xl font-black text-white">ПАУЗА</h2>
+                            <button onClick={togglePause} className="p-6 bg-green-500 rounded-full shadow-lg hover:scale-110 transition-transform">
+                                <Play size={40} fill="currentColor" />
+                            </button>
+                            <div className="flex space-x-4">
+                                <button onClick={handleRestart} className="p-4 bg-blue-600 rounded-full hover:bg-blue-500 shadow-lg transition-transform hover:scale-105">
+                                    <RotateCcw size={24} />
+                                </button>
+                                <button onClick={toggleMute} className="p-4 bg-slate-700 rounded-full hover:bg-slate-600">
+                                    {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                                </button>
+                                <button onClick={handleReturnToMenu} className="p-4 bg-slate-700 rounded-full hover:bg-slate-600">
+                                    <Home size={24} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Game Over Modal */}
+                    {gameState === GameState.GAME_OVER && (
+                        <div className="absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center space-y-8 animate-in fade-in duration-300">
+                            <div className="text-center space-y-2">
+                                <h2 className="text-5xl font-black text-red-500 drop-shadow-lg leading-tight">ИГРА<br/>ОКОНЧЕНА</h2>
+                                <p className="text-slate-400 text-lg">Повезет в следующий раз!</p>
+                            </div>
+                            
+                            <div className="bg-slate-800 p-6 rounded-2xl w-64 text-center shadow-xl border border-slate-700 relative overflow-hidden">
+                                <div className="text-xs uppercase text-slate-500 font-bold mb-1">Итоговый счёт</div>
+                                <div className="text-4xl font-mono font-bold text-white mb-2">{score}</div>
+                                
+                                <div className="flex items-center justify-center gap-1 text-yellow-400 font-mono text-sm bg-yellow-400/10 py-1 rounded-lg mb-4">
+                                    <Coins size={14} /> 
+                                    +{calculatePendingCoins(score)}
+                                </div>
+                                
+                                {score >= bestScores[gameMode] && score > 0 && (
+                                    <div className="inline-block bg-yellow-500/20 text-yellow-400 px-3 py-1 rounded-full text-sm font-bold animate-pulse">
+                                        НОВЫЙ РЕКОРД!
+                                    </div>
+                                )}
+                                <div className="mt-2 text-xs text-slate-500">Лучший: {bestScores[gameMode]}</div>
+                            </div>
+
+                            <div className="flex flex-col space-y-3 w-64">
+                                {/* Revive Button */}
+                                <button
+                                    onClick={handleRevive}
+                                    disabled={playerState.coins < REVIVE_COST}
+                                    className={`w-full py-3 rounded-xl text-lg font-bold shadow-lg transform transition-all flex items-center justify-center gap-2 ${
+                                        playerState.coins >= REVIVE_COST 
+                                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:scale-105 text-white' 
+                                        : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                                    }`}
+                                >
+                                    <Heart size={20} className={playerState.coins >= REVIVE_COST ? "animate-pulse" : ""} />
+                                    <span className="flex-1 text-left">Продолжить</span>
+                                    <div className="flex items-center gap-1 text-sm bg-black/20 px-2 py-0.5 rounded">
+                                        <Coins size={12} /> {REVIVE_COST}
+                                    </div>
+                                </button>
+
+                                <button 
+                                    onClick={handleRestart}
+                                    className="w-full py-4 bg-white text-slate-900 hover:bg-slate-200 rounded-xl text-lg font-bold shadow-lg transform hover:scale-105 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <RotateCcw size={20} /> Заново
+                                </button>
+                                <button 
+                                    onClick={handleReturnToMenu}
+                                    className="w-full py-4 bg-slate-800 hover:bg-slate-700 rounded-xl text-lg font-bold shadow-lg transform hover:scale-105 transition-all"
+                                >
+                                    Меню
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(
+            <React.StrictMode>
+                <App />
+            </React.StrictMode>
+        );
+    </script>
+</body>
+  </html>
