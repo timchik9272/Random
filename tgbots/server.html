@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Remote Control WebRTC</title>
+    <style>
+        body { font-family: sans-serif; background: #222; color: #fff; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; }
+        
+        /* Видео контейнер */
+        #media { position: relative; width: 100%; max-width: 1280px; border-bottom: 2px solid #444; cursor: crosshair; }
+        video { width: 100%; display: block; background: #000; }
+        
+        /* Панель управления */
+        .controls { padding: 10px; width: 100%; max-width: 600px; box-sizing: border-box; }
+        
+        /* Сетка кнопок */
+        .grid-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+        .grid-arrows { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; max-width: 200px; margin: 0 auto 20px auto; }
+        
+        button { padding: 15px; font-size: 16px; background: #444; color: white; border: none; border-radius: 8px; active: background: #666; cursor: pointer; touch-action: manipulation; }
+        button:active { background: #007bff; }
+        
+        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        input { flex: 1; padding: 10px; border-radius: 5px; border: none; }
+        
+        .status { margin-top: 10px; color: #aaa; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+<div id="media">
+    <video id="video" autoplay playsinline muted></video>
+</div>
+
+<div class="controls">
+    <div class="input-group">
+        <input type="text" id="TextInput" placeholder="Введите текст (RU/EN)...">
+        <button onclick="sendText()">Отправить</button>
+    </div>
+
+    <div class="grid-arrows">
+        <div></div>
+        <button onclick="sendKey('up')">⬆️</button>
+        <div></div>
+        <button onclick="sendKey('left')">⬅️</button>
+        <button onclick="sendKey('down')">⬇️</button>
+        <button onclick="sendKey('right')">➡️</button>
+    </div>
+
+    <div class="grid-keys">
+        <button onclick="sendKey('enter')">Enter</button>
+        <button onclick="sendKey('backspace')">Bksp</button>
+        <button onclick="sendKey('space')">Space</button>
+        <button onclick="sendKey('esc')">Esc</button>
+        <button onclick="sendKey('tab')">Tab</button>
+        <button onclick="sendKey('win')">Win</button>
+        <button style="background:#007bff" onclick="sendClick()">CLICK</button>
+    </div>
+
+    <button onclick="start()" style="width:100%; background: #28a745; margin-top:10px;">🔴 ПОДКЛЮЧИТЬСЯ (START)</button>
+    <div class="status" id="status">Отключено</div>
+</div>
+
+<script>
+    const pc = new RTCPeerConnection();
+    const videoEl = document.getElementById('video');
+
+    // 1. Запуск WebRTC
+    async function start() {
+        document.getElementById('status').innerText = "Подключение...";
+        
+        // Получаем видео треки
+        pc.addTransceiver('video', {direction: 'recvonly'});
+        
+        // Создаем offer
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        // Ждем пока соберутся ICE кандидаты
+        await new Promise((resolve) => {
+            if (pc.iceGatheringState === 'complete') {
+                resolve();
+            } else {
+                const checkState = () => {
+                    if (pc.iceGatheringState === 'complete') {
+                        pc.removeEventListener('icegatheringstatechange', checkState);
+                        resolve();
+                    }
+                };
+                pc.addEventListener('icegatheringstatechange', checkState);
+            }
+        });
+
+        // Отправляем offer на сервер
+        const response = await fetch('/offer', {
+            method: 'POST',
+            body: JSON.stringify({
+                sdp: pc.localDescription.sdp,
+                type: pc.localDescription.type,
+            }),
+            headers: {'Content-Type': 'application/json'}
+        });
+
+        // Получаем answer
+        const answer = await response.json();
+        await pc.setRemoteDescription(answer);
+        document.getElementById('status').innerText = "Подключено! Нажмите на видео для клика.";
+    }
+
+    // При получении потока — вставляем в <video>
+    pc.ontrack = function(evt) {
+        if (evt.track.kind === 'video') {
+            videoEl.srcObject = evt.streams[0];
+        }
+    };
+
+    // 2. Управление МЫШЬЮ
+    // Логика: при нажатии на видео, координаты нормализуются (0.0 - 1.0) и отправляются серверу
+    videoEl.addEventListener('click', (e) => {
+        const rect = videoEl.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / rect.width;
+        const y = (e.clientY - rect.top) / rect.height;
+        
+        // Сначала двигаем
+        fetch('/control', {
+            method: 'POST',
+            body: JSON.stringify({ type: 'mousemove', x: x, y: y }),
+            headers: {'Content-Type': 'application/json'}
+        });
+        
+        // Потом кликаем (через небольшую задержку, чтобы мышь успела доехать)
+        setTimeout(() => {
+            fetch('/control', {
+                method: 'POST',
+                body: JSON.stringify({ type: 'click' }),
+                headers: {'Content-Type': 'application/json'}
+            });
+        }, 100);
+    });
+
+    // 3. Отправка клавиш
+    function sendKey(keyName) {
+        fetch('/control', {
+            method: 'POST',
+            body: JSON.stringify({ type: 'keypress', key: keyName }),
+            headers: {'Content-Type': 'application/json'}
+        });
+    }
+
+    function sendClick() {
+        fetch('/control', {
+            method: 'POST',
+            body: JSON.stringify({ type: 'click' }),
+            headers: {'Content-Type': 'application/json'}
+        });
+    }
+
+    // 4. Отправка текста
+    function sendText() {
+        const text = document.getElementById('TextInput').value;
+        if (!text) return;
+        fetch('/control', {
+            method: 'POST',
+            body: JSON.stringify({ type: 'text', text: text }),
+            headers: {'Content-Type': 'application/json'}
+        });
+        document.getElementById('TextInput').value = '';
+    }
+</script>
+
+</body>
+</html>
