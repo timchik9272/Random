@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Snowman VR Battle</title>
+    
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/webvr-polyfill@latest/build/webvr-polyfill.min.js"></script>
+
+    <script>
+        // === НАСТРОЙКИ (МОЖНО МЕНЯТЬ) ===
+        const SETTINGS = {
+            // Время в миллисекундах, которое нужно держать палец, чтобы начать идти.
+            // Если вы хотите 8 секунд, поставьте здесь 8000.
+            // Сейчас стоит 500 (полсекунды), чтобы было удобно играть.
+            WALK_DELAY: 500, 
+            
+            // Скорость игрока
+            WALK_SPEED: 3.0,
+            
+            // Как часто появляются враги (мс)
+            SPAWN_RATE: 3000 
+        };
+
+        // Запуск полифила для совместимости
+        window.polyfill = new WebVRPolyfill();
+
+        // Глобальные списки
+        let enemies = [];
+        let snowballs = [];
+        let isGameOver = false;
+
+        // --- КОМПОНЕНТ ИГРОКА (Движение + Стрельба) ---
+        AFRAME.registerComponent('player-mode', {
+            init: function () {
+                this.isHolding = false;
+                this.touchTime = 0;
+                this.isWalking = false;
+
+                // Функция начала нажатия
+                const startPress = (e) => {
+                    if (isGameOver) return;
+                    this.isHolding = true;
+                    this.touchTime = new Date().getTime();
+                    this.isWalking = false; // Пока не идем, ждем таймер
+                };
+
+                // Функция окончания нажатия
+                const endPress = (e) => {
+                    if (isGameOver) {
+                        location.reload(); // Рестарт при клике после смерти
+                        return;
+                    }
+
+                    const releaseTime = new Date().getTime();
+                    const duration = releaseTime - this.touchTime;
+
+                    this.isHolding = false;
+                    this.isWalking = false;
+
+                    // Если нажатие было короче, чем задержка ходьбы -> это ВЫСТРЕЛ
+                    if (duration < SETTINGS.WALK_DELAY) {
+                        shootSnowball(this.el.sceneEl);
+                    }
+                };
+
+                // Слушаем и тачскрин, и мышь
+                window.addEventListener('mousedown', startPress);
+                window.addEventListener('touchstart', startPress);
+                
+                window.addEventListener('mouseup', endPress);
+                window.addEventListener('touchend', endPress);
+            },
+            tick: function (time, timeDelta) {
+                if (isGameOver) return;
+
+                // Логика ходьбы с задержкой
+                if (this.isHolding) {
+                    const holdDuration = new Date().getTime() - this.touchTime;
+                    
+                    // Если держим дольше указанного времени - начинаем идти
+                    if (holdDuration > SETTINGS.WALK_DELAY) {
+                        this.movePlayer(timeDelta);
+                    }
+                }
+            },
+            movePlayer: function(timeDelta) {
+                const camera = this.el.sceneEl.camera;
+                if (!camera) return;
+
+                const direction = new THREE.Vector3();
+                camera.getWorldDirection(direction);
+                direction.y = 0; // Не летим в небо
+                direction.normalize();
+
+                const speed = SETTINGS.WALK_SPEED * (timeDelta / 1000);
+                const pos = this.el.getAttribute('position');
+
+                this.el.setAttribute('position', {
+                    x: pos.x + direction.x * speed,
+                    y: pos.y,
+                    z: pos.z + direction.z * speed
+                });
+            }
+        });
+
+        // --- ФУНКЦИЯ ВЫСТРЕЛА ---
+        function shootSnowball(scene) {
+            const camera = scene.camera;
+            if(!camera) return;
+
+            const ball = document.createElement('a-sphere');
+            ball.setAttribute('radius', '0.1');
+            ball.setAttribute('color', '#E0F7FA');
+            
+            // Старт от позиции камеры
+            const pos = new THREE.Vector3();
+            camera.getWorldPosition(pos);
+            pos.y -= 0.2; // Чуть ниже глаз
+            
+            // Направление
+            const dir = new THREE.Vector3();
+            camera.getWorldDirection(dir);
+            dir.normalize();
+            
+            // Смещаем чуть вперед, чтобы не застрял в голове
+            pos.addScaledVector(dir, 0.5);
+            
+            ball.setAttribute('position', pos);
+            
+            // Данные для полета
+            ball.velocity = dir;
+            ball.speed = 15;
+            ball.lifeTime = 0;
+
+            scene.appendChild(ball);
+            snowballs.push(ball);
+        }
+
+        // --- МЕНЕДЖЕР ИГРЫ (Враги и Столкновения) ---
+        AFRAME.registerComponent('game-loop', {
+            init: function() {
+                this.spawnTimer = 0;
+            },
+            tick: function(time, timeDelta) {
+                if(isGameOver) return;
+
+                // 1. Спавн врагов
+                this.spawnTimer += timeDelta;
+                if(this.spawnTimer > SETTINGS.SPAWN_RATE) {
+                    this.spawnEnemy();
+                    this.spawnTimer = 0;
+                }
+
+                // 2. Движение снеговиков
+                const playerPos = document.getElementById('player-rig').getAttribute('position');
+                
+                enemies.forEach((enemy, index) => {
+                    if(!enemy.el.parentNode) return;
+
+                    const enemyPos = enemy.el.getAttribute('position');
+                    
+                    // Расстояние до игрока
+                    const dx = playerPos.x - enemyPos.x;
+                    const dz = playerPos.z - enemyPos.z;
+                    const dist = Math.sqrt(dx*dx + dz*dz);
+
+                    if(dist < 1.0) {
+                        triggerGameOver();
+                    }
+
+                    // Поворот на игрока и движение
+                    enemy.el.object3D.lookAt(playerPos.x, 0, playerPos.z);
+                    enemy.el.object3D.translateZ(1.5 * (timeDelta/1000));
+                });
+
+                // 3. Полет снежков и убийство врагов
+                snowballs.forEach((ball, bIndex) => {
+                    if(!ball.parentNode) return;
+                    
+                    ball.lifeTime += timeDelta;
+                    if(ball.lifeTime > 2000) { // Удалить через 2 сек
+                        ball.parentNode.removeChild(ball);
+                        snowballs.splice(bIndex, 1);
+                        return;
+                    }
+
+                    // Движение
+                    const currentPos = ball.object3D.position;
+                    currentPos.addScaledVector(ball.velocity, ball.speed * (timeDelta/1000));
+                    ball.setAttribute('position', currentPos);
+
+                    // Проверка попаданий
+                    for(let i=0; i<enemies.length; i++) {
+                        let enemy = enemies[i];
+                        let enemyPos = enemy.el.object3D.position;
+                        
+                        if(currentPos.distanceTo(enemyPos) < 1.0) {
+                            // Убит
+                            enemy.el.parentNode.removeChild(enemy.el);
+                            ball.parentNode.removeChild(ball);
+                            
+                            enemies.splice(i, 1);
+                            snowballs.splice(bIndex, 1);
+                            break;
+                        }
+                    }
+                });
+            },
+            spawnEnemy: function() {
+                const angle = Math.random() * Math.PI * 2;
+                const r = 10 + Math.random() * 5;
+                const x = Math.cos(angle) * r;
+                const z = Math.sin(angle) * r;
+                
+                const rigPos = document.getElementById('player-rig').getAttribute('position');
+                
+                const wrapper = document.createElement('a-entity');
+                wrapper.setAttribute('position', {
+                    x: rigPos.x + x,
+                    y: 0,
+                    z: rigPos.z + z
+                });
+
+                // Модель снеговика
+                wrapper.innerHTML = `
+                    <a-sphere position="0 0.5 0" radius="0.6" color="white"></a-sphere>
+                    <a-sphere position="0 1.4 0" radius="0.45" color="white"></a-sphere>
+                    <a-sphere position="0 2.0 0" radius="0.3" color="white"></a-sphere>
+                    <a-sphere position="-0.15 2.05 0.25" radius="0.05" color="#800000"></a-sphere>
+                    <a-sphere position="0.15 2.05 0.25" radius="0.05" color="#800000"></a-sphere>
+                    <a-cone position="0 2.0 0.3" rotation="90 0 0" radius-bottom="0.05" height="0.2" color="orange"></a-cone>
+                    <a-entity class="enemy-tag"></a-entity>
+                `;
+
+                this.el.sceneEl.appendChild(wrapper);
+                enemies.push({el: wrapper});
+            }
+        });
+
+        function triggerGameOver() {
+            if(isGameOver) return;
+            isGameOver = true;
+            document.getElementById('game-over-text').setAttribute('visible', 'true');
+            document.getElementById('red-screen').setAttribute('visible', 'true');
+        }
+
+    </script>
+</head>
+<body>
+    <a-scene game-loop vr-mode-ui="enabled: true">
+        
+        <a-assets>
+            <img id="ground" src="https://cdn.aframe.io/a-painter/images/floor.jpg" crossorigin="anonymous">
+        </a-assets>
+
+        <a-sky color="#87CEEB"></a-sky>
+        <a-plane position="0 0 0" rotation="-90 0 0" width="200" height="200" color="#FFF"></a-plane>
+
+        <a-entity id="player-rig" position="0 1.6 0" player-mode>
+            <a-camera look-controls="pointerLockEnabled: false">
+                <a-cursor color="red" scale="0.5 0.5 0.5" position="0 0 -1" opacity="0.7"></a-cursor>
+                
+                <a-plane id="red-screen" position="0 0 -0.1" width="5" height="5" color="red" opacity="0.5" visible="false" transparent="true"></a-plane>
+                <a-text id="game-over-text" value="GAME OVER" align="center" position="0 0 -0.5" scale="2 2 2" color="black" visible="false"></a-text>
+            </a-camera>
+        </a-entity>
+
+        <a-light type="ambient" color="#BBB"></a-light>
+        <a-light type="directional" position="2 4 -3" intensity="0.6"></a-light>
+
+        <a-entity position="0 0 -5">
+            <a-text value="Survival VR" align="center" position="0 2 0" color="#333" side="double"></a-text>
+        </a-entity>
+
+    </a-scene>
+</body>
+</html>
