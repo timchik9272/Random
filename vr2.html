@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Битва со Снеговиками VR</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+
+    <script>
+        // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
+        let enemies = [];
+        let snowballs = [];
+        let isGameOver = false;
+
+        // --- КОМПОНЕНТ УПРАВЛЕНИЯ (ХОДЬБА + СТРЕЛЬБА) ---
+        AFRAME.registerComponent('player-controls', {
+            init: function () {
+                this.walking = false;
+                this.touchStartTime = 0;
+                
+                const startAction = (e) => {
+                    if(isGameOver) return;
+                    this.walking = true;
+                    this.touchStartTime = new Date().getTime();
+                };
+
+                const endAction = (e) => {
+                    if(isGameOver) {
+                        // Перезагрузка страницы при клике после проигрыша
+                        location.reload(); 
+                        return;
+                    }
+                    this.walking = false;
+                    const duration = new Date().getTime() - this.touchStartTime;
+                    
+                    // Если нажатие было коротким (менее 200мс), это выстрел
+                    if (duration < 250) {
+                        shootSnowball(this.el.sceneEl);
+                    }
+                };
+
+                // Слушаем события
+                window.addEventListener('mousedown', startAction);
+                window.addEventListener('mouseup', endAction);
+                window.addEventListener('touchstart', startAction);
+                window.addEventListener('touchend', endAction);
+            },
+            tick: function (time, timeDelta) {
+                if (this.walking && !isGameOver) {
+                    // Движение вперед
+                    const camera = this.el.sceneEl.camera;
+                    if (!camera) return;
+
+                    const direction = new THREE.Vector3();
+                    camera.getWorldDirection(direction);
+                    direction.y = 0; // Не летать вверх
+                    direction.normalize();
+
+                    const speed = 3.0 * (timeDelta / 1000);
+                    const pos = this.el.getAttribute('position');
+                    
+                    this.el.setAttribute('position', {
+                        x: pos.x + direction.x * speed,
+                        y: pos.y,
+                        z: pos.z + direction.z * speed
+                    });
+                }
+            }
+        });
+
+        // --- ФУНКЦИЯ СТРЕЛЬБЫ ---
+        function shootSnowball(scene) {
+            const camera = scene.camera;
+            if(!camera) return;
+
+            // Создаем снежок
+            const el = document.createElement('a-sphere');
+            el.setAttribute('radius', '0.15');
+            el.setAttribute('color', '#EEE');
+            
+            // Позиция старта (от игрока)
+            const rig = document.getElementById('rig');
+            const position = new THREE.Vector3();
+            const rotation = camera.el.getAttribute('rotation');
+            
+            camera.getWorldPosition(position);
+            
+            // Чуть ниже камеры, чтобы не перекрывать обзор
+            position.y -= 0.2; 
+            
+            // Вектор направления
+            const direction = new THREE.Vector3();
+            camera.getWorldDirection(direction);
+            direction.normalize();
+
+            // Чуть выдвинуть вперед, чтобы не застрял в игроке
+            position.addScaledVector(direction, 0.5);
+
+            el.setAttribute('position', position);
+            
+            // Добавляем логику полета
+            el.direction = direction;
+            el.speed = 15; // Скорость полета
+            el.birthTime = new Date().getTime();
+
+            scene.appendChild(el);
+            snowballs.push(el);
+        }
+
+        // --- СПАВНЕР СНЕГОВИКОВ ---
+        AFRAME.registerComponent('game-manager', {
+            init: function() {
+                this.timer = 0;
+                this.spawnInterval = 3000; // Спавн каждые 3 секунды
+            },
+            tick: function(time, timeDelta) {
+                if (isGameOver) return;
+
+                // 1. Спавн врагов
+                this.timer += timeDelta;
+                if(this.timer > this.spawnInterval) {
+                    this.spawnSnowman();
+                    this.timer = 0;
+                    // Усложнение: спавнить чуть быстрее со временем
+                    if(this.spawnInterval > 1000) this.spawnInterval -= 50;
+                }
+
+                // 2. Обновление врагов (движение к игроку)
+                const playerPos = document.getElementById('rig').getAttribute('position');
+                
+                enemies.forEach((enemy, index) => {
+                    if(!enemy.parentNode) return; // Если уже удален
+
+                    const enemyPos = enemy.getAttribute('position');
+                    const dist = distance(playerPos, enemyPos);
+
+                    // Если враг дошел до игрока
+                    if(dist < 1.0) {
+                        gameOver();
+                    }
+
+                    // Движение к игроку
+                    enemy.object3D.lookAt(playerPos.x, 0, playerPos.z);
+                    enemy.object3D.translateZ(1.5 * (timeDelta/1000)); // Скорость врага
+                });
+
+                // 3. Обновление снежков и проверка попаданий
+                const now = new Date().getTime();
+                snowballs.forEach((ball, bIndex) => {
+                    if(!ball.parentNode) return;
+
+                    // Удаляем старые снежки (через 2 сек)
+                    if(now - ball.birthTime > 2000) {
+                        ball.parentNode.removeChild(ball);
+                        snowballs.splice(bIndex, 1);
+                        return;
+                    }
+
+                    // Двигаем снежок
+                    const currentPos = ball.object3D.position;
+                    currentPos.addScaledVector(ball.direction, ball.speed * (timeDelta/1000));
+                    ball.setAttribute('position', currentPos);
+
+                    // Проверка столкновений с врагами
+                    for(let i = 0; i < enemies.length; i++) {
+                        let enemy = enemies[i];
+                        let enemyPos = enemy.object3D.position;
+                        
+                        // Простая проверка дистанции (попадание)
+                        if(currentPos.distanceTo(enemyPos) < 1.0) {
+                            // Убит!
+                            // Анимация смерти (просто удаляем пока)
+                            enemy.parentNode.removeChild(enemy);
+                            ball.parentNode.removeChild(ball);
+                            
+                            enemies.splice(i, 1);
+                            snowballs.splice(bIndex, 1);
+                            break; // Снежок попал в одного, цикл прервать
+                        }
+                    }
+                });
+            },
+            spawnSnowman: function() {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 10 + Math.random() * 5; // Расстояние 10-15 метров
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+                
+                const rigPos = document.getElementById('rig').getAttribute('position');
+
+                const enemy = document.createElement('a-entity');
+                enemy.setAttribute('position', {
+                    x: rigPos.x + x, 
+                    y: 0, 
+                    z: rigPos.z + z
+                });
+
+                // Рисуем снеговика
+                enemy.innerHTML = `
+                    <a-sphere position="0 0.5 0" radius="0.6" color="white"></a-sphere>
+                    <a-sphere position="0 1.4 0" radius="0.45" color="white"></a-sphere>
+                    <a-sphere position="0 2.0 0" radius="0.3" color="white"></a-sphere>
+                    <a-sphere position="-0.15 2.05 0.25" radius="0.05" color="red"></a-sphere>
+                    <a-sphere position="0.15 2.05 0.25" radius="0.05" color="red"></a-sphere>
+                    <a-cone position="0 2.0 0.3" rotation="90 0 0" radius-bottom="0.05" height="0.2" color="orange"></a-cone>
+                `;
+                
+                this.el.sceneEl.appendChild(enemy);
+                enemies.push(enemy);
+            }
+        });
+
+        // Утилита для расстояния
+        function distance(p1, p2) {
+            const dx = p1.x - p2.x;
+            const dz = p1.z - p2.z;
+            return Math.sqrt(dx*dx + dz*dz);
+        }
+
+        function gameOver() {
+            if(isGameOver) return;
+            isGameOver = true;
+            
+            // Красный экран
+            const hud = document.getElementById('hud');
+            hud.setAttribute('visible', 'true');
+            
+            const txt = document.getElementById('statusText');
+            txt.setAttribute('value', 'GAME OVER\nClick to Restart');
+        }
+
+    </script>
+</head>
+<body>
+    <a-scene game-manager>
+        
+        <a-assets>
+            <img id="skyTexture" src="https://cdn.aframe.io/360-image-gallery-boilerplate/img/sechelt.jpg" crossorigin="anonymous">
+        </a-assets>
+
+        <a-sky color="#87CEEB"></a-sky>
+        <a-plane position="0 0 0" rotation="-90 0 0" width="200" height="200" color="#FFF"></a-plane>
+
+        <a-entity id="rig" position="0 1.6 0" player-controls>
+            <a-camera look-controls="pointerLockEnabled: false">
+                <a-cursor 
+                    color="red"
+                    fuse="false"
+                    scale="0.5 0.5 0.5"
+                    raycaster="objects: .clickable"
+                    position="0 0 -1"
+                    geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03">
+                </a-cursor>
+
+                <a-entity id="hud" position="0 0 -0.5" visible="false">
+                    <a-plane color="black" opacity="0.8" width="2" height="1"></a-plane>
+                    <a-text id="statusText" value="" align="center" width="2" color="red"></a-text>
+                </a-entity>
+            </a-camera>
+        </a-entity>
+
+        <a-light type="ambient" color="#CCC"></a-light>
+        <a-light type="directional" position="-1 1 0" intensity="0.5"></a-light>
+
+        <a-entity position="-5 0 -5">
+            <a-cone color="green" radius-bottom="1.5" height="4" position="0 2 0"></a-cone>
+            <a-cylinder color="brown" radius="0.3" height="1" position="0 0.5 0"></a-cylinder>
+        </a-entity>
+        <a-entity position="6 0 8">
+            <a-cone color="green" radius-bottom="1.5" height="4" position="0 2 0"></a-cone>
+            <a-cylinder color="brown" radius="0.3" height="1" position="0 0.5 0"></a-cylinder>
+        </a-entity>
+
+    </a-scene>
+</body>
+</html>
