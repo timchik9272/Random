@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Снеговик VR</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    
+    <script>
+        // Компонент для движения вперед по нажатию
+        AFRAME.registerComponent('walk-on-click', {
+            init: function () {
+                this.walking = false;
+                
+                // Обработчики нажатия (мышь или тачскрин/кнопка кардборда)
+                const startWalk = () => { this.walking = true; };
+                const stopWalk = () => { this.walking = false; };
+
+                window.addEventListener('mousedown', startWalk);
+                window.addEventListener('mouseup', stopWalk);
+                window.addEventListener('touchstart', startWalk);
+                window.addEventListener('touchend', stopWalk);
+            },
+            tick: function (time, timeDelta) {
+                if (!this.walking) return;
+
+                // Получаем камеру
+                var camera = this.el.sceneEl.camera;
+                if (!camera) return;
+
+                // Получаем направление взгляда
+                var direction = new THREE.Vector3();
+                camera.getWorldDirection(direction);
+
+                // Игнорируем наклон вверх/вниз, чтобы не улетать в небо
+                direction.y = 0;
+                direction.normalize();
+
+                // Скорость движения
+                var speed = 2.5 * (timeDelta / 1000); 
+
+                // Обновляем позицию "Рига" (контейнера игрока)
+                var currentPos = this.el.getAttribute('position');
+                this.el.setAttribute('position', {
+                    x: currentPos.x + direction.x * speed,
+                    y: currentPos.y,
+                    z: currentPos.z + direction.z * speed
+                });
+            }
+        });
+    </script>
+</head>
+<body>
+    <a-scene>
+        <a-assets>
+            <img id="skyTexture" src="https://cdn.aframe.io/360-image-gallery-boilerplate/img/sechelt.jpg" crossorigin="anonymous">
+        </a-assets>
+
+        <a-sky color="#87CEEB"></a-sky> <a-plane position="0 0 0" rotation="-90 0 0" width="100" height="100" color="#FFFFFF"></a-plane> <a-entity id="rig" position="0 1.6 4" walk-on-click>
+            <a-camera look-controls wasd-controls="enabled: false"></a-camera>
+        </a-entity>
+
+        <a-entity position="0 0 -3">
+            <a-sphere position="0 0.5 0" radius="1" color="#FFFFFF"></a-sphere>
+            <a-sphere position="0 1.6 0" radius="0.7" color="#FFFFFF"></a-sphere>
+            <a-sphere position="0 2.4 0" radius="0.5" color="#FFFFFF"></a-sphere>
+
+            <a-sphere position="-0.2 2.5 0.4" radius="0.05" color="#000000"></a-sphere>
+            <a-sphere position="0.2 2.5 0.4" radius="0.05" color="#000000"></a-sphere>
+
+            <a-cone position="0 2.4 0.5" rotation="90 0 0" radius-bottom="0.05" height="0.3" color="orange"></a-cone>
+
+            <a-cylinder position="-0.8 1.6 0" rotation="0 0 45" radius="0.03" height="1" color="#5C4033"></a-cylinder>
+            <a-cylinder position="0.8 1.6 0" rotation="0 0 -45" radius="0.03" height="1" color="#5C4033"></a-cylinder>
+            
+            <a-cylinder position="0 2.9 0" radius="0.3" height="0.5" color="#333"></a-cylinder>
+            <a-cylinder position="0 2.65 0" radius="0.5" height="0.05" color="#333"></a-cylinder>
+        </a-entity>
+
+        <a-entity position="-4 0 -5">
+            <a-cone position="0 1 0" radius-bottom="1" height="2" color="green"></a-cone>
+            <a-cylinder position="0 0.2 0" radius="0.2" height="0.4" color="brown"></a-cylinder>
+        </a-entity>
+
+        <a-entity position="5 0 -2">
+            <a-cone position="0 1 0" radius-bottom="1" height="2" color="green"></a-cone>
+            <a-cylinder position="0 0.2 0" radius="0.2" height="0.4" color="brown"></a-cylinder>
+        </a-entity>
+
+        <a-entity position="-3 0 2">
+            <a-cone position="0 1 0" radius-bottom="1" height="2" color="green"></a-cone>
+            <a-cylinder position="0 0.2 0" radius="0.2" height="0.4" color="brown"></a-cylinder>
+        </a-entity>
+
+        <a-light type="ambient" color="#BBB"></a-light>
+        <a-light type="directional" position="1 1 0.5" intensity="0.5"></a-light>
+
+    </a-scene>
+</body>
+</html>
