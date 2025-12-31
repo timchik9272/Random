@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Кликер + Лидерборд (GamePush)</title>
+
+  <!-- GamePush SDK -->
+  <script src="https://gamepush.com/sdk/gamepush.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    h1 {
+      margin: 20px 0 10px;
+    }
+
+    .score {
+      font-size: 56px;
+      margin: 10px 0 20px;
+    }
+
+    button {
+      font-size: 20px;
+      padding: 16px 32px;
+      border: none;
+      border-radius: 14px;
+      background: #22c55e;
+      color: #000;
+      cursor: pointer;
+      margin-bottom: 16px;
+    }
+
+    button:active {
+      transform: scale(0.95);
+    }
+
+    .leaderboard {
+      width: 90%;
+      max-width: 420px;
+      background: #020617;
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .leaderboard h2 {
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 30px 1fr auto;
+      gap: 10px;
+      padding: 6px 0;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .row:last-child {
+      border-bottom: none;
+    }
+
+    .rank {
+      color: #38bdf8;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🖱️ Кликер</h1>
+
+  <div class="score" id="score">0</div>
+
+  <button onclick="clickBtn()">Клик!</button>
+  <button onclick="submitScore()">Отправить результат</button>
+
+  <div class="leaderboard">
+    <h2>🏆 Топ игроков</h2>
+    <div id="leaderboard"></div>
+  </div>
+
+<script>
+  let score = 0;
+
+  // Инициализация GamePush
+  GamePush.init({
+    gameId: 25955,
+    publicKey: 'jNwMXSOpZ2at2JidL17nuy0XK7mC6D69'
+  }).then(() => {
+    console.log('GamePush инициализирован');
+    loadLeaderboard();
+  });
+
+  function clickBtn() {
+    score++;
+    document.getElementById('score').innerText = score;
+  }
+
+  function submitScore() {
+    if (!GamePush.player.isAuthorized) {
+      GamePush.player.login().then(() => {
+        sendScore();
+      });
+    } else {
+      sendScore();
+    }
+  }
+
+  function sendScore() {
+    GamePush.Leaderboard.submitScore({
+      leaderboardId: 'score',
+      score: score
+    }).then(() => {
+      loadLeaderboard();
+    });
+  }
+
+  function loadLeaderboard() {
+    GamePush.Leaderboard.getEntries({
+      leaderboardId: 'score',
+      limit: 10
+    }).then(result => {
+      const list = document.getElementById('leaderboard');
+      list.innerHTML = '';
+
+      result.entries.forEach(e => {
+        list.innerHTML += `
+          <div class="row">
+            <span class="rank">${e.rank}</span>
+            <span>${e.player.name || 'Гость'}</span>
+            <span>${e.score}</span>
+          </div>
+        `;
+      });
+    });
+  }
+</script>
+
+</body>
+</html>
