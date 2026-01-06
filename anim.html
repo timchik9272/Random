@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Анимация на телефоне</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #f0f0f0;
+            height: 100vh;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Верхняя панель */
+        .top-bar {
+            background: #16213e;
+            padding: 12px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            border-bottom: 1px solid #0f3460;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 18px;
+            color: #4cc9f0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .top-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* Основная область */
+        .main-area {
+            flex-grow: 1;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        /* Боковые панели */
+        .side-panel {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 280px;
+            background: #16213e;
+            z-index: 90;
+            padding: 20px 15px;
+            overflow-y: auto;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            border-top: 1px solid #0f3460;
+        }
+
+        .tools-panel {
+            left: 0;
+            transform: translateX(-100%);
+        }
+
+        .layers-panel {
+            right: 0;
+            transform: translateX(100%);
+        }
+
+        .side-panel.active {
+            transform: translateX(0);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #0f3460;
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #4cc9f0;
+        }
+
+        /* Контейнер холста */
+        .canvas-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            background: #0f3460;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        canvas {
+            background: white;
+            touch-action: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
+        }
+
+        .canvas-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            pointer-events: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 15px;
+        }
+
+        .canvas-info {
+            background: rgba(22, 33, 62, 0.9);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #4cc9f0;
+            pointer-events: auto;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Панель кадров */
+        .frames-bar {
+            background: #16213e;
+            padding: 15px;
+            height: 140px;
+            flex-shrink: 0;
+            border-top: 1px solid #0f3460;
+            display: flex;
+            flex-direction: column;
+            z-index: 80;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .frames-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .frames-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #4cc9f0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .frames-scroll {
+            display: flex;
+            overflow-x: auto;
+            flex-grow: 1;
+            gap: 10px;
+            padding: 5px 0;
+            scrollbar-width: thin;
+            scrollbar-color: #4cc9f0 #0f3460;
+        }
+
+        .frames-scroll::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .frames-scroll::-webkit-scrollbar-track {
+            background: #0f3460;
+            border-radius: 3px;
+        }
+
+        .frames-scroll::-webkit-scrollbar-thumb {
+            background: #4cc9f0;
+            border-radius: 3px;
+        }
+
+        /* Кнопки */
+        .btn {
+            background: linear-gradient(135deg, #4cc9f0, #4361ee);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 12px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(76, 201, 240, 0.3);
+            user-select: none;
+        }
+
+        .btn:hover, .btn:active {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(76, 201, 240, 0.4);
+        }
+
+        .btn-icon {
+            background: rgba(22, 33, 62, 0.8);
+            color: #4cc9f0;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-icon:hover, .btn-icon:active {
+            background: rgba(76, 201, 240, 0.2);
+            transform: scale(1.1);
+        }
+
+        .btn-icon.active {
+            background: #4cc9f0;
+            color: #16213e;
+            box-shadow: 0 0 15px rgba(76, 201, 240, 0.7);
+        }
+
+        .btn-sm {
+            padding: 8px 15px;
+            font-size: 14px;
+        }
+
+        /* Инструменты */
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        .tool {
+            background: #0f3460;
+            border: 2px solid transparent;
+            border-radius: 12px;
+            padding: 15px 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #b8c1ec;
+        }
+
+        .tool i {
+            font-size: 24px;
+        }
+
+        .tool:hover, .tool.active {
+            background: rgba(76, 201, 240, 0.15);
+            border-color: #4cc9f0;
+            color: #4cc9f0;
+            transform: translateY(-3px);
+        }
+
+        .tool span {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        /* Настройки */
+        .settings-section {
+            margin-top: 20px;
+        }
+
+        .slider-container {
+            margin-bottom: 20px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            color: #b8c1ec;
+            font-size: 14px;
+        }
+
+        .slider-value {
+            color: #4cc9f0;
+            font-weight: 600;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            -webkit-appearance: none;
+            background: #0f3460;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #4cc9f0;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .color-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .color-label {
+            color: #b8c1ec;
+            font-size: 14px;
+        }
+
+        .color-picker-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="color"] {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 3px solid #0f3460;
+            cursor: pointer;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .current-color {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Кадры */
+        .frame-item {
+            flex: 0 0 auto;
+            width: 100px;
+            height: 80px;
+            background: #0f3460;
+            border-radius: 8px;
+            position: relative;
+            cursor: pointer;
+            overflow: hidden;
+            border: 3px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .frame-item:hover, .frame-item.active {
+            border-color: #4cc9f0;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(76, 201, 240, 0.3);
+        }
+
+        .frame-preview {
+            width: 100%;
+            height: 100%;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .frame-number {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            background: rgba(22, 33, 62, 0.9);
+            color: #4cc9f0;
+            font-size: 12px;
+            font-weight: 600;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .frame-actions {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            display: flex;
+            gap: 5px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .frame-item:hover .frame-actions {
+            opacity: 1;
+        }
+
+        .frame-action-btn {
+            background: rgba(22, 33, 62, 0.9);
+            color: #4cc9f0;
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .frame-action-btn:hover {
+            background: #4cc9f0;
+            color: #16213e;
+        }
+
+        /* Слои */
+        .layers-list {
+            margin-top: 15px;
+        }
+
+        .layer-item {
+            background: #0f3460;
+            border-radius: 10px;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-left: 4px solid #4cc9f0;
+            transition: all 0.2s ease;
+        }
+
+        .layer-item.active {
+            background: rgba(76, 201, 240, 0.15);
+            border-left-color: #f72585;
+        }
+
+        .layer-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .layer-visibility {
+            color: #b8c1ec;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        .layer-visibility.active {
+            color: #4cc9f0;
+        }
+
+        .layer-name {
+            font-size: 15px;
+            color: #f0f0f0;
+        }
+
+        /* Полноэкранный режим */
+        body.fullscreen .top-bar,
+        body.fullscreen .frames-bar {
+            display: none;
+        }
+
+        body.fullscreen .canvas-container {
+            padding: 0;
+            border-radius: 0;
+        }
+
+        body.fullscreen canvas {
+            border-radius: 0;
+            max-width: 100vw;
+            max-height: 100vh;
+        }
+
+        /* Адаптивность */
+        @media (max-width: 480px) {
+            .tools-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .side-panel {
+                width: 85vw;
+            }
+            
+            .btn-icon {
+                width: 45px;
+                height: 45px;
+                font-size: 18px;
+            }
+            
+            .frame-item {
+                width: 90px;
+                height: 70px;
+            }
+        }
+
+        @media (max-height: 700px) {
+            .frames-bar {
+                height: 120px;
+            }
+            
+            .frame-item {
+                height: 70px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Верхняя панель -->
+        <div class="top-bar">
+            <div class="logo">
+                <i class="fas fa-film"></i>
+                <span>Анимация</span>
+            </div>
+            <div class="top-actions">
+                <button class="btn-icon" id="fullscreenBtn" title="Полноэкранный режим">
+                    <i class="fas fa-expand"></i>
+                </button>
+                <button class="btn-icon" id="playBtn" title="Воспроизвести">
+                    <i class="fas fa-play"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Основная область -->
+        <div class="main-area">
+            <!-- Левая панель инструментов -->
+            <div class="side-panel tools-panel" id="toolsPanel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fas fa-paint-brush"></i>
+                        <span>Инструменты</span>
+                    </div>
+                    <button class="btn-icon" id="closeToolsBtn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="tools-grid">
+                    <div class="tool active" data-tool="brush" title="Кисть">
+                        <i class="fas fa-paintbrush"></i>
+                        <span>Кисть</span>
+                    </div>
+                    <div class="tool" data-tool="eraser" title="Ластик">
+                        <i class="fas fa-eraser"></i>
+                        <span>Ластик</span>
+                    </div>
+                    <div class="tool" data-tool="fill" title="Заливка">
+                        <i class="fas fa-fill-drip"></i>
+                        <span>Заливка</span>
+                    </div>
+                    <div class="tool" data-tool="line" title="Линия">
+                        <i class="fas fa-slash"></i>
+                        <span>Линия</span>
+                    </div>
+                    <div class="tool" data-tool="rectangle" title="Прямоугольник">
+                        <i class="fas fa-square"></i>
+                        <span>Прямоугольник</span>
+                    </div>
+                    <div class="tool" data-tool="circle" title="Круг">
+                        <i class="fas fa-circle"></i>
+                        <span>Круг</span>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span><i class="fas fa-arrows-alt-h"></i> Размер кисти</span>
+                            <span class="slider-value" id="brushSizeValue">10</span>
+                        </div>
+                        <input type="range" id="brushSize" min="1" max="50" value="10">
+                    </div>
+                    
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span><i class="fas fa-adjust"></i> Прозрачность</span>
+                            <span class="slider-value" id="opacityValue">100%</span>
+                        </div>
+                        <input type="range" id="opacity" min="1" max="100" value="100">
+                    </div>
+                    
+                    <div class="color-section">
+                        <div class="color-label">
+                            <i class="fas fa-palette"></i> Цвет:
+                        </div>
+                        <div class="color-picker-wrapper">
+                            <input type="color" id="colorPicker" value="#ff4757">
+                            <div class="current-color" id="currentColor"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Центральный холст -->
+            <div class="canvas-container">
+                <div class="canvas-overlay">
+                    <div class="canvas-info">
+                        <i class="fas fa-pencil-alt"></i>
+                        <span id="canvasInfo">Кисть (10px)</span>
+                    </div>
+                    <div>
+                        <button class="btn-icon" id="toolsToggleBtn" title="Инструменты">
+                            <i class="fas fa-bars"></i>
+                        </button>
+                        <button class="btn-icon" id="layersToggleBtn" title="Слои">
+                            <i class="fas fa-layer-group"></i>
+                        </button>
+                    </div>
+                </div>
+                <canvas id="mainCanvas"></canvas>
+            </div>
+            
+            <!-- Правая панель слоев -->
+            <div class="side-panel layers-panel" id="layersPanel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fas fa-layer-group"></i>
+                        <span>Слои</span>
+                    </div>
+                    <button class="btn-icon" id="closeLayersBtn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="layers-list" id="layersList">
+                    <!-- Слои будут добавляться динамически -->
+                </div>
+                
+                <button class="btn" id="addLayerBtn" style="margin-top: 20px; width: 100%;">
+                    <i class="fas fa-plus"></i>
+                    <span>Новый слой</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Нижняя панель кадров -->
+        <div class="frames-bar">
+            <div class="frames-header">
+                <div class="frames-title">
+                    <i class="fas fa-film"></i>
+                    <span>Кадры</span>
+                </div>
+                <div>
+                    <button class="btn btn-sm" id="addFrameBtn">
+                        <i class="fas fa-plus"></i>
+                        <span>Добавить</span>
+                    </button>
+                    <button class="btn btn-sm" id="duplicateFrameBtn" style="margin-left: 10px;">
+                        <i class="fas fa-copy"></i>
+                        <span>Копировать</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="frames-scroll" id="framesContainer">
+                <!-- Кадры будут добавляться динамически -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Инициализация элементов
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const toolsPanel = document.getElementById('toolsPanel');
+        const layersPanel = document.getElementById('layersPanel');
+        const framesContainer = document.getElementById('framesContainer');
+        const layersList = document.getElementById('layersList');
+        const colorPicker = document.getElementById('colorPicker');
+        const currentColor = document.getElementById('currentColor');
+        const brushSizeInput = document.getElementById('brushSize');
+        const brushSizeValue = document.getElementById('brushSizeValue');
+        const opacityInput = document.getElementById('opacity');
+        const opacityValue = document.getElementById('opacityValue');
+        const canvasInfo = document.getElementById('canvasInfo');
+        
+        // Переменные состояния
+        let currentTool = 'brush';
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let brushColor = colorPicker.value;
+        let brushSize = parseInt(brushSizeInput.value);
+        let opacity = parseInt(opacityInput.value) / 100;
+        let frames = [];
+        let currentFrameIndex = 0;
+        let layers = [];
+        let currentLayerIndex = 0;
+        let history = [];
+        
+        // Инициализация приложения
+        function init() {
+            // Устанавливаем размер холста
+            resizeCanvas();
+            
+            // Инициализируем значения
+            updateBrushSize();
+            updateOpacity();
+            updateColor();
+            
+            // Создаем первый кадр и слой
+            createNewFrame();
+            createNewLayer();
+            
+            // Настраиваем события инструментов
+            document.querySelectorAll('.tool').forEach(tool => {
+                tool.addEventListener('click', function() {
+                    document.querySelectorAll('.tool').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    currentTool = this.dataset.tool;
+                    updateCanvasInfo();
+                });
+            });
+            
+            // События для слайдеров
+            brushSizeInput.addEventListener('input', updateBrushSize);
+            opacityInput.addEventListener('input', updateOpacity);
+            colorPicker.addEventListener('input', updateColor);
+            
+            // События для кнопок
+            document.getElementById('toolsToggleBtn').addEventListener('click', () => {
+                toolsPanel.classList.add('active');
+                layersPanel.classList.remove('active');
+            });
+            
+            document.getElementById('layersToggleBtn').addEventListener('click', () => {
+                layersPanel.classList.add('active');
+                toolsPanel.classList.remove('active');
+            });
+            
+            document.getElementById('closeToolsBtn').addEventListener('click', () => {
+                toolsPanel.classList.remove('active');
+            });
+            
+            document.getElementById('closeLayersBtn').addEventListener('click', () => {
+                layersPanel.classList.remove('active');
+            });
+            
+            document.getElementById('addFrameBtn').addEventListener('click', createNewFrame);
+            document.getElementById('duplicateFrameBtn').addEventListener('click', duplicateFrame);
+            document.getElementById('addLayerBtn').addEventListener('click', createNewLayer);
+            document.getElementById('playBtn').addEventListener('click', playAnimation);
+            document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
+            
+            // События для canvas (поддержка touch и mouse)
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+            
+            canvas.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                startDrawing(touch);
+            });
+            
+            canvas.addEventListener('touchmove', function(e) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                draw(touch);
+            });
+            
+            canvas.addEventListener('touchend', stopDrawing);
+            
+            // Обновляем интерфейс
+            updateFramesUI();
+            updateLayersUI();
+            updateCanvasInfo();
+            
+            // Обработчик изменения размера окна
+            window.addEventListener('resize', resizeCanvas);
+        }
+        
+        // Функции рисования
+        function startDrawing(e) {
+            isDrawing = true;
+            [lastX, lastY] = getCursorPos(e);
+            
+            // Сохраняем состояние для отмены
+            saveState();
+            
+            // Если инструмент заливки, заливаем сразу
+            if (currentTool === 'fill') {
+                floodFill(lastX, lastY);
+                updateFramePreview();
+                updateFramesUI();
+            }
+            
+            // Для инструментов форм начинаем рисование
+            if (['line', 'rectangle', 'circle'].includes(currentTool)) {
+                // Для этих инструментов мы будем рисовать при движении
+            }
+        }
+        
+        function draw(e) {
+            if (!isDrawing) return;
+            
+            const [x, y] = getCursorPos(e);
+            
+            // Для инструментов форм рисуем временную форму
+            if (['line', 'rectangle', 'circle'].includes(currentTool)) {
+                redrawCanvas();
+                
+                ctx.globalAlpha = opacity;
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = currentTool === 'eraser' ? '#ffffff' : brushColor;
+                ctx.lineWidth = brushSize;
+                
+                switch(currentTool) {
+                    case 'line':
+                        ctx.beginPath();
+                        ctx.moveTo(lastX, lastY);
+                        ctx.lineTo(x, y);
+                        ctx.stroke();
+                        break;
+                    case 'rectangle':
+                        ctx.beginPath();
+                        ctx.rect(lastX, lastY, x - lastX, y - lastY);
+                        ctx.stroke();
+                        break;
+                    case 'circle':
+                        const radius = Math.sqrt(Math.pow(x - lastX, 2) + Math.pow(y - lastY, 2));
+                        ctx.beginPath();
+                        ctx.arc(lastX, lastY, radius, 0, Math.PI * 2);
+                        ctx.stroke();
+                        break;
+                }
+                
+                return;
+            }
+            
+            // Для кисти и ластика рисуем линию
+            ctx.globalAlpha = opacity;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = currentTool === 'eraser' ? '#ffffff' : brushColor;
+            ctx.lineWidth = brushSize;
+            
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            
+            [lastX, lastY] = [x, y];
+        }
+        
+        function stopDrawing(e) {
+            if (!isDrawing) return;
+            isDrawing = false;
+            
+            // Для инструментов форм сохраняем окончательную форму
+            if (['line', 'rectangle', 'circle'].includes(currentTool) && e) {
+                const [x, y] = getCursorPos(e);
+                
+                ctx.globalAlpha = opacity;
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = currentTool === 'eraser' ? '#ffffff' : brushColor;
+                ctx.lineWidth = brushSize;
+                
+                switch(currentTool) {
+                    case 'line':
+                        ctx.beginPath();
+                        ctx.moveTo(lastX, lastY);
+                        ctx.lineTo(x, y);
+                        ctx.stroke();
+                        break;
+                    case 'rectangle':
+                        ctx.beginPath();
+                        ctx.rect(lastX, lastY, x - lastX, y - lastY);
+                        ctx.stroke();
+                        break;
+                    case 'circle':
+                        const radius = Math.sqrt(Math.pow(x - lastX, 2) + Math.pow(y - lastY, 2));
+                        ctx.beginPath();
+                        ctx.arc(lastX, lastY, radius, 0, Math.PI * 2);
+                        ctx.stroke();
+                        break;
+                }
+            }
+            
+            // Обновляем превью кадра
+            updateFramePreview();
+            updateFramesUI();
+        }
+        
+        // Функции для кадров
+        function createNewFrame() {
+            const newFrame = {
+                id: frames.length + 1,
+                layers: []
+            };
+            
+            // Создаем копии всех слоев
+            layers.forEach(layer => {
+                const layerCanvas = document.createElement('canvas');
+                layerCanvas.width = canvas.width;
+                layerCanvas.height = canvas.height;
+                const layerCtx = layerCanvas.getContext('2d');
+                
+                // Если это не первый кадр, копируем содержимое текущего кадра
+                if (frames.length > 0 && frames[currentFrameIndex]) {
+                    const currentLayerData = frames[currentFrameIndex].layers[layer.id - 1];
+                    if (currentLayerData) {
+                        layerCtx.putImageData(currentLayerData, 0, 0);
+                    }
+                }
+                
+                newFrame.layers.push(layerCtx.getImageData(0, 0, canvas.width, canvas.height));
+            });
+            
+            frames.push(newFrame);
+            currentFrameIndex = frames.length - 1;
+            updateFramesUI();
+            loadFrame();
+        }
+        
+        function duplicateFrame() {
+            if (frames.length === 0) return;
+            
+            const currentFrame = frames[currentFrameIndex];
+            const newFrame = {
+                id: frames.length + 1,
+                layers: []
+            };
+            
+            // Копируем все слои текущего кадра
+            currentFrame.layers.forEach(layerData => {
+                const layerCanvas = document.createElement('canvas');
+                layerCanvas.width = canvas.width;
+                layerCanvas.height = canvas.height;
+                const layerCtx = layerCanvas.getContext('2d');
+                layerCtx.putImageData(layerData, 0, 0);
+                
+                newFrame.layers.push(layerCtx.getImageData(0, 0, canvas.width, canvas.height));
+            });
+            
+            frames.push(newFrame);
+            currentFrameIndex = frames.length - 1;
+            updateFramesUI();
+            loadFrame();
+        }
+        
+        function switchFrame(frameIndex) {
+            if (frameIndex < 0 || frameIndex >= frames.length) return;
+            
+            // Сохраняем текущий кадр
+            saveFrame();
+            
+            currentFrameIndex = frameIndex;
+            updateFramesUI();
+            
+            // Загружаем выбранный кадр
+            loadFrame();
+        }
+        
+        function deleteFrame(frameIndex) {
+            if (frames.length <= 1) return;
+            
+            frames.splice(frameIndex, 1);
+            
+            // Обновляем id кадров
+            frames.forEach((frame, index) => {
+                frame.id = index + 1;
+            });
+            
+            if (currentFrameIndex >= frames.length) {
+                currentFrameIndex = frames.length - 1;
+            }
+            
+            updateFramesUI();
+            loadFrame();
+        }
+        
+        function updateFramesUI() {
+            framesContainer.innerHTML = '';
+            
+            frames.forEach((frame, index) => {
+                const frameElement = document.createElement('div');
+                frameElement.className = `frame-item ${index === currentFrameIndex ? 'active' : ''}`;
+                frameElement.dataset.index = index;
+                
+                frameElement.innerHTML = `
+                    <div class="frame-preview" id="preview-${index}"></div>
+                    <div class="frame-number">${frame.id}</div>
+                    <div class="frame-actions">
+                        <button class="frame-action-btn" onclick="switchFrame(${index})" title="Выбрать">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="frame-action-btn" onclick="deleteFrame(${index})" title="Удалить">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                
+                framesContainer.appendChild(frameElement);
+                
+                // Создаем превью кадра
+                updateFramePreview(frame, index);
+            });
+            
+            // Прокручиваем к текущему кадру
+            const currentFrameElement = framesContainer.querySelector(`.frame-item[data-index="${currentFrameIndex}"]`);
+            if (currentFrameElement) {
+                currentFrameElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
+        }
+        
+        function updateFramePreview(frameObj, index = currentFrameIndex) {
+            const frame = frameObj || frames[index];
+            if (!frame) return;
+            
+            const previewElement = document.getElementById(`preview-${index}`) || 
+                document.querySelector(`.frame-item[data-index="${index}"] .frame-preview`);
+            
+            if (!previewElement) return;
+            
+            const previewCanvas = document.createElement('canvas');
+            previewCanvas.width = 100;
+            previewCanvas.height = 80;
+            const previewCtx = previewCanvas.getContext('2d');
+            
+            // Очищаем превью
+            previewCtx.fillStyle = '#ffffff';
+            previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+            
+            // Масштабируем и рисуем содержимое кадра
+            const scale = Math.min(previewCanvas.width / canvas.width, previewCanvas.height / canvas.height);
+            previewCtx.save();
+            previewCtx.scale(scale, scale);
+            
+            // Рисуем все видимые слои
+            for (let i = 0; i < layers.length; i++) {
+                if (layers[i].visible) {
+                    const layerData = frame.layers[i];
+                    if (layerData) {
+                        previewCtx.putImageData(layerData, 0, 0);
+                    }
+                }
+            }
+            
+            previewCtx.restore();
+            
+            // Добавляем canvas в превью
+            previewElement.innerHTML = '';
+            previewElement.appendChild(previewCanvas);
+        }
+        
+        // Функции для слоев
+        function createNewLayer() {
+            const newLayer = {
+                id: layers.length + 1,
+                name: `Слой ${layers.length + 1}`,
+                visible: true
+            };
+            
+            layers.push(newLayer);
+            currentLayerIndex = layers.length - 1;
+            
+            // Добавляем слой во все кадры
+            frames.forEach(frame => {
+                const layerCanvas = document.createElement('canvas');
+                layerCanvas.width = canvas.width;
+                layerCanvas.height = canvas.height;
+                const layerCtx = layerCanvas.getContext('2d');
+                frame.layers.push(layerCtx.getImageData(0, 0, canvas.width, canvas.height));
+            });
+            
+            updateLayersUI();
+        }
+        
+        function switchLayer(layerIndex) {
+            if (layerIndex < 0 || layerIndex >= layers.length) return;
+            
+            // Сохраняем текущий слой
+            saveFrame();
+            
+            currentLayerIndex = layerIndex;
+            updateLayersUI();
+            
+            // Загружаем выбранный слой
+            loadFrame();
+        }
+        
+        function toggleLayerVisibility(layerIndex) {
+            layers[layerIndex].visible = !layers[layerIndex].visible;
+            updateLayersUI();
+            loadFrame();
+        }
+        
+        function deleteLayer(layerIndex) {
+            if (layers.length <= 1) return;
+            
+            layers.splice(layerIndex, 1);
+            
+            // Удаляем слой из всех кадров
+            frames.forEach(frame => {
+                frame.layers.splice(layerIndex, 1);
+            });
+            
+            // Обновляем id слоев
+            layers.forEach((layer, index) => {
+                layer.id = index + 1;
+                layer.name = `Слой ${index + 1}`;
+            });
+            
+            if (currentLayerIndex >= layers.length) {
+                currentLayerIndex = layers.length - 1;
+            }
+            
+            updateLayersUI();
+            loadFrame();
+        }
+        
+        function updateLayersUI() {
+            layersList.innerHTML = '';
+            
+            layers.forEach((layer, index) => {
+                const layerElement = document.createElement('div');
+                layerElement.className = `layer-item ${index === currentLayerIndex ? 'active' : ''}`;
+                
+                layerElement.innerHTML = `
+                    <div class="layer-info">
+                        <span class="layer-visibility ${layer.visible ? 'active' : ''}" onclick="toggleLayerVisibility(${index})">
+                            <i class="fas fa-${layer.visible ? 'eye' : 'eye-slash'}"></i>
+                        </span>
+                        <span class="layer-name">${layer.name}</span>
+                    </div>
+                    <div>
+                        <button class="frame-action-btn" onclick="switchLayer(${index})" title="Выбрать">
+                            <i class="fas fa-pencil-alt"></i>
+                        </button>
+                        <button class="frame-action-btn" onclick="deleteLayer(${index})" title="Удалить">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                
+                layersList.appendChild(layerElement);
+            });
+        }
+        
+        // Вспомогательные функции
+        function getCursorPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+            
+            if (e.touches) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            
+            return [
+                Math.round((clientX - rect.left) * (canvas.width / rect.width)),
+                Math.round((clientY - rect.top) * (canvas.height / rect.height))
+            ];
+        }
+        
+        function updateBrushSize() {
+            brushSize = parseInt(brushSizeInput.value);
+            brushSizeValue.textContent = brushSize;
+            updateCanvasInfo();
+        }
+        
+        function updateOpacity() {
+            opacity = parseInt(opacityInput.value) / 100;
+            opacityValue.textContent = `${opacityInput.value}%`;
+        }
+        
+        function updateColor() {
+            brushColor = colorPicker.value;
+            currentColor.style.backgroundColor = brushColor;
+        }
+        
+        function updateCanvasInfo() {
+            const toolNames = {
+                brush: 'Кисть',
+                eraser: 'Ластик',
+                fill: 'Заливка',
+                line: 'Линия',
+                rectangle: 'Прямоугольник',
+                circle: 'Круг'
+            };
+            
+            canvasInfo.innerHTML = `<i class="fas fa-${getToolIcon()}"></i> ${toolNames[currentTool]} (${brushSize}px)`;
+        }
+        
+        function getToolIcon() {
+            const icons = {
+                brush: 'paintbrush',
+                eraser: 'eraser',
+                fill: 'fill-drip',
+                line: 'slash',
+                rectangle: 'square',
+                circle: 'circle'
+            };
+            return icons[currentTool] || 'paintbrush';
+        }
+        
+        function saveState() {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            history.push(imageData);
+            
+            if (history.length > 10) {
+                history.shift();
+            }
+        }
+        
+        function undo() {
+            if (history.length === 0) return;
+            
+            const previousState = history.pop();
+            ctx.putImageData(previousState, 0, 0);
+            updateFramePreview();
+            updateFramesUI();
+        }
+        
+        function clearCanvas() {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            updateFramePreview();
+            updateFramesUI();
+        }
+        
+        function redrawCanvas() {
+            // Очищаем холст
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Восстанавливаем все видимые слои текущего кадра
+            if (frames[currentFrameIndex]) {
+                for (let i = 0; i < layers.length; i++) {
+                    if (layers[i].visible) {
+                        const layerData = frames[currentFrameIndex].layers[i];
+                        if (layerData) {
+                            ctx.putImageData(layerData, 0, 0);
+                        }
+                    }
+                }
+            }
+        }
+        
+        function saveFrame() {
+            if (!frames[currentFrameIndex]) return;
+            
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            frames[currentFrameIndex].layers[currentLayerIndex] = imageData;
+        }
+        
+        function loadFrame() {
+            if (!frames[currentFrameIndex]) return;
+            
+            // Очищаем холст
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Загружаем все видимые слои текущего кадра
+            for (let i = 0; i < layers.length; i++) {
+                if (layers[i].visible) {
+                    const layerData = frames[currentFrameIndex].layers[i];
+                    if (layerData) {
+                        ctx.putImageData(layerData, 0, 0);
+                    }
+                }
+            }
+            
+            updateFramePreview();
+        }
+        
+        function floodFill(startX, startY) {
+            // Простая реализация заливки
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const fillColor = hexToRgb(brushColor);
+            
+            // Устанавливаем цвет пикселя
+            const index = (startY * imageData.width + startX) * 4;
+            imageData.data[index] = fillColor.r;
+            imageData.data[index + 1] = fillColor.g;
+            imageData.data[index + 2] = fillColor.b;
+            imageData.data[index + 3] = fillColor.a;
+            
+            ctx.putImageData(imageData, 0, 0);
+        }
+        
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16),
+                a: 255
+            } : {r: 0, g: 0, b: 0, a: 255};
+        }
+        
+        function playAnimation() {
+            if (frames.length < 2) {
+                alert('Добавьте больше кадров для анимации!');
+                return;
+            }
+            
+            const originalFrame = currentFrameIndex;
+            let frameIndex = 0;
+            let isPlaying = true;
+            
+            const playBtn = document.getElementById('playBtn');
+            playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            playBtn.onclick = function() {
+                isPlaying = false;
+                playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                playBtn.onclick = playAnimation;
+                switchFrame(originalFrame);
+            };
+            
+            const playInterval = setInterval(() => {
+                if (!isPlaying) {
+                    clearInterval(playInterval);
+                    return;
+                }
+                
+                switchFrame(frameIndex);
+                frameIndex = (frameIndex + 1) % frames.length;
+                
+                if (frameIndex === 0 && !isPlaying) {
+                    clearInterval(playInterval);
+                    playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                    playBtn.onclick = playAnimation;
+                    switchFrame(originalFrame);
+                }
+            }, 500);
+        }
+        
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log(`Ошибка при переходе в полноэкранный режим: ${err.message}`);
+                });
+                document.body.classList.add('fullscreen');
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                    document.body.classList.remove('fullscreen');
+                }
+            }
+        }
+        
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            const maxWidth = container.clientWidth - 20;
+            const maxHeight = container.clientHeight - 20;
+            
+            // Сохраняем соотношение сторон
+            const aspectRatio = 800 / 500; // Исходное соотношение
+            
+            let newWidth = maxWidth;
+            let newHeight = newWidth / aspectRatio;
+            
+            if (newHeight > maxHeight) {
+                newHeight = maxHeight;
+                newWidth = newHeight * aspectRatio;
+            }
+            
+            // Устанавливаем новые размеры canvas
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            
+            // Перерисовываем текущий кадр
+            loadFrame();
+        }
+        
+        // Делаем функции глобальными для обработчиков событий
+        window.switchFrame = switchFrame;
+        window.deleteFrame = deleteFrame;
+        window.switchLayer = switchLayer;
+        window.toggleLayerVisibility = toggleLayerVisibility;
+        window.deleteLayer = deleteLayer;
+        
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
