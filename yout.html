@@ -1,0 +1,196 @@
+import yt_dlp
+import os
+
+def get_video_info(url):
+    """Получает информацию о видео без скачивания"""
+    try:
+        ydl_opts = {'quiet': True, 'no_warnings': True}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            return ydl.extract_info(url, download=False)
+    except Exception as e:
+        print(f"❌ Ошибка получения информации: {e}")
+        return None
+
+def format_selector(ctx):
+    """Фиктивная функция для селектора, логика вынесена в main"""
+    return ctx
+
+def get_sorted_formats(info):
+    """
+    Разбирает форматы и группирует их по разрешению.
+    Возвращает словарь уникальных разрешений с лучшим битрейтом.
+    """
+    formats = info.get('formats', [])
+    
+    # Словарь для хранения лучшего формата для каждого разрешения
+    # Ключ: высота (height), Значение: объект формата
+    video_resolutions = {}
+    
+    for f in formats:
+        # Пропускаем форматы без видео
+        if f.get('vcodec') == 'none':
+            continue
+            
+        height = f.get('height')
+        if not height:
+            continue
+            
+        # Если такого разрешения еще нет или этот формат лучше (больше битрейт/fps)
+        if height not in video_resolutions:
+            video_resolutions[height] = f
+        else:
+            # Простая логика: если файл больше (или битрейт выше), берем его
+            curr_size = f.get('filesize') or f.get('filesize_approx') or 0
+            best_size = video_resolutions[height].get('filesize') or video_resolutions[height].get('filesize_approx') or 0
+            
+            if curr_size > best_size:
+                video_resolutions[height] = f
+                
+    # Превращаем в список и сортируем от большего к меньшему
+    sorted_videos = sorted(video_resolutions.values(), key=lambda x: x['height'], reverse=True)
+    return sorted_videos
+
+def show_formats(video_formats):
+    """Показывает доступные видео форматы"""
+    print("\n📊 ДОСТУПНЫЕ КАЧЕСТВА ВИДЕО:")
+    print("-" * 60)
+    
+    for i, fmt in enumerate(video_formats):
+        height = fmt.get('height')
+        fps = fmt.get('fps')
+        ext = fmt.get('ext')
+        
+        # Размер может быть filesize или filesize_approx
+        size = fmt.get('filesize') or fmt.get('filesize_approx')
+        if size:
+            size_str = f"{size/(1024*1024):.1f}MB"
+        else:
+            size_str = "N/A"
+            
+        # Пометка, если это только видео (без звука в самом потоке, но мы это исправим при скачивании)
+        note = " (Video only + Audio merge)" if fmt.get('acodec') == 'none' else ""
+        
+        print(f"  [{i+1}] {height}p @ {fps}fps | {ext.upper()} | ~{size_str}{note}")
+        
+    return video_formats
+
+def progress_hook(d):
+    """Хук для отображения прогресса"""
+    if d['status'] == 'downloading':
+        percent = d.get('_percent_str', '0%').strip()
+        speed = d.get('_speed_str', 'N/A')
+        print(f'📥 Загрузка: {percent} | Скорость: {speed}', end='\r')
+    elif d['status'] == 'finished':
+        print('\n🔄 Обработка / Склейка файлов...', end='\r')
+
+def download_content(url, choices, selected_video_format=None, audio_quality='192'):
+    """
+    Скачивает контент с жесткой привязкой к формату
+    """
+    ydl_opts = {
+        'outtmpl': '%(title)s.%(ext)s',
+        'quiet': True,
+        'no_warnings': True,
+        'progress_hooks': [progress_hook],
+        # Используем ffmpeg для склейки видео и аудио
+        'writethumbnail': 'thumbnail' in choices,
+    }
+
+    # --- ЛОГИКА ВЫБОРА ФОРМАТА ---
+    if 'video' in choices:
+        if selected_video_format:
+            # САМОЕ ВАЖНОЕ: Мы берем ID конкретного видео + лучшее аудио
+            # Это гарантирует, что 480p останется 480p, но со звуком
+            vid_id = selected_video_format['format_id']
+            ydl_opts['format'] = f"{vid_id}+bestaudio/best"
+        else:
+            # Если автовыбор - лучшее видео + лучшее аудио
+            ydl_opts['format'] = "bestvideo+bestaudio/best"
+        
+        # Гарантируем контейнер MP4 или MKV для совместимости
+        ydl_opts['merge_output_format'] = 'mp4'
+
+    elif 'audio' in choices:
+        ydl_opts['format'] = 'bestaudio/best'
+        ydl_opts['postprocessors'] = [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': audio_quality,
+        }]
+    
+    # Добавление обложки в файл
+    if 'thumbnail' in choices:
+        # Для аудио это уже настроено выше, для видео добавляем:
+        if 'postprocessors' not in ydl_opts:
+            ydl_opts['postprocessors'] = []
+        ydl_opts['postprocessors'].append({'key': 'EmbedThumbnail'})
+
+    try:
+        print(f'\n🚀 Начинаю загрузку...')
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+            print(f'\n✅ Готово! Файлы сохранены в папке со скриптом.')
+            return True
+            
+    except Exception as e:
+        print(f'\n❌ Ошибка загрузки: {e}')
+        print("💡 Подсказка: Убедитесь, что установлен FFmpeg, если скачиваете высокое качество.")
+        return False
+
+def main():
+    print('=' * 60)
+    print('🎬 YOUTUBE DOWNLOADER (FIXED)')
+    print('=' * 60)
+    
+    while True:
+        url = input('\nВведите ссылку (или "exit"): ').strip()
+        if url.lower() in ['exit', 'quit']: break
+        if not url.startswith('http'): continue
+        
+        print('\n🔍 Анализ видео...')
+        info = get_video_info(url)
+        if not info: continue
+        
+        print(f"📌 {info.get('title')}")
+        
+        # 1. Получаем список уникальных видео разрешений
+        available_videos = get_sorted_formats(info)
+        
+        print('\n🎯 ЧТО СКАЧАТЬ?')
+        print('  1. Видео (выбрать качество)')
+        print('  2. Аудио (MP3)')
+        print('  3. Видео (Авто - лучшее качество)')
+        
+        mode = input('Ваш выбор: ').strip()
+        
+        choices = set()
+        selected_fmt = None
+        
+        if mode == '2':
+            choices.add('audio')
+            print("🎵 Скачиваем аудио...")
+        else:
+            choices.add('video')
+            # Спрашиваем про качество
+            if mode == '1':
+                show_formats(available_videos)
+                try:
+                    idx = int(input('\nВыберите номер качества: ')) - 1
+                    if 0 <= idx < len(available_videos):
+                        selected_fmt = available_videos[idx]
+                        print(f"✅ Выбрано: {selected_fmt['height']}p")
+                    else:
+                        print("⚠️ Неверный номер, качаю лучшее.")
+                except ValueError:
+                    print("⚠️ Ошибка ввода, качаю лучшее.")
+            else:
+                print("✅ Выбран режим авто (лучшее качество).")
+
+        # Спрашиваем про обложку
+        if input('Вшить обложку? (y/n): ').lower() == 'y':
+            choices.add('thumbnail')
+            
+        download_content(url, choices, selected_fmt)
+
+if __name__ == "__main__":
+    main()
