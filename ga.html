@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Block Miner + Firebase</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #1a1a1a;
+            color: #ecf0f1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+
+        h1 { margin-bottom: 10px; color: #f39c12; }
+
+        .game-container {
+            text-align: center;
+            background: #2c3e50;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            width: 300px;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .block-btn {
+            width: 150px;
+            height: 150px;
+            background: #e67e22;
+            border: 4px solid #d35400;
+            border-radius: 10px;
+            font-size: 60px;
+            cursor: pointer;
+            margin: 0 auto 20px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.05s, background 0.2s;
+            box-shadow: 0 5px 0 #a04000;
+        }
+
+        .block-btn:active {
+            transform: scale(0.95) translateY(5px);
+            box-shadow: 0 0 0 #a04000;
+        }
+
+        .upgrade-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 4px 0 #1e8449;
+            transition: all 0.1s;
+        }
+
+        .upgrade-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        .upgrade-btn:disabled {
+            background-color: #7f8c8d;
+            box-shadow: 0 4px 0 #586364;
+            cursor: not-allowed;
+        }
+
+        #console-log {
+            margin-top: 20px;
+            font-size: 10px;
+            color: #bdc3c7;
+            text-align: left;
+            width: 300px;
+            height: 100px;
+            overflow-y: auto;
+            border-top: 1px solid #7f8c8d;
+            padding-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1>BLOCK MINER</h1>
+        
+        <div class="stats">
+            <div>Блоки: <span id="score" style="color:#f1c40f">0</span></div>
+            <div>Сила: <span id="level">1</span></div>
+        </div>
+
+        <!-- Кнопка-блок -->
+        <div id="click-block" class="block-btn">📦</div>
+
+        <!-- Кнопка улучшения -->
+        <button id="upgrade-btn" class="upgrade-btn" disabled>
+            Улучшить (Цена: <span id="cost">10</span>)
+        </button>
+
+        <!-- Лог для наглядности работы Firebase -->
+        <div id="console-log">
+            > Готов к работе...<br>
+        </div>
+    </div>
+
+    <!-- Модуль скрипта -->
+    <script type="module">
+        // Импортируем Firebase через CDN (аналог npm install для браузера)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js";
+
+        // --- КОНФИГУРАЦИЯ FIREBASE (ТВОЯ) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCam6BFw143bkrNhT5sicgWB7KCCQkx6lE",
+            authDomain: "block-na-block.firebaseapp.com",
+            projectId: "block-na-block",
+            storageBucket: "block-na-block.firebasestorage.app",
+            messagingSenderId: "104574874759",
+            appId: "1:104574874759:web:d2719f3e4aa6d11fac3422",
+            measurementId: "G-16T9T88DG1"
+        };
+
+        // Инициализация
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        
+        // --- ЛОГИКА ИГРЫ ---
+        
+        let score = 0;
+        let power = 1;
+        let cost = 10;
+
+        // Элементы UI
+        const scoreEl = document.getElementById('score');
+        const levelEl = document.getElementById('level');
+        const costEl = document.getElementById('cost');
+        const blockBtn = document.getElementById('click-block');
+        const upgradeBtn = document.getElementById('upgrade-btn');
+        const logBox = document.getElementById('console-log');
+
+        // Функция обновления UI
+        function updateUI() {
+            scoreEl.innerText = score;
+            levelEl.innerText = power;
+            costEl.innerText = cost;
+            
+            if (score >= cost) {
+                upgradeBtn.disabled = false;
+                upgradeBtn.innerText = `Улучшить (Цена: ${cost})`;
+            } else {
+                upgradeBtn.disabled = true;
+                upgradeBtn.innerText = `Нужно еще ${cost - score}`;
+            }
+        }
+
+        // Логгер на экран
+        function gameLog(msg) {
+            const time = new Date().toLocaleTimeString();
+            logBox.innerHTML = `> [${time}] ${msg}<br>` + logBox.innerHTML;
+        }
+
+        // --- ДЕЙСТВИЯ (ACTIONS) ---
+
+        // 1. Клик по блоку
+        blockBtn.addEventListener('click', () => {
+            score += power;
+            updateUI();
+
+            // Отправка события в Firebase
+            // Мы не хотим спамить, но по ТЗ "каждый клик"
+            logEvent(analytics, 'click_block', {
+                score_earned: power,
+                total_score: score
+            });
+            
+            // gameLog('Event sent: click_block'); // Раскомментируй, если хочешь видеть спам логов
+        });
+
+        // 2. Покупка улучшения
+        upgradeBtn.addEventListener('click', () => {
+            if (score >= cost) {
+                score -= cost;
+                power++;
+                
+                // Увеличение цены
+                let oldCost = cost;
+                cost = Math.floor(cost * 1.5);
+                
+                updateUI();
+
+                // Отправка события в Firebase
+                logEvent(analytics, 'purchase_upgrade', {
+                    item_name: 'pickaxe_level',
+                    value: oldCost,
+                    new_level: power
+                });
+                
+                gameLog(`Event sent: purchase_upgrade (Lvl ${power})`);
+            }
+        });
+
+        // Старт
+        gameLog('Firebase Analytics initialized');
+        logEvent(analytics, 'game_opened');
+        updateUI();
+
+    </script>
+</body>
+  </html>
