@@ -1,86 +1,169 @@
 export default {
   async fetch(request, env, ctx) {
-    // 1. Проверяем, задан ли токен
-    if (!env.BOT_TOKEN) {
-      return new Response("Ошибка: BOT_TOKEN не найден в переменных", { status: 500 });
+    // Проверка наличия переменных
+    if (!env.BOT_TOKEN || !env.ADMIN_ID) {
+      return new Response("Error: Переменные не заданы", { status: 500 });
     }
 
-    // Telegram отправляет запросы только методом POST
     if (request.method === "POST") {
       try {
-        // Получаем данные от Телеграма (это JSON объект "Update")
         const payload = await request.json();
-
-        // --- ЛОГИКА БОТА ---
-
-        // СЛУЧАЙ А: Пользователь прислал сообщение (например, /start)
-        if (payload.message && payload.message.text) {
-          const chatId = payload.message.chat.id;
-          const text = payload.message.text;
-
-          if (text === "/start") {
-            // Отправляем сообщение с кнопкой
-            await sendTelegramRequest(env.BOT_TOKEN, "sendMessage", {
-              chat_id: chatId,
-              text: "Привет! Нажми на кнопку ниже:",
-              reply_markup: {
-                inline_keyboard: [
-                  [
-                    { text: "Кнопка 1", callback_data: "btn_1" },
-                    { text: "Кнопка 2", callback_data: "btn_2" }
-                  ],
-                  [
-                    { text: "Ссылка на Google", url: "https://google.com" }
-                  ]
-                ]
-              }
-            });
-          } else {
-             // Эхо на любой другой текст
-             await sendTelegramRequest(env.BOT_TOKEN, "sendMessage", {
-              chat_id: chatId,
-              text: `Вы написали: ${text}`
-            });
-          }
-        }
-
-        // СЛУЧАЙ Б: Пользователь нажал на Inline-кнопку
-        else if (payload.callback_query) {
-          const chatId = payload.callback_query.message.chat.id;
-          const data = payload.callback_query.data; // то, что написано в callback_data
-          const callbackId = payload.callback_query.id;
-
-          // Отвечаем пользователю
-          await sendTelegramRequest(env.BOT_TOKEN, "sendMessage", {
-            chat_id: chatId,
-            text: `Вы нажали кнопку с данными: ${data}`
-          });
-
-          // Обязательно "гасим" часики загрузки на кнопке
-          await sendTelegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
-            callback_query_id: callbackId
-          });
-        }
-
+        await handleUpdate(payload, env);
       } catch (e) {
-        // Если ошибка JSON или логики
         console.error(e);
       }
     }
-
-    // Всегда возвращаем 200 OK Телеграму, иначе он будет дублировать сообщения
     return new Response("OK");
   },
 };
 
-// Вспомогательная функция для отправки запросов в Telegram API
-async function sendTelegramRequest(token, method, body) {
-  const url = `https://api.telegram.org/bot${token}/${method}`;
-  return await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
+async function handleUpdate(update, env) {
+  // --- ОБРАБОТКА КОМАНД (/start и текст) ---
+  if (update.message && update.message.text) {
+    const chatId = update.message.chat.id;
+    const userId = update.message.from.id;
+    const text = update.message.text;
+
+    // Проверяем, админ ли пишет (сравниваем как строки, чтобы избежать ошибок типов)
+    const isAdmin = String(userId) === String(env.ADMIN_ID);
+
+    if (text === "/start") {
+      // 1. Формируем кнопки
+      // Кнопка генератора есть у всех
+      const keyboard = [
+        [{ text: "🔐 Сгенерировать пароль", callback_data: "gen_pass" }]
+      ];
+
+      // 2. ЕСЛИ это админ, добавляем ему кнопку настроек
+      if (isAdmin) {
+        keyboard.push([{ text: "⚙️ Настройки / Uptime", callback_data: "admin_menu" }]);
+      }
+
+      await sendTelegram(env, "sendMessage", {
+        chat_id: chatId,
+        text: `Привет! Я бот-помощник.\n\nТвой статус: ${isAdmin ? "👑 Админ" : "👤 Пользователь"}`,
+        reply_markup: { inline_keyboard: keyboard }
+      });
+    }
+
+    // Обработка команд админа (например /check google.com)
+    else if (text.startsWith("/check")) {
+      if (!isAdmin) return; // Игнорируем обычных юзеров
+      
+      const url = text.split(" ")[1];
+      if (!url) {
+        await sendTelegram(env, "sendMessage", { chat_id: chatId, text: "Пример: /check google.com" });
+      } else {
+        await checkSite(chatId, url, env);
+      }
+    }
+  }
+
+  // --- ОБРАБОТКА КНОПОК ---
+  else if (update.callback_query) {
+    const cb = update.callback_query;
+    const chatId = cb.message.chat.id;
+    const messageId = cb.message.message_id;
+    const data = cb.data;
+    const userId = cb.from.id;
+    const isAdmin = String(userId) === String(env.ADMIN_ID);
+
+    // 1. Генерация пароля (Доступно всем)
+    if (data === "gen_pass") {
+      const password = generatePassword(12);
+      // Если это админ, оставляем ему кнопку меню, если нет - только генератор
+      const backButton = isAdmin ? [{ text: "🔙 В меню", callback_data: "go_start" }] : [];
+      
+      await sendTelegram(env, "editMessageText", {
+        chat_id: chatId,
+        message_id: messageId,
+        text: `🔐 <b>Ваш новый пароль:</b>\n<code>${password}</code>`,
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔄 Еще один", callback_data: "gen_pass" }],
+            backButton 
+          ]
+        }
+      });
+    }
+
+    // 2. Главное меню (возврат)
+    else if (data === "go_start") {
+      const keyboard = [[{ text: "🔐 Сгенерировать пароль", callback_data: "gen_pass" }]];
+      if (isAdmin) keyboard.push([{ text: "⚙️ Настройки / Uptime", callback_data: "admin_menu" }]);
+
+      await sendTelegram(env, "editMessageText", {
+        chat_id: chatId,
+        message_id: messageId,
+        text: "Главное меню:",
+        reply_markup: { inline_keyboard: keyboard }
+      });
+    }
+
+    // 3. Меню Админа (ТОЛЬКО ДЛЯ АДМИНА)
+    else if (data === "admin_menu") {
+      if (!isAdmin) return; // Защита от хакеров
+
+      await sendTelegram(env, "editMessageText", {
+        chat_id: chatId,
+        message_id: messageId,
+        text: "⚙️ <b>Панель Uptime</b>\nВыберите действие или отправьте команду <code>/check ссылка</code>",
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🟢 Проверить Google", callback_data: "check_google" }],
+            [{ text: "🔙 Назад", callback_data: "go_start" }]
+          ]
+        }
+      });
+    }
+
+    // 4. Проверка Google по кнопке
+    else if (data === "check_google") {
+      if (!isAdmin) return;
+      await sendTelegram(env, "answerCallbackQuery", { callback_query_id: cb.id, text: "Запрос отправлен..." });
+      await checkSite(chatId, "https://google.com", env);
+    }
+  }
+}
+
+// --- ЛОГИКА ---
+
+async function checkSite(chatId, url, env) {
+  if (!url.startsWith("http")) url = "https://" + url;
+  
+  const start = Date.now();
+  let textResult = "";
+  
+  try {
+    const res = await fetch(url, { headers: {"User-Agent": "Bot"} });
+    const time = Date.now() - start;
+    const icon = res.status === 200 ? "✅" : "⚠️";
+    textResult = `${icon} <b>${url}</b>\nСтатус: ${res.status}\nПинг: ${time}ms`;
+  } catch (e) {
+    textResult = `❌ <b>${url}</b>\nСайт лежит или недоступен.\nОшибка: ${e.message}`;
+  }
+
+  await sendTelegram(env, "sendMessage", {
+    chat_id: chatId,
+    text: textResult,
+    parse_mode: "HTML"
   });
 }
+
+function generatePassword(len) {
+  const chars = "abcdefhkmnpqrstuvwxyzABCDEFGHKMNPQRSTUVWXYZ23456789@#%";
+  let pass = "";
+  for (let i = 0; i < len; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
+  return pass;
+}
+
+// --- API TELEGRAM ---
+async function sendTelegram(env, method, body) {
+  return await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/${method}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+            }
