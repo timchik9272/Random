@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>MiniMessenger - Звонок</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    :root {
+      --bg: #121212;
+      --bg-light: #1e1e1e;
+      --accent: #25D366;
+      --text: #ffffff;
+      --gray: #888888;
+      --error: #e63946;
+      --radius: 12px;
+      --shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .call-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      padding: 20px;
+      background: var(--bg-light);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      max-width: 100%;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    .video-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    #remote-video,
+    #local-video {
+      width: 100%;
+      height: 100%;
+      border-radius: var(--radius);
+      background: #000;
+      object-fit: contain;
+      box-shadow: var(--shadow);
+    }
+    #local-video {
+      width: 150px;
+      height: 200px;
+      position: absolute;
+      bottom: 80px;
+      right: 10px;
+      z-index: 10;
+    }
+    .swap-video #remote-video {
+      width: 150px;
+      height: 200px;
+      position: absolute;
+      bottom: 80px;
+      right: 10px;
+      z-index: 10;
+    }
+    .swap-video #local-video {
+      width: 100%;
+      height: 100%;
+      position: static;
+    }
+    .fullscreen-remote #remote-video {
+      width: 100vw;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 5;
+    }
+    .fullscreen-remote #local-video {
+      bottom: 100px;
+      right: 20px;
+    }
+    .fullscreen-remote.swap-video #local-video {
+      width: 100vw;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 5;
+    }
+    .fullscreen-remote.swap-video #remote-video {
+      bottom: 100px;
+      right: 20px;
+    }
+    @media (max-width: 600px) {
+      .call-container {
+        padding: 10px;
+      }
+      #local-video {
+        width: 120px;
+        height: 160px;
+        bottom: 70px;
+        right: 5px;
+      }
+      .fullscreen-remote #local-video {
+        bottom: 80px;
+        right: 10px;
+      }
+      .controls {
+        gap: 10px;
+      }
+      button {
+        width: 40px;
+        height: 40px;
+      }
+      .fa {
+        font-size: 18px;
+      }
+    }
+    .controls {
+      display: flex;
+      gap: 15px;
+      margin-top: 10px;
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+    }
+    button {
+      background: var(--accent);
+      color: var(--text);
+      padding: 12px;
+      border: none;
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:disabled {
+      background: var(--gray);
+      cursor: not-allowed;
+    }
+    button:hover:not(:disabled) {
+      background: #20b858;
+    }
+    .end-call-btn {
+      background: #e63946;
+    }
+    .end-call-btn:hover:not(:disabled) {
+      background: #b32d39;
+    }
+    #status {
+      font-size: 14px;
+      color: var(--gray);
+      margin-bottom: 10px;
+      position: absolute;
+      top: 10px;
+      z-index: 10;
+    }
+    #call-title {
+      font-size: 20px;
+      font-weight: 500;
+      color: var(--text);
+      position: absolute;
+      top: 40px;
+      z-index: 10;
+    }
+    .fa {
+      font-size: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="call-container">
+    <h2 id="call-title">Звонок</h2>
+    <div class="video-grid" id="video-grid">
+      <video id="remote-video" autoplay playsinline></video>
+      <video id="local-video" autoplay playsinline muted></video>
+    </div>
+    <div id="status">Инициализация...</div>
+    <div class="controls">
+      <button id="toggle-mic" title="Вкл/выкл микрофон"><i class="fa fa-microphone"></i></button>
+      <button id="toggle-camera" title="Вкл/выкл камеру"><i class="fa fa-video"></i></button>
+      <button id="switch-camera" title="Переключить камеру"><i class="fa fa-sync-alt"></i></button>
+      <button id="swap-video" title="Поменять местами"><i class="fa fa-exchange-alt"></i></button>
+      <button id="fullscreen-toggle" title="На весь экран"><i class="fa fa-expand"></i></button>
+      <button id="end-call" class="end-call-btn"><i class="fa fa-phone-slash"></i></button>
+    </div>
+  </div>
+
+  <script>
+    const supabaseClient = supabase.createClient(
+      "https://zmewwzlzujsrhstjehrp.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24"
+    );
+
+    let currentUser = null;
+    let otherUserId = null;
+    let chatId = null;
+    let localStream = null;
+    let peerConnection = null;
+    let channel = null;
+    let offered = false;
+    let micEnabled = true;
+    let cameraEnabled = true;
+    let facingMode = 'user';
+
+    const localVideo = document.getElementById('local-video');
+    const remoteVideo = document.getElementById('remote-video');
+    const statusEl = document.getElementById('status');
+    const callTitle = document.getElementById('call-title');
+    const videoGrid = document.getElementById('video-grid');
+
+    // Улучшенная конфигурация с TURN (Metered Open Relay — бесплатный и рабочий)
+    const servers = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        {
+          urls: [
+            'turn:openrelay.metered.ca:80',
+            'turn:openrelay.metered.ca:443',
+            'turn:openrelay.metered.ca:443?transport=tcp'
+          ],
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        }
+      ]
+    };
+
+    const urlParams = new URLSearchParams(window.location.search);
+    chatId = urlParams.get('chat_id');
+
+    async function init() {
+      if (!chatId) {
+        statusEl.innerText = 'Ошибка: нет chat_id в URL';
+        return;
+      }
+
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) {
+        statusEl.innerText = 'Ошибка авторизации';
+        return;
+      }
+      currentUser = session.user;
+
+      const { data: profileData, error: profileError } = await supabaseClient
+        .from('profiles')
+        .select('ban, username')
+        .eq('id', currentUser.id)
+        .single();
+
+      if (profileError || profileData.ban) {
+        statusEl.innerText = 'Доступ запрещён';
+        return;
+      }
+      const username = profileData.username;
+
+      const { data: chat, error: chatError } = await supabaseClient
+        .from('chats')
+        .select('user1, user2')
+        .eq('id', chatId)
+        .single();
+
+      if (chatError || !chat) {
+        statusEl.innerText = 'Чат не найден';
+        return;
+      }
+
+      otherUserId = chat.user1 === currentUser.id ? chat.user2 : chat.user1;
+
+      const { data: otherProfile } = await supabaseClient
+        .from('profiles')
+        .select('username')
+        .eq('id', otherUserId)
+        .single();
+
+      callTitle.innerText = `Звонок с ${otherProfile?.username || 'Пользователь'}`;
+
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode },
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+        });
+        localVideo.srcObject = localStream;
+      } catch (err) {
+        statusEl.innerText = 'Нет доступа к камере/микрофону';
+        console.error('Media error:', err);
+        return;
+      }
+
+      peerConnection = new RTCPeerConnection(servers);
+      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+      const remoteStream = new MediaStream();
+      remoteVideo.srcObject = remoteStream;
+
+      peerConnection.ontrack = event => {
+        console.log('Remote track received:', event.track.kind);
+        event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
+      };
+
+      peerConnection.onicecandidate = event => {
+        if (event.candidate) {
+          console.log('New ICE candidate');
+          sendSignal({ type: 'candidate', candidate: event.candidate.toJSON() });
+        }
+      };
+
+      // Мониторинг общего состояния
+      peerConnection.onconnectionstatechange = () => {
+        console.log('Connection state:', peerConnection.connectionState);
+        if (peerConnection.connectionState === 'connected') {
+          statusEl.innerText = 'Соединение установлено';
+        } else if (peerConnection.connectionState === 'failed') {
+          statusEl.innerText = 'Соединение не удалось';
+          endCall();
+        }
+      };
+
+      // Критически важный мониторинг ICE (решает обрывы)
+      peerConnection.oniceconnectionstatechange = () => {
+        console.log('ICE connection state:', peerConnection.iceConnectionState);
+        if (peerConnection.iceConnectionState === 'connected' || peerConnection.iceConnectionState === 'completed') {
+          statusEl.innerText = 'Соединение установлено (видео/аудио активно)';
+        } else if (peerConnection.iceConnectionState === 'disconnected' || peerConnection.iceConnectionState === 'failed') {
+          statusEl.innerText = 'Соединение потеряно (проблема с сетью)';
+          endCall();
+        } else if (peerConnection.iceConnectionState === 'checking') {
+          statusEl.innerText = 'Поиск пути соединения...';
+        }
+      };
+
+      channel = supabaseClient.channel(`call:${chatId}`);
+
+      channel
+        .on('presence', { event: 'sync' }, handlePresenceSync)
+        .on('presence', { event: 'join' }, () => updateStatus())
+        .on('presence', { event: 'leave' }, () => {
+          const peers = getPeers();
+          if (peers.length === 0) endCall();
+        })
+        .on('broadcast', { event: 'signal' }, ({ payload }) => handleSignal(payload))
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await channel.track({ user_id: currentUser.id, username });
+            updateStatus();
+          }
+        });
+    }
+
+    function getPeers() {
+      const state = channel.presenceState();
+      return Object.values(state).flat().filter(p => p.user_id !== currentUser.id);
+    }
+
+    function handlePresenceSync() {
+      const peers = getPeers();
+      if (peers.length === 0) {
+        statusEl.innerText = 'Ожидание собеседника...';
+        return;
+      }
+      if (peers.length > 1) {
+        statusEl.innerText = 'Ошибка: слишком много пользователей';
+        return;
+      }
+
+      const peer = peers[0];
+      callTitle.innerText = `Звонок с ${peer.username || 'Пользователь'}`;
+
+      if (!offered && currentUser.id < peer.user_id) {
+        createAndSendOffer();
+        offered = true;
+      }
+      updateStatus();
+    }
+
+    function updateStatus() {
+      const peers = getPeers();
+      if (peers.length === 0) {
+        statusEl.innerText = 'Ожидание собеседника...';
+      } else if (peerConnection?.iceConnectionState === 'connected' || peerConnection?.iceConnectionState === 'completed') {
+        statusEl.innerText = 'Соединение установлено';
+      } else {
+        statusEl.innerText = 'Установка соединения...';
+      }
+    }
+
+    async function createAndSendOffer() {
+      try {
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        sendSignal({ type: 'offer', sdp: peerConnection.localDescription });
+        statusEl.innerText = 'Звонок... Ожидание ответа';
+      } catch (err) {
+        console.error('Offer error:', err);
+      }
+    }
+
+    async function sendSignal(signal) {
+      if (channel) {
+        await channel.send({
+          type: 'broadcast',
+          event: 'signal',
+          payload: signal
+        });
+      }
+    }
+
+    async function handleSignal(signal) {
+      try {
+        if (signal.type === 'offer') {
+          if (peerConnection.signalingState !== 'stable') return;
+          await peerConnection.setRemoteDescription(signal.sdp);
+          const answer = await peerConnection.createAnswer();
+          await peerConnection.setLocalDescription(answer);
+          sendSignal({ type: 'answer', sdp: peerConnection.localDescription });
+        } else if (signal.type === 'answer') {
+          if (peerConnection.signalingState === 'have-local-offer') {
+            await peerConnection.setRemoteDescription(signal.sdp);
+          }
+        } else if (signal.type === 'candidate') {
+          if (peerConnection.remoteDescription) {
+            await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+            console.log('ICE candidate added');
+          }
+        }
+      } catch (err) {
+        console.error('Signal error:', err);
+      }
+    }
+
+    async function endCall() {
+      if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+      }
+      if (localStream) {
+        localStream.getTracks().forEach(t => t.stop());
+        localStream = null;
+      }
+      if (channel) {
+        await channel.untrack();
+        await channel.unsubscribe();
+        channel = null;
+      }
+      localVideo.srcObject = null;
+      remoteVideo.srcObject = null;
+      statusEl.innerText = 'Звонок завершён';
+      setTimeout(() => {
+        window.location.href = 'https://super-random.netlify.app/test';
+      }, 1000);
+    }
+
+    document.getElementById('toggle-mic').onclick = () => {
+      if (localStream) {
+        micEnabled = !micEnabled;
+        localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
+        document.getElementById('toggle-mic').innerHTML = `<i class="fa fa-microphone${micEnabled ? '' : '-slash'}"></i>`;
+      }
+    };
+
+    document.getElementById('toggle-camera').onclick = () => {
+      if (localStream) {
+        cameraEnabled = !cameraEnabled;
+        localStream.getVideoTracks().forEach(t => t.enabled = cameraEnabled);
+        document.getElementById('toggle-camera').innerHTML = `<i class="fa fa-video${cameraEnabled ? '' : '-slash'}"></i>`;
+      }
+    };
+
+    document.getElementById('switch-camera').onclick = async () => {
+      if (localStream) {
+        facingMode = facingMode === 'user' ? 'environment' : 'user';
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode },
+          audio: false
+        });
+        const newTrack = newStream.getVideoTracks()[0];
+        const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
+        if (sender) sender.replaceTrack(newTrack);
+        localStream.getVideoTracks()[0].stop();
+        localStream.removeTrack(localStream.getVideoTracks()[0]);
+        localStream.addTrack(newTrack);
+        localVideo.srcObject = localStream;
+      }
+    };
+
+    document.getElementById('swap-video').onclick = () => {
+      videoGrid.classList.toggle('swap-video');
+    };
+
+    document.getElementById('fullscreen-toggle').onclick = () => {
+      videoGrid.classList.toggle('fullscreen-remote');
+      const icon = videoGrid.classList.contains('fullscreen-remote') ? 'compress' : 'expand';
+      document.getElementById('fullscreen-toggle').innerHTML = `<i class="fa fa-${icon}"></i>`;
+    };
+
+    document.getElementById('end-call').onclick = endCall;
+
+    window.addEventListener('load', init);
+    window.addEventListener('beforeunload', endCall);
+  </script>
+</body>
+</html>
