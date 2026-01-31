@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>MiniMessenger - Звонок</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    :root {
+      --bg: #0b0b0b;
+      --accent: #25D366;
+      --error: #ff4d4d;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: #fff;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .call-container {
+      position: relative;
+      flex: 1;
+      display: flex;
+      background: #000;
+    }
+
+    /* Видео */
+    #remote-video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain; /* Чтобы видео не обрезалось */
+    }
+    #local-video {
+      position: absolute;
+      bottom: 100px;
+      right: 20px;
+      width: 110px;
+      height: 160px;
+      border-radius: 12px;
+      object-fit: cover;
+      border: 2px solid rgba(255,255,255,0.3);
+      z-index: 10;
+      background: #222;
+    }
+
+    /* Верхняя панель */
+    .top-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 20px;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+      z-index: 20;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .info-text { text-align: center; flex: 1; }
+    #call-title { font-size: 18px; font-weight: bold; }
+    #status { font-size: 13px; color: var(--accent); margin-top: 4px; }
+
+    /* Кнопки */
+    .controls {
+      position: absolute;
+      bottom: 30px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      z-index: 30;
+    }
+    .btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.15);
+      color: white;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+    }
+    .btn-fs { width: 40px; height: 40px; background: rgba(0,0,0,0.5); }
+    .btn.off { background: var(--error); }
+    .btn.end-call { background: var(--error); width: 60px; height: 60px; font-size: 24px; }
+
+    /* Режим "поменять местами" */
+    .swap-video #remote-video {
+      position: absolute;
+      bottom: 100px;
+      right: 20px;
+      width: 110px;
+      height: 160px;
+      object-fit: cover;
+      z-index: 10;
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+    .swap-video #local-video {
+      position: static;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="call-container" id="main-ui">
+    <div class="top-bar">
+      <div style="width: 40px;"></div> <!-- Placeholder -->
+      <div class="info-text">
+        <div id="call-title">Загрузка...</div>
+        <div id="status">Ожидание...</div>
+      </div>
+      <button class="btn btn-fs" id="fs-btn" title="На весь экран">
+        <i class="fa fa-expand"></i>
+      </button>
+    </div>
+
+    <video id="remote-video" autoplay playsinline></video>
+    <video id="local-video" autoplay playsinline muted></video>
+
+    <div class="controls">
+      <button class="btn" id="toggle-mic"><i class="fa fa-microphone"></i></button>
+      <button class="btn" id="toggle-camera"><i class="fa fa-video"></i></button>
+      <button class="btn" id="switch-camera"><i class="fa fa-sync-alt"></i></button>
+      <button class="btn" id="swap-btn"><i class="fa fa-exchange-alt"></i></button>
+      <button class="btn end-call" id="end-btn"><i class="fa fa-phone-slash"></i></button>
+    </div>
+  </div>
+
+  <script>
+    // Оборачиваем в блок, чтобы переменные не конфликтовали
+    {
+      const config = {
+        url: "https://zmewwzlzujsrhstjehrp.supabase.co",
+        key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24"
+      };
+
+      const supabase = window.supabase.createClient(config.url, config.key);
+
+      let pc = null;
+      let localStream = null;
+      let callId = null;
+      let currentUser = null;
+      let isCaller = false;
+      let candidatesQueue = []; // Очередь для кандидатов, если RemoteDesc еще не готов
+
+      const els = {
+        remote: document.getElementById('remote-video'),
+        local: document.getElementById('local-video'),
+        status: document.getElementById('status'),
+        title: document.getElementById('call-title'),
+        main: document.getElementById('main-ui')
+      };
+
+      const iceServers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+      async function init() {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return els.status.innerText = "Авторизуйтесь!";
+        currentUser = session.user;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const chatId = urlParams.get('chat_id');
+        if (!chatId) return els.status.innerText = "Ошибка: Chat ID не найден";
+
+        // 1. Получаем инфо о чате
+        const { data: chat } = await supabase.from('chats').select('*').eq('id', chatId).single();
+        if (!chat) return;
+        const otherId = chat.user1 === currentUser.id ? chat.user2 : chat.user1;
+        
+        const { data: profile } = await supabase.from('profiles').select('username').eq('id', otherId).single();
+        els.title.innerText = profile?.username || "Собеседник";
+
+        // 2. Ищем или создаем звонок
+        const { data: call } = await supabase.from('calls').select('*').eq('chat_id', chatId).maybeSingle();
+
+        if (call && call.status !== 'ended') {
+          callId = call.id;
+          isCaller = (call.caller_id === currentUser.id);
+          startSignaling(call.id); // Сначала подписываемся
+          setupWebRTC(isCaller ? null : call.offer);
+        } else {
+          isCaller = true;
+          createNewCall(chatId, otherId);
+        }
+      }
+
+      async function createNewCall(chatId, otherId) {
+        els.status.innerText = "Запуск камеры...";
+        const stream = await getMedia();
+        if (!stream) return;
+
+        pc = new RTCPeerConnection(iceServers);
+        stream.getTracks().forEach(t => pc.addTrack(t, stream));
+
+        pc.onicecandidate = e => e.candidate && sendIce(e.candidate);
+        pc.ontrack = e => els.remote.srcObject = e.streams[0];
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        const { data, error } = await supabase.from('calls').insert({
+          chat_id: chatId,
+          caller_id: currentUser.id,
+          receiver_id: otherId,
+          offer: { type: offer.type, sdp: offer.sdp },
+          status: 'initiated',
+          ice_candidates: []
+        }).select().single();
+
+        if (data) {
+          callId = data.id;
+          startSignaling(callId);
+          els.status.innerText = "Вызов...";
+        }
+      }
+
+      async function setupWebRTC(remoteOffer) {
+        els.status.innerText = remoteOffer ? "Входящий звонок..." : "Подключение...";
+        const stream = await getMedia();
+        if (!stream) return;
+
+        if (!pc) {
+          pc = new RTCPeerConnection(iceServers);
+          stream.getTracks().forEach(t => pc.addTrack(t, stream));
+          pc.onicecandidate = e => e.candidate && sendIce(e.candidate);
+          pc.ontrack = e => els.remote.srcObject = e.streams[0];
+        }
+
+        if (remoteOffer) {
+          await pc.setRemoteDescription(new RTCSessionDescription(remoteOffer));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          await supabase.from('calls').update({ 
+            answer: { type: answer.type, sdp: answer.sdp },
+            status: 'answered' 
+          }).eq('id', callId);
+          processQueue();
+        }
+      }
+
+      function startSignaling(id) {
+        supabase.channel(`call_${id}`)
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'calls', filter: `id=eq.${id}` }, async (payload) => {
+            const data = payload.new;
+
+            if (isCaller && data.answer && !pc.remoteDescription) {
+              await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+              els.status.innerText = "В сети";
+              processQueue();
+            }
+
+            if (data.ice_candidates && data.ice_candidates.length > 0) {
+              data.ice_candidates.forEach(cand => {
+                if (pc && pc.remoteDescription) {
+                  pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+                } else {
+                  candidatesQueue.push(cand);
+                }
+              });
+            }
+
+            if (data.status === 'ended') location.reload();
+          })
+          .subscribe();
+      }
+
+      async function sendIce(candidate) {
+        const { data } = await supabase.from('calls').select('ice_candidates').eq('id', callId).single();
+        const list = data?.ice_candidates || [];
+        // Проверка, чтобы не дублировать
+        if (list.some(c => c.candidate === candidate.candidate)) return;
+        
+        await supabase.from('calls').update({
+          ice_candidates: [...list, candidate.toJSON()]
+        }).eq('id', callId);
+      }
+
+      function processQueue() {
+        while (candidatesQueue.length > 0) {
+          const cand = candidatesQueue.shift();
+          pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+        }
+      }
+
+      async function getMedia() {
+        try {
+          localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          els.local.srcObject = localStream;
+          return localStream;
+        } catch (e) {
+          els.status.innerText = "Ошибка камеры";
+          return null;
+        }
+      }
+
+      // UI Events
+      document.getElementById('end-btn').onclick = async () => {
+        if (callId) await supabase.from('calls').delete().eq('id', callId);
+        location.href = "/test";
+      };
+
+      document.getElementById('toggle-mic').onclick = (e) => {
+        const t = localStream.getAudioTracks()[0];
+        t.enabled = !t.enabled;
+        e.currentTarget.classList.toggle('off', !t.enabled);
+      };
+
+      document.getElementById('toggle-camera').onclick = (e) => {
+        const t = localStream.getVideoTracks()[0];
+        t.enabled = !t.enabled;
+        e.currentTarget.classList.toggle('off', !t.enabled);
+      };
+
+      document.getElementById('swap-btn').onclick = () => els.main.classList.toggle('swap-video');
+
+      document.getElementById('fs-btn').onclick = () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen();
+          document.getElementById('fs-btn').innerHTML = '<i class="fa fa-compress"></i>';
+        } else {
+          document.exitFullscreen();
+          document.getElementById('fs-btn').innerHTML = '<i class="fa fa-expand"></i>';
+        }
+      };
+
+      document.getElementById('switch-camera').onclick = async () => {
+        const vTrack = localStream.getVideoTracks()[0];
+        const newMode = vTrack.getSettings().facingMode === 'user' ? 'environment' : 'user';
+        const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: newMode } });
+        const newTrack = newStream.getVideoTracks()[0];
+        if (pc) {
+          const sender = pc.getSenders().find(s => s.track.kind === 'video');
+          sender.replaceTrack(newTrack);
+        }
+        vTrack.stop();
+        localStream.removeTrack(vTrack);
+        localStream.addTrack(newTrack);
+        els.local.srcObject = localStream;
+      };
+
+      init();
+    }
+  </script>
+</body>
+</html>
