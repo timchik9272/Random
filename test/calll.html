@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>MiniMessenger - Звонок</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    :root { --bg: #0b0b0b; --accent: #25D366; --error: #ff4d4d; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: var(--bg); color: #fff; height: 100vh; overflow: hidden; }
+
+    .call-container { position: relative; height: 100%; display: flex; flex-direction: column; background: #000; }
+    #remote-video { width: 100%; height: 100%; object-fit: contain; }
+    #local-video { position: absolute; bottom: 100px; right: 20px; width: 100px; height: 140px; border-radius: 12px; object-fit: cover; border: 2px solid rgba(255,255,255,0.3); z-index: 10; }
+
+    .top-bar { position: absolute; top: 0; left: 0; right: 0; padding: 20px; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); z-index: 20; display: flex; justify-content: space-between; }
+    .info { text-align: center; flex: 1; }
+    #status { font-size: 13px; color: var(--accent); margin-top: 5px; }
+
+    .controls { position: absolute; bottom: 30px; left: 0; right: 0; display: flex; justify-content: center; gap: 15px; z-index: 30; }
+    .btn { width: 50px; height: 50px; border-radius: 50%; border: none; background: rgba(255,255,255,0.2); color: #fff; font-size: 18px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
+    .btn-fs { width: 40px; height: 40px; }
+    .end-call { background: var(--error); width: 60px; height: 60px; font-size: 24px; }
+
+    /* Окно входящего вызова */
+    #incoming-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.9); z-index: 100;
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+    }
+    #accept-btn { background: var(--accent); width: 80px; height: 80px; border-radius: 50%; border: none; color: white; font-size: 30px; margin-top: 20px; cursor: pointer; box-shadow: 0 0 20px var(--accent); }
+    
+    .swap-video #remote-video { position: absolute; bottom: 100px; right: 20px; width: 100px; height: 140px; object-fit: cover; z-index: 10; border: 2px solid #fff; }
+    .swap-video #local-video { position: static; width: 100%; height: 100%; object-fit: contain; }
+  </style>
+</head>
+<body>
+
+  <div id="incoming-overlay">
+    <h2 id="caller-name">Входящий звонок...</h2>
+    <button id="accept-btn"><i class="fa fa-phone"></i></button>
+  </div>
+
+  <div class="call-container" id="main-ui">
+    <div class="top-bar">
+      <button class="btn btn-fs" id="fs-btn"><i class="fa fa-expand"></i></button>
+      <div class="info">
+        <b id="call-title">Загрузка...</b>
+        <div id="status">Инициализация...</div>
+      </div>
+      <div style="width:40px"></div>
+    </div>
+
+    <video id="remote-video" autoplay playsinline></video>
+    <video id="local-video" autoplay playsinline muted></video>
+
+    <div class="controls">
+      <button class="btn" id="toggle-mic"><i class="fa fa-microphone"></i></button>
+      <button class="btn" id="toggle-camera"><i class="fa fa-video"></i></button>
+      <button class="btn" id="switch-camera"><i class="fa fa-sync-alt"></i></button>
+      <button class="btn" id="swap-btn"><i class="fa fa-exchange-alt"></i></button>
+      <button class="btn end-call" id="end-btn"><i class="fa fa-phone-slash"></i></button>
+    </div>
+  </div>
+
+<script>
+{
+    const config = {
+        url: "https://zmewwzlzujsrhstjehrp.supabase.co",
+        key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24"
+    };
+    const supabase = window.supabase.createClient(config.url, config.key);
+
+    let pc, localStream, callId, currentUser, isCaller = false;
+    let iceCandidatesQueue = [];
+
+    const els = {
+        status: document.getElementById('status'),
+        title: document.getElementById('call-title'),
+        remote: document.getElementById('remote-video'),
+        local: document.getElementById('local-video'),
+        overlay: document.getElementById('incoming-overlay'),
+        accept: document.getElementById('accept-btn')
+    };
+
+    async function init() {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return alert("Войдите в аккаунт");
+        currentUser = session.user;
+
+        const chatId = new URLSearchParams(window.location.search).get('chat_id');
+        if (!chatId) return;
+
+        // Ищем активный звонок
+        const { data: call } = await supabase.from('calls').select('*').eq('chat_id', chatId).maybeSingle();
+
+        if (call && call.caller_id !== currentUser.id && call.status === 'initiated') {
+            // МЫ ПОЛУЧАТЕЛЬ
+            callId = call.id;
+            isCaller = false;
+            els.overlay.style.display = 'flex';
+            els.accept.onclick = () => {
+                els.overlay.style.display = 'none';
+                startCall(call.offer);
+            };
+        } else {
+            // МЫ ИНИЦИАТОР
+            isCaller = true;
+            startCall();
+        }
+
+        // Слушаем изменения в реальном времени
+        supabase.channel('signaling').on('postgres_changes', { event: '*', schema: 'public', table: 'calls' }, async (p) => {
+            const data = p.new || p.old;
+            if (data.id !== callId) return;
+
+            if (isCaller && data.answer && !pc.remoteDescription) {
+                await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                processIceQueue();
+            }
+
+            if (data.ice_candidates) {
+                data.ice_candidates.forEach(cand => {
+                    // Добавляем только чужие кандидаты (те, что помечены противоположной ролью)
+                    if (cand.role !== (isCaller ? 'caller' : 'receiver')) {
+                        if (pc && pc.remoteDescription) {
+                            pc.addIceCandidate(new RTCIceCandidate(cand.candidate)).catch(() => {});
+                        } else {
+                            iceCandidatesQueue.push(cand.candidate);
+                        }
+                    }
+                });
+            }
+
+            if (p.eventType === 'DELETE' || data.status === 'ended') {
+                location.href = '/test';
+            }
+        }).subscribe();
+    }
+
+    async function startCall(offer = null) {
+        els.status.innerText = "Запуск медиа...";
+        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        els.local.srcObject = localStream;
+
+        pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+        localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+        pc.ontrack = e => els.remote.srcObject = e.streams[0];
+        pc.onicecandidate = e => e.candidate && sendIce(e.candidate);
+        
+        pc.onconnectionstatechange = () => {
+            els.status.innerText = pc.connectionState === 'connected' ? 'В сети' : 'Соединение...';
+        };
+
+        if (isCaller) {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            const { data } = await supabase.from('calls').insert({
+                chat_id: new URLSearchParams(window.location.search).get('chat_id'),
+                caller_id: currentUser.id,
+                offer: { type: offer.type, sdp: offer.sdp },
+                status: 'initiated',
+                ice_candidates: []
+            }).select().single();
+            callId = data.id;
+        } else {
+            await pc.setRemoteDescription(new RTCSessionDescription(offer));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            await supabase.from('calls').update({
+                answer: { type: answer.type, sdp: answer.sdp },
+                status: 'answered'
+            }).eq('id', callId);
+            processIceQueue();
+        }
+    }
+
+    async function sendIce(candidate) {
+        const { data } = await supabase.from('calls').select('ice_candidates').eq('id', callId).single();
+        const current = data?.ice_candidates || [];
+        const newCand = { role: isCaller ? 'caller' : 'receiver', candidate: candidate.toJSON() };
+        
+        await supabase.from('calls').update({
+            ice_candidates: [...current, newCand]
+        }).eq('id', callId);
+    }
+
+    function processIceQueue() {
+        while (iceCandidatesQueue.length > 0) {
+            const c = iceCandidatesQueue.shift();
+            pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+        }
+    }
+
+    // Кнопки
+    document.getElementById('end-btn').onclick = async () => {
+        await supabase.from('calls').delete().eq('id', callId);
+        location.href = '/test';
+    };
+
+    document.getElementById('fs-btn').onclick = () => {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+        else document.exitFullscreen();
+    };
+
+    document.getElementById('toggle-mic').onclick = (e) => {
+        const t = localStream.getAudioTracks()[0];
+        t.enabled = !t.enabled;
+        e.currentTarget.classList.toggle('off', !t.enabled);
+    };
+
+    document.getElementById('toggle-camera').onclick = (e) => {
+        const t = localStream.getVideoTracks()[0];
+        t.enabled = !t.enabled;
+        e.currentTarget.classList.toggle('off', !t.enabled);
+    };
+
+    document.getElementById('swap-btn').onclick = () => document.getElementById('main-ui').classList.toggle('swap-video');
+
+    document.getElementById('switch-camera').onclick = async () => {
+        const track = localStream.getVideoTracks()[0];
+        const mode = track.getSettings().facingMode === 'user' ? 'environment' : 'user';
+        const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
+        const newTrack = newStream.getVideoTracks()[0];
+        pc.getSenders().find(s => s.track.kind === 'video').replaceTrack(newTrack);
+        track.stop();
+        localStream.removeTrack(track);
+        localStream.addTrack(newTrack);
+        els.local.srcObject = localStream;
+    };
+
+    init();
+}
+</script>
+</body>
+</html>
