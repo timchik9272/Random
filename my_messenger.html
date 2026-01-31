@@ -523,7 +523,7 @@ async function openChat(chatId, otherName, otherId, otherAvatarUrl = null){
   document.getElementById('chat-status').innerText = '';
   document.getElementById('typing-status').innerText = '';
   document.getElementById('call-link').style.display = isSelf ? 'none' : 'block';
-  if(!isSelf) document.getElementById('call-link').href = `https://super-random.netlify.app/test/call?chat_id=${encodeURIComponent(chatId)}`;
+  if(!isSelf) document.getElementById('call-link').href = `https://super-random.netlify.app/zvonok2?chat_id=${encodeURIComponent(chatId)}`;
   
   document.getElementById('chat-avatar-container').innerHTML = renderAvatarHTML(otherAvatarUrl, otherName, 38);
   
