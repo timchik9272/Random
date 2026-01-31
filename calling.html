@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>MiniMessenger - Звонок</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    :root {
+      --bg: #0b0b0b;
+      --bg-light: #1a1a1a;
+      --accent: #25D366;
+      --text: #ffffff;
+      --gray: #aaaaaa;
+      --error: #ff4d4d;
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .call-container {
+      position: relative;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #000;
+    }
+    /* Видео сетка */
+    .video-wrapper {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    #remote-video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain; /* Чтобы видео не обрезалось */
+      background: #000;
+    }
+    #local-video {
+      position: absolute;
+      bottom: 100px;
+      right: 20px;
+      width: 120px;
+      height: 180px;
+      border-radius: var(--radius);
+      object-fit: cover;
+      border: 2px solid rgba(255,255,255,0.2);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+      z-index: 10;
+      background: #222;
+      transition: all 0.3s ease;
+    }
+    /* Поменять местами */
+    .swap-video #remote-video {
+      position: absolute;
+      bottom: 100px;
+      right: 20px;
+      width: 120px;
+      height: 180px;
+      object-fit: cover;
+      z-index: 10;
+      border: 2px solid rgba(255,255,255,0.2);
+    }
+    .swap-video #local-video {
+      position: static;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    /* Верхняя панель */
+    .top-info {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 30px 20px;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+      z-index: 15;
+      text-align: center;
+    }
+    #call-title { font-size: 18px; font-weight: 600; margin-bottom: 5px; }
+    #status { font-size: 13px; color: var(--accent); opacity: 0.9; }
+
+    /* Панель управления */
+    .controls {
+      position: absolute;
+      bottom: 30px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      z-index: 20;
+      padding: 0 10px;
+    }
+    .btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.1);
+      color: white;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      transition: background 0.3s;
+    }
+    .btn:active { transform: scale(0.9); }
+    .btn.off { background: var(--error); }
+    .btn.end-call { background: var(--error); width: 60px; height: 60px; font-size: 24px; }
+
+    @media (max-width: 480px) {
+      #local-video { width: 90px; height: 130px; bottom: 110px; right: 15px; }
+      .btn { width: 45px; height: 45px; font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="call-container" id="main-container">
+    <div class="top-info">
+      <div id="call-title">Загрузка...</div>
+      <div id="status">Инициализация...</div>
+    </div>
+
+    <div class="video-wrapper" id="video-wrapper">
+      <video id="remote-video" autoplay playsinline></video>
+      <video id="local-video" autoplay playsinline muted></video>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="toggle-mic"><i class="fa fa-microphone"></i></button>
+      <button class="btn" id="toggle-camera"><i class="fa fa-video"></i></button>
+      <button class="btn" id="switch-camera"><i class="fa fa-sync-alt"></i></button>
+      <button class="btn" id="swap-video-btn"><i class="fa fa-exchange-alt"></i></button>
+      <button class="btn end-call" id="end-call-btn"><i class="fa fa-phone-slash"></i></button>
+    </div>
+  </div>
+
+  <script>
+    // Используем блок, чтобы избежать ошибки "Identifier already declared"
+    {
+      const SUPABASE_URL = "https://zmewwzlzujsrhstjehrp.supabase.co";
+      const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24";
+      
+      const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+      let pc = null;
+      let localStream = null;
+      let callId = null;
+      let currentUser = null;
+      let isCaller = false;
+      let candidatesAdded = new Set(); // Чтобы не дублировать ICE-кандидатов
+
+      const servers = {
+        iceServers: [
+          { urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }
+        ]
+      };
+
+      const elements = {
+        remoteVideo: document.getElementById('remote-video'),
+        localVideo: document.getElementById('local-video'),
+        status: document.getElementById('status'),
+        title: document.getElementById('call-title'),
+        btnMic: document.getElementById('toggle-mic'),
+        btnCam: document.getElementById('toggle-camera'),
+        btnEnd: document.getElementById('end-call-btn'),
+        btnSwap: document.getElementById('swap-video-btn'),
+        btnSwitch: document.getElementById('switch-camera'),
+        wrapper: document.getElementById('video-wrapper')
+      };
+
+      async function init() {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return alert("Нужна авторизация");
+        currentUser = session.user;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const chatId = urlParams.get('chat_id');
+        if (!chatId) return (elements.status.innerText = "Ошибка: нет ID чата");
+
+        // Определяем кто мы и кому звоним
+        const { data: chat } = await supabase.from('chats').select('*').eq('id', chatId).single();
+        if (!chat) return;
+        
+        const otherUserId = chat.user1 === currentUser.id ? chat.user2 : chat.user1;
+        const { data: otherProfile } = await supabase.from('profiles').select('username').eq('id', otherUserId).single();
+        elements.title.innerText = otherProfile?.username || "Собеседник";
+
+        // Проверяем, есть ли активный звонок
+        const { data: existingCall } = await supabase.from('calls')
+          .select('*')
+          .eq('chat_id', chatId)
+          .single();
+
+        if (existingCall) {
+          if (existingCall.caller_id === currentUser.id) {
+            isCaller = true;
+            callId = existingCall.id;
+            setupWebRTC();
+          } else {
+            isCaller = false;
+            callId = existingCall.id;
+            setupWebRTC(existingCall.offer);
+          }
+        } else {
+          isCaller = true;
+          startNewCall(chatId, otherUserId);
+        }
+
+        subscribeToSignaling();
+      }
+
+      async function startNewCall(chatId, receiverId) {
+        isCaller = true;
+        const stream = await getMedia();
+        if (!stream) return;
+
+        pc = new RTCPeerConnection(servers);
+        stream.getTracks().forEach(t => pc.addTrack(t, stream));
+
+        pc.onicecandidate = (e) => {
+          if (e.candidate) saveIceCandidate(e.candidate);
+        };
+
+        pc.ontrack = (e) => elements.remoteVideo.srcObject = e.streams[0];
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        const { data, error } = await supabase.from('calls').insert({
+          chat_id: chatId,
+          caller_id: currentUser.id,
+          receiver_id: receiverId,
+          offer: { type: offer.type, sdp: offer.sdp },
+          status: 'initiated',
+          ice_candidates: []
+        }).select().single();
+
+        if (data) callId = data.id;
+        elements.status.innerText = "Вызов...";
+      }
+
+      async function setupWebRTC(remoteOffer = null) {
+        const stream = await getMedia();
+        if (!stream) return;
+
+        pc = new RTCPeerConnection(servers);
+        stream.getTracks().forEach(t => pc.addTrack(t, stream));
+        pc.ontrack = (e) => elements.remoteVideo.srcObject = e.streams[0];
+        pc.onicecandidate = (e) => {
+          if (e.candidate) saveIceCandidate(e.candidate);
+        };
+
+        if (remoteOffer) {
+          await pc.setRemoteDescription(new RTCSessionDescription(remoteOffer));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          await supabase.from('calls').update({ 
+            answer: { type: answer.type, sdp: answer.sdp },
+            status: 'answered'
+          }).eq('id', callId);
+          elements.status.innerText = "Соединение...";
+        }
+      }
+
+      async function getMedia() {
+        try {
+          localStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, 
+            audio: true 
+          });
+          elements.localVideo.srcObject = localStream;
+          return localStream;
+        } catch (e) {
+          elements.status.innerText = "Доступ к камере запрещен";
+          return null;
+        }
+      }
+
+      function subscribeToSignaling() {
+        supabase.channel(`call_${callId || 'new'}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'calls' }, async (payload) => {
+            const data = payload.new;
+            if (!data || data.id !== callId) return;
+
+            // Если пришел ответ
+            if (isCaller && data.answer && !pc.remoteDescription) {
+              await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+              elements.status.innerText = "В сети";
+            }
+
+            // Обработка ICE кандидатов
+            if (data.ice_candidates && pc && pc.remoteDescription) {
+              data.ice_candidates.forEach(cand => {
+                const candidateStr = JSON.stringify(cand);
+                if (!candidatesAdded.has(candidateStr)) {
+                  pc.addIceCandidate(new RTCIceCandidate(cand)).catch(e => {});
+                  candidatesAdded.add(candidateStr);
+                }
+              });
+            }
+
+            if (data.status === 'ended') endCall(false);
+          })
+          .subscribe();
+      }
+
+      async function saveIceCandidate(candidate) {
+        if (!callId) return;
+        // Читаем текущие, добавляем новый. В идеале использовать RPC, но для простоты:
+        const { data } = await supabase.from('calls').select('ice_candidates').eq('id', callId).single();
+        const current = data?.ice_candidates || [];
+        await supabase.from('calls').update({
+          ice_candidates: [...current, candidate.toJSON()]
+        }).eq('id', callId);
+      }
+
+      async function endCall(notify = true) {
+        if (notify && callId) {
+          await supabase.from('calls').delete().eq('id', callId);
+        }
+        if (localStream) localStream.getTracks().forEach(t => t.stop());
+        if (pc) pc.close();
+        window.location.href = "/test";
+      }
+
+      // Кнопки управления
+      elements.btnMic.onclick = () => {
+        const audio = localStream.getAudioTracks()[0];
+        audio.enabled = !audio.enabled;
+        elements.btnMic.classList.toggle('off', !audio.enabled);
+        elements.btnMic.innerHTML = `<i class="fa fa-microphone${audio.enabled ? '' : '-slash'}"></i>`;
+      };
+
+      elements.btnCam.onclick = () => {
+        const video = localStream.getVideoTracks()[0];
+        video.enabled = !video.enabled;
+        elements.btnCam.classList.toggle('off', !video.enabled);
+        elements.btnCam.innerHTML = `<i class="fa fa-video${video.enabled ? '' : '-slash'}"></i>`;
+      };
+
+      elements.btnSwap.onclick = () => elements.wrapper.classList.toggle('swap-video');
+
+      elements.btnEnd.onclick = () => endCall(true);
+
+      elements.btnSwitch.onclick = async () => {
+        if (!localStream) return;
+        const videoTrack = localStream.getVideoTracks()[0];
+        const currentMode = videoTrack.getSettings().facingMode;
+        const newMode = currentMode === 'user' ? 'environment' : 'user';
+        
+        const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: newMode } });
+        const newTrack = newStream.getVideoTracks()[0];
+        
+        if (pc) {
+          const sender = pc.getSenders().find(s => s.track.kind === 'video');
+          sender.replaceTrack(newTrack);
+        }
+        
+        videoTrack.stop();
+        localStream.removeTrack(videoTrack);
+        localStream.addTrack(newTrack);
+        elements.localVideo.srcObject = localStream;
+      };
+
+      init();
+    }
+  </script>
+</body>
+</html>
