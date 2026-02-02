@@ -68,6 +68,8 @@
       bottom: 80px;
       right: 10px;
       z-index: 10;
+      cursor: pointer;
+      transition: cursor 0.3s;
     }
     .swap-video #remote-video {
       width: 150px;
@@ -76,11 +78,13 @@
       bottom: 80px;
       right: 10px;
       z-index: 10;
+      cursor: default;
     }
     .swap-video #local-video {
       width: 100%;
       height: 100%;
       position: static;
+      cursor: default;
     }
     @media (max-width: 600px) {
       .call-container {
@@ -107,7 +111,7 @@
       display: flex;
       gap: 15px;
       position: absolute;
-      top: 20px; /* Перемещено вверх */
+      top: 20px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 20;
@@ -144,25 +148,40 @@
       color: var(--gray);
       margin-bottom: 10px;
       position: absolute;
-      top: 80px; /* Сдвинуто ниже controls */
+      top: 80px;
       z-index: 10;
+      text-align: center;
+      width: 100%;
     }
     #call-title {
       font-size: 20px;
       font-weight: 500;
       color: var(--text);
       position: absolute;
-      top: 110px; /* Сдвинуто ниже */
+      top: 110px;
       z-index: 10;
     }
     .fullscreen-btn {
       position: absolute;
       top: 20px;
-      left: 20px; /* Сверху слева */
+      left: 20px;
       z-index: 30;
     }
     .fa {
       font-size: 20px;
+    }
+    #redirect-now {
+      margin-top: 20px;
+      padding: 12px 24px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    #redirect-now:hover {
+      background: #20b858;
     }
   </style>
 </head>
@@ -179,7 +198,6 @@
       <button id="toggle-mic" title="Вкл/выкл микрофон"><i class="fa fa-microphone"></i></button>
       <button id="toggle-camera" title="Вкл/выкл камеру"><i class="fa fa-video"></i></button>
       <button id="switch-camera" title="Переключить камеру"><i class="fa fa-sync-alt"></i></button>
-      <button id="swap-video" title="Поменять местами"><i class="fa fa-exchange-alt"></i></button>
       <button id="end-call" class="end-call-btn"><i class="fa fa-phone-slash"></i></button>
     </div>
   </div>
@@ -211,12 +229,28 @@
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        { urls: 'stun:stun.ekiga.net:3478' },
+        { urls: 'stun:stun.schlund.de:3478' },
+        { urls: 'stun:stun.voipbuster.com:3478' },
+        { urls: 'stun:stun.ideasip.com:3478' },
+        { urls: 'stun:stun.iptel.org:3478' },
+        { urls: 'stun:stun.stunprotocol.org:3478' },
+        { urls: 'stun:stun.voiparound.com:3478' },
         {
-          urls: [
-            'turn:openrelay.metered.ca:80',
-            'turn:openrelay.metered.ca:443',
-            'turn:openrelay.metered.ca:443?transport=tcp'
-          ],
+          urls: 'turn:openrelay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
           username: 'openrelayproject',
           credential: 'openrelayproject'
         }
@@ -439,9 +473,35 @@
       }
       localVideo.srcObject = null;
       remoteVideo.srcObject = null;
-      statusEl.innerText = 'Звонок завершён';
-      setTimeout(() => {
-        window.location.href = 'https://super-random.netlify.app/test';
+
+      // Скрываем элементы управления
+      document.querySelector('.controls').style.display = 'none';
+      document.getElementById('fullscreen-toggle').style.display = 'none';
+      document.getElementById('call-title').style.display = 'none';
+
+      // Показываем сообщение об окончании и обратный отсчёт
+      const redirectUrl = 'https://super-random.netlify.app/test';
+      let countdown = 10;
+
+      statusEl.innerHTML = `
+        <div style="font-size: 18px; margin-bottom: 10px;">Звонок завершён</div>
+        <div>Перенаправление через <strong id="countdown-span">${countdown}</strong> секунд</div>
+        <button id="redirect-now">Перейти сейчас</button>
+      `;
+
+      document.getElementById('redirect-now').onclick = () => {
+        clearInterval(countdownInterval);
+        window.location.href = redirectUrl;
+      };
+
+      const countdownInterval = setInterval(() => {
+        countdown--;
+        if (countdown > 0) {
+          document.getElementById('countdown-span').innerText = countdown;
+        } else {
+          clearInterval(countdownInterval);
+          window.location.href = redirectUrl;
+        }
       }, 1000);
     }
 
@@ -478,7 +538,8 @@
       }
     };
 
-    document.getElementById('swap-video').onclick = () => {
+    // Смена местами по клику на своё видео (local-video)
+    localVideo.onclick = () => {
       videoGrid.classList.toggle('swap-video');
     };
 
@@ -499,4 +560,4 @@
     window.addEventListener('beforeunload', endCall);
   </script>
 </body>
-    </html>
+</html>
