@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>MiniMessenger - Авторизация</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    :root {
+      --bg: #121212;
+      --bg-light: #1e1e1e;
+      --accent: #25D366;
+      --text: #ffffff;
+      --gray: #888888;
+      --error: #e63946;
+      --success: #25D366;
+      --radius: 12px;
+      --shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .auth-container {
+      background: var(--bg-light);
+      padding: 30px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+    }
+    h2 {
+      margin-bottom: 20px;
+      font-weight: 500;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 16px;
+      min-height: 24px;
+    }
+    .spinner {
+      display: none;
+      margin: 20px auto;
+      width: 40px;
+      height: 40px;
+      border: 4px solid var(--gray);
+      border-top: 4px solid var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .error { color: var(--error); }
+    .success { color: var(--success); }
+  </style>
+</head>
+<body>
+  <div class="auth-container">
+    <h2>Авторизация</h2>
+    <div class="spinner" id="spinner"></div>
+    <div id="status">Проверка параметров...</div>
+  </div>
+
+  <script>
+    const supabaseClient = supabase.createClient(
+      "https://zmewwzlzujsrhstjehrp.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24"
+    );
+
+    const statusEl = document.getElementById('status');
+    const spinner = document.getElementById('spinner');
+
+    async function performAuth() {
+      const urlParams = new URLSearchParams(window.location.search);
+
+      const email = urlParams.get('email');
+      const password = urlParams.get('password');
+      const redirectTo = urlParams.get('redirect') || 'https://super-random.netlify.app/test'; // дефолтная ссылка, можно изменить
+
+      if (!email || !password) {
+        statusEl.innerHTML = '<span class="error">Ошибка: в URL отсутствуют параметры email или password</span>';
+        spinner.style.display = 'none';
+        return;
+      }
+
+      spinner.style.display = 'block';
+      statusEl.textContent = 'Выполняется вход...';
+
+      try {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+          email: email.trim(),
+          password: password
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        if (data.session) {
+          statusEl.innerHTML = '<span class="success">Успешный вход!</span><br>Перенаправление...';
+          setTimeout(() => {
+            window.location.href = redirectTo;
+          }, 1500);
+        } else {
+          statusEl.innerHTML = '<span class="error">Не удалось получить сессию</span>';
+          spinner.style.display = 'none';
+        }
+      } catch (err) {
+        console.error('Auth error:', err);
+        let message = 'Ошибка авторизации';
+        if (err.message.includes('Invalid login credentials')) {
+          message = 'Неверный email или пароль';
+        } else if (err.message.includes('Email not confirmed')) {
+          message = 'Email не подтверждён';
+        }
+        statusEl.innerHTML = `<span class="error">${message}</span>`;
+        spinner.style.display = 'none';
+      }
+    }
+
+    window.addEventListener('load', performAuth);
+  </script>
+</body>
+</html>
