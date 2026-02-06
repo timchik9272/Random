@@ -26,7 +26,6 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
 
-    /* Основной контейнер звонка */
     .call-container {
       position: relative;
       width: 100%;
@@ -43,7 +42,7 @@
       height: 100vh;
     }
 
-    /* СЕТКА ВИДЕО */
+    /* ОБЩИЙ СЛОЙ ВИДЕО */
     .video-layer {
       position: absolute;
       top: 0;
@@ -53,33 +52,59 @@
       z-index: 1;
     }
 
-    /* Большое видео (Фон) */
-    .video-full {
+    /* Обертка для видео и заглушки */
+    .video-wrapper {
+      position: absolute;
+      overflow: hidden;
+      background: #1e1e1e;
+      transition: all 0.6s cubic-bezier(0.25, 0.8, 0.25, 1); /* Плавная анимация */
+    }
+
+    video {
       width: 100%;
       height: 100%;
       object-fit: cover;
       display: block;
     }
 
-    /* Маленькое видео (Плавающее) */
-    .video-floating {
+    /* Картинка-заглушка (когда камера выкл) */
+    .camera-placeholder {
       position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none; /* Скрыто по умолчанию */
+      z-index: 2;
+      background: #111;
+    }
+
+    /* Состояние: ПОЛНЫЙ ЭКРАН (Фон) */
+    .video-wrapper.is-full {
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      border-radius: 0;
+      z-index: 1;
+    }
+
+    /* Состояние: ПЛАВАЮЩЕЕ ОКНО (Маленькое) */
+    .video-wrapper.is-floating {
       width: 120px;
       height: 160px;
-      bottom: 100px; /* Выше панели управления */
+      bottom: 100px; 
       right: 16px;
       border-radius: var(--radius);
-      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-      object-fit: cover;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
       z-index: 10;
       cursor: pointer;
       border: 2px solid rgba(255,255,255,0.1);
-      transition: all 0.3s ease;
-      background: #1e1e1e;
     }
-    
-    /* Активное состояние нажатия на маленькое видео */
-    .video-floating:active {
+
+    /* Эффект нажатия на маленькое окно */
+    .video-wrapper.is-floating:active {
       transform: scale(0.95);
     }
 
@@ -95,7 +120,7 @@
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      pointer-events: none; /* Чтобы клики проходили сквозь прозрачные зоны */
+      pointer-events: none;
     }
 
     .call-info {
@@ -128,7 +153,7 @@
       backdrop-filter: blur(5px);
     }
 
-    /* НИЖНЯЯ ПАНЕЛЬ УПРАВЛЕНИЯ */
+    /* ПАНЕЛЬ УПРАВЛЕНИЯ */
     .controls-bar {
       position: absolute;
       bottom: 0;
@@ -219,8 +244,15 @@
   <div class="call-container" id="call-root">
     
     <div class="video-layer">
-      <video id="remote-video" class="video-full" autoplay playsinline></video>
-      <video id="local-video" class="video-floating" autoplay playsinline muted></video>
+      <div id="remote-wrapper" class="video-wrapper is-full">
+        <img src="https://2nwatpeu4k.ucarecd.net/601bc32d-258d-4e79-9fcb-d2e067f2f353/" class="camera-placeholder" id="remote-placeholder">
+        <video id="remote-video" autoplay playsinline></video>
+      </div>
+
+      <div id="local-wrapper" class="video-wrapper is-floating">
+        <img src="https://2nwatpeu4k.ucarecd.net/601bc32d-258d-4e79-9fcb-d2e067f2f353/" class="camera-placeholder" id="local-placeholder">
+        <video id="local-video" autoplay playsinline muted></video>
+      </div>
     </div>
 
     <div class="top-bar">
@@ -258,7 +290,8 @@
       "https://zmewwzlzujsrhstjehrp.supabase.co",
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24"
     );
-    const HOME_URL = 'https://super-random.netlify.app/test'; 
+    // ОБНОВЛЕННАЯ ССЫЛКА НА ГЛАВНУЮ
+    const HOME_URL = 'https://super-random.netlify.app/my_messenger'; 
 
     // --- ПЕРЕМЕННЫЕ ---
     let currentUser = null;
@@ -271,11 +304,16 @@
     let micEnabled = true;
     let cameraEnabled = true;
     let facingMode = 'user';
-    let isSwapped = false; // Состояние: кто на главном экране
+    let isSwapped = false; // false = Remote большой, Local маленький
 
     // --- ЭЛЕМЕНТЫ ---
     const localVideo = document.getElementById('local-video');
     const remoteVideo = document.getElementById('remote-video');
+    const localWrapper = document.getElementById('local-wrapper');
+    const remoteWrapper = document.getElementById('remote-wrapper');
+    const localPlaceholder = document.getElementById('local-placeholder');
+    const remotePlaceholder = document.getElementById('remote-placeholder');
+    
     const statusEl = document.getElementById('status');
     const callTitle = document.getElementById('call-title');
     const callRoot = document.getElementById('call-root');
@@ -303,12 +341,10 @@
       if (!session) { statusEl.innerText = 'Нет авторизации'; return; }
       currentUser = session.user;
 
-      // Проверка профиля
       const { data: profile } = await supabaseClient.from('profiles').select('ban, username').eq('id', currentUser.id).single();
       if (!profile || profile.ban) { statusEl.innerText = 'Доступ запрещён'; return; }
       const username = profile.username;
 
-      // Данные чата
       const { data: chat } = await supabaseClient.from('chats').select('user1, user2').eq('id', chatId).single();
       if (!chat) { statusEl.innerText = 'Чат не найден'; return; }
 
@@ -316,7 +352,6 @@
       const { data: otherProfile } = await supabaseClient.from('profiles').select('username').eq('id', otherUserId).single();
       callTitle.innerText = otherProfile?.username || 'Собеседник';
 
-      // Запуск медиа
       try {
         localStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode },
@@ -328,17 +363,14 @@
         return;
       }
 
-      // Настройка WebRTC
       setupPeerConnection();
 
-      // Сигнализация (Supabase Realtime)
       channel = supabaseClient.channel(`call:${chatId}`);
       channel
         .on('presence', { event: 'sync' }, handlePresenceSync)
         .on('presence', { event: 'join' }, updateStatus)
         .on('presence', { event: 'leave' }, () => {
-          const peers = getPeers();
-          if (peers.length === 0) endCall(false); // false = не локальный сброс
+          if (getPeers().length === 0) endCall();
         })
         .on('broadcast', { event: 'signal' }, ({ payload }) => handleSignal(payload))
         .subscribe(status => {
@@ -363,11 +395,10 @@
 
       peerConnection.onconnectionstatechange = () => {
         if (peerConnection.connectionState === 'connected') statusEl.innerText = 'Идёт разговор';
-        else if (peerConnection.connectionState === 'failed') endCall(false);
+        else if (peerConnection.connectionState === 'failed') endCall();
       };
     }
 
-    // --- ЛОГИКА СИГНАЛИЗАЦИИ ---
     function getPeers() {
       const state = channel.presenceState();
       return Object.values(state).flat().filter(p => p.user_id !== currentUser.id);
@@ -380,7 +411,6 @@
       callTitle.innerText = peers[0].username || 'Собеседник';
       updateStatus();
 
-      // Инициатор звонка (тот у кого ID меньше, чтобы не было коллизий)
       if (!offered && currentUser.id < peers[0].user_id) {
         createOffer();
         offered = true;
@@ -390,7 +420,7 @@
     function updateStatus() {
       const peers = getPeers();
       if (peers.length === 0) statusEl.innerText = 'Ожидание собеседника...';
-      else if (peerConnection?.connectionState === 'connected') statusEl.innerText = '00:00'; // Тут можно таймер добавить
+      else if (peerConnection?.connectionState === 'connected') statusEl.innerText = 'В эфире';
       else statusEl.innerText = 'Соединение...';
     }
 
@@ -406,12 +436,14 @@
 
     async function handleSignal(signal) {
       if (!peerConnection) return;
+
       if (signal.type === 'offer') {
         if (peerConnection.signalingState !== 'stable') return;
         await peerConnection.setRemoteDescription(signal.sdp);
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
         sendSignal({ type: 'answer', sdp: peerConnection.localDescription });
+        
       } else if (signal.type === 'answer') {
         if (peerConnection.signalingState === 'have-local-offer') {
           await peerConnection.setRemoteDescription(signal.sdp);
@@ -420,40 +452,50 @@
         if (peerConnection.remoteDescription) {
           await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
         }
+      } else if (signal.type === 'cam_toggle') {
+        // ЛОГИКА ЗАГЛУШКИ ДЛЯ СОБЕСЕДНИКА
+        if (signal.value === false) {
+          remotePlaceholder.style.display = 'block';
+        } else {
+          remotePlaceholder.style.display = 'none';
+        }
       }
     }
 
-    // --- ФУНКЦИИ ИНТЕРФЕЙСА ---
+    // --- UI ИНТЕРАКТИВ ---
 
-    // 1. Своп Видео (Правильная реализация)
-    function swapVideos() {
-      isSwapped = !isSwapped;
-      
-      if (isSwapped) {
-        // Local становится большим (Full), Remote маленьким (Floating)
-        localVideo.className = 'video-full';
-        remoteVideo.className = 'video-floating';
-        // Важно: перенести floating элемент в конец контейнера, чтобы z-index работал верно (или просто через z-index css)
-      } else {
-        // Вернуть как было
-        localVideo.className = 'video-floating';
-        remoteVideo.className = 'video-full';
+    // Функция проверки клика для смены мест
+    function handleWrapperClick(wrapper) {
+      // Меняем местами, ТОЛЬКО если кликнули по "плавающему" (маленькому) окну
+      if (wrapper.classList.contains('is-floating')) {
+        isSwapped = !isSwapped;
+        
+        if (isSwapped) {
+          // Local -> Большой, Remote -> Маленький
+          localWrapper.className = 'video-wrapper is-full';
+          remoteWrapper.className = 'video-wrapper is-floating';
+          // Поднимаем z-index маленького окна, чтобы оно было кликабельно
+          remoteWrapper.style.zIndex = '10';
+          localWrapper.style.zIndex = '1';
+        } else {
+          // Вернуть как было
+          localWrapper.className = 'video-wrapper is-floating';
+          remoteWrapper.className = 'video-wrapper is-full';
+          
+          localWrapper.style.zIndex = '10';
+          remoteWrapper.style.zIndex = '1';
+        }
       }
     }
 
-    // Навешиваем обработчики на оба элемента
-    localVideo.onclick = swapVideos;
-    remoteVideo.onclick = () => {
-      // Кликабельно только если оно маленькое
-      if (remoteVideo.classList.contains('video-floating')) swapVideos();
-    };
+    localWrapper.onclick = () => handleWrapperClick(localWrapper);
+    remoteWrapper.onclick = () => handleWrapperClick(remoteWrapper);
 
-    // 2. Полноэкранный режим (Реальный)
+    // Fullscreen
     document.getElementById('fullscreen-toggle').onclick = () => {
       if (!document.fullscreenElement) {
-        // Запрашиваем фуллскрин на КОРНЕВОЙ элемент, а не на видео
         if (callRoot.requestFullscreen) callRoot.requestFullscreen();
-        else if (callRoot.webkitRequestFullscreen) callRoot.webkitRequestFullscreen(); // Safari
+        else if (callRoot.webkitRequestFullscreen) callRoot.webkitRequestFullscreen();
         document.getElementById('fullscreen-toggle').innerHTML = '<i class="fa fa-compress"></i>';
       } else {
         if (document.exitFullscreen) document.exitFullscreen();
@@ -461,25 +503,22 @@
       }
     };
 
-    // 3. Завершение звонка
-    async function endCall(isLocal = true) {
-      // Остановить стримы
+    // Завершение
+    async function endCall() {
       if (localStream) localStream.getTracks().forEach(t => t.stop());
       if (peerConnection) peerConnection.close();
       if (channel) await supabaseClient.removeChannel(channel);
 
-      // UI
       document.querySelector('.top-bar').style.display = 'none';
       document.getElementById('controls').style.display = 'none';
-      
-      // Показать экран завершения
       endScreen.style.display = 'flex';
     }
 
-    document.getElementById('end-call').onclick = () => endCall(true);
+    document.getElementById('end-call').onclick = endCall;
     document.getElementById('go-home-btn').onclick = () => window.location.href = HOME_URL;
 
-    // 4. Медиа контроль
+    // --- МЕДИА КОНТРОЛЛЕРЫ ---
+    
     document.getElementById('toggle-mic').onclick = function() {
       micEnabled = !micEnabled;
       if (localStream) localStream.getAudioTracks()[0].enabled = micEnabled;
@@ -489,7 +528,21 @@
 
     document.getElementById('toggle-camera').onclick = function() {
       cameraEnabled = !cameraEnabled;
+      
+      // 1. Выключаем/Включаем трек видео
       if (localStream) localStream.getVideoTracks()[0].enabled = cameraEnabled;
+      
+      // 2. Локально показываем/скрываем заглушку
+      if (cameraEnabled) {
+        localPlaceholder.style.display = 'none';
+      } else {
+        localPlaceholder.style.display = 'block';
+      }
+
+      // 3. Отправляем сигнал собеседнику, чтобы он тоже показал заглушку
+      sendSignal({ type: 'cam_toggle', value: cameraEnabled });
+
+      // 4. Меняем иконку кнопки
       this.innerHTML = `<i class="fa fa-video${cameraEnabled ? '' : '-slash'}"></i>`;
       this.style.background = cameraEnabled ? 'rgba(255,255,255,0.2)' : 'rgba(255,59,48,0.5)';
     };
@@ -508,6 +561,12 @@
         localStream.removeTrack(localStream.getVideoTracks()[0]);
         localStream.addTrack(videoTrack);
         localVideo.srcObject = localStream;
+
+        // При смене камеры, если она была выключена интерфейсом, нужно учесть это, но обычно смена камеры включает её
+        if (!cameraEnabled) {
+            // Если камера была выключена, новая камера включится аппаратно, но мы должны ее заглушить программно, если хотим сохранить состояние
+            videoTrack.enabled = false;
+        }
       } catch (e) { console.error(e); }
     };
 
