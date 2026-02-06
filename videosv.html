@@ -36,7 +36,6 @@
       flex-direction: column;
     }
 
-    /* Когда контейнер в фуллскрине */
     .call-container:fullscreen {
       width: 100vw;
       height: 100vh;
@@ -50,37 +49,37 @@
       width: 100%;
       height: 100%;
       z-index: 1;
+      background: #000;
     }
 
-    /* Обертка для видео и заглушки */
+    /* Обертка для видео */
     .video-wrapper {
       position: absolute;
       overflow: hidden;
-      background: #1e1e1e;
-      transition: all 0.6s cubic-bezier(0.25, 0.8, 0.25, 1); /* Плавная анимация */
+      background: #000; /* Черный фон для полос по краям */
+      /* Анимация удалена по просьбе */
     }
 
     video {
       width: 100%;
       height: 100%;
-      object-fit: cover;
       display: block;
     }
 
-    /* Картинка-заглушка (когда камера выкл) */
+    /* Картинка-заглушка */
     .camera-placeholder {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      object-fit: cover;
-      display: none; /* Скрыто по умолчанию */
+      object-fit: contain; /* Тоже не обрезаем аватар */
+      display: none;
       z-index: 2;
       background: #111;
     }
 
-    /* Состояние: ПОЛНЫЙ ЭКРАН (Фон) */
+    /* === СОСТОЯНИЕ: НА ВЕСЬ ЭКРАН (ФОН) === */
     .video-wrapper.is-full {
       width: 100%;
       height: 100%;
@@ -88,24 +87,33 @@
       left: 0;
       border-radius: 0;
       z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    /* Состояние: ПЛАВАЮЩЕЕ ОКНО (Маленькое) */
+    /* ГЛАВНОЕ ИЗМЕНЕНИЕ: contain вместо cover */
+    .video-wrapper.is-full video {
+      object-fit: contain; 
+      /* Видео вписывается целиком, черные полосы по краям, ничего не режется */
+    }
+
+    /* === СОСТОЯНИЕ: ПЛАВАЮЩЕЕ ОКНО (МАЛЕНЬКОЕ) === */
     .video-wrapper.is-floating {
       width: 120px;
       height: 160px;
       bottom: 100px; 
       right: 16px;
       border-radius: var(--radius);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      box-shadow: 0 4px 10px rgba(255,255,255,0.1); /* Легкая рамка для контраста */
       z-index: 10;
       cursor: pointer;
-      border: 2px solid rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
     }
 
-    /* Эффект нажатия на маленькое окно */
-    .video-wrapper.is-floating:active {
-      transform: scale(0.95);
+    /* Маленькое видео оставляем cover, чтобы оно не было "точкой", но можно поменять */
+    .video-wrapper.is-floating video {
+      object-fit: cover; 
     }
 
     /* ИНТЕРФЕЙС */
@@ -115,7 +123,7 @@
       left: 0;
       width: 100%;
       padding: 16px;
-      background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+      background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
       z-index: 20;
       display: flex;
       justify-content: space-between;
@@ -150,7 +158,6 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      backdrop-filter: blur(5px);
     }
 
     /* ПАНЕЛЬ УПРАВЛЕНИЯ */
@@ -176,22 +183,19 @@
       font-size: 20px;
       cursor: pointer;
       background: rgba(255,255,255,0.2);
-      backdrop-filter: blur(10px);
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: transform 0.2s, background 0.2s;
     }
 
     .ctrl-btn:active {
-      transform: scale(0.9);
+      background: rgba(255,255,255,0.4); /* Простой эффект нажатия без анимации размера */
     }
 
     .btn-end {
       background: var(--danger);
     }
-    .btn-end:hover { background: #d9362e; }
-
+    
     /* ЭКРАН ЗАВЕРШЕНИЯ */
     .end-screen {
       display: none;
@@ -236,7 +240,6 @@
       background: #333;
       color: white;
     }
-
   </style>
 </head>
 <body>
@@ -285,15 +288,14 @@
   </div>
 
   <script>
-    // --- КОНФИГУРАЦИЯ ---
+    // --- CONFIG ---
     const supabaseClient = supabase.createClient(
       "https://zmewwzlzujsrhstjehrp.supabase.co",
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24"
     );
-    // ОБНОВЛЕННАЯ ССЫЛКА НА ГЛАВНУЮ
     const HOME_URL = 'https://super-random.netlify.app/my_messenger'; 
 
-    // --- ПЕРЕМЕННЫЕ ---
+    // --- VARS ---
     let currentUser = null;
     let otherUserId = null;
     let chatId = null;
@@ -304,9 +306,9 @@
     let micEnabled = true;
     let cameraEnabled = true;
     let facingMode = 'user';
-    let isSwapped = false; // false = Remote большой, Local маленький
+    let isSwapped = false;
 
-    // --- ЭЛЕМЕНТЫ ---
+    // --- ELEMENTS ---
     const localVideo = document.getElementById('local-video');
     const remoteVideo = document.getElementById('remote-video');
     const localWrapper = document.getElementById('local-wrapper');
@@ -330,7 +332,7 @@
       ]
     };
 
-    // --- ИНИЦИАЛИЗАЦИЯ ---
+    // --- INIT ---
     const urlParams = new URLSearchParams(window.location.search);
     chatId = urlParams.get('chat_id');
 
@@ -453,7 +455,6 @@
           await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
         }
       } else if (signal.type === 'cam_toggle') {
-        // ЛОГИКА ЗАГЛУШКИ ДЛЯ СОБЕСЕДНИКА
         if (signal.value === false) {
           remotePlaceholder.style.display = 'block';
         } else {
@@ -462,23 +463,21 @@
       }
     }
 
-    // --- UI ИНТЕРАКТИВ ---
+    // --- UI INTERACTION (NO ANIMATION) ---
 
-    // Функция проверки клика для смены мест
     function handleWrapperClick(wrapper) {
-      // Меняем местами, ТОЛЬКО если кликнули по "плавающему" (маленькому) окну
+      // Меняем только при клике на плавающее окно
       if (wrapper.classList.contains('is-floating')) {
         isSwapped = !isSwapped;
         
+        // Мгновенное переключение классов без анимации
         if (isSwapped) {
-          // Local -> Большой, Remote -> Маленький
           localWrapper.className = 'video-wrapper is-full';
           remoteWrapper.className = 'video-wrapper is-floating';
-          // Поднимаем z-index маленького окна, чтобы оно было кликабельно
+          
           remoteWrapper.style.zIndex = '10';
           localWrapper.style.zIndex = '1';
         } else {
-          // Вернуть как было
           localWrapper.className = 'video-wrapper is-floating';
           remoteWrapper.className = 'video-wrapper is-full';
           
@@ -491,7 +490,6 @@
     localWrapper.onclick = () => handleWrapperClick(localWrapper);
     remoteWrapper.onclick = () => handleWrapperClick(remoteWrapper);
 
-    // Fullscreen
     document.getElementById('fullscreen-toggle').onclick = () => {
       if (!document.fullscreenElement) {
         if (callRoot.requestFullscreen) callRoot.requestFullscreen();
@@ -503,7 +501,6 @@
       }
     };
 
-    // Завершение
     async function endCall() {
       if (localStream) localStream.getTracks().forEach(t => t.stop());
       if (peerConnection) peerConnection.close();
@@ -517,7 +514,7 @@
     document.getElementById('end-call').onclick = endCall;
     document.getElementById('go-home-btn').onclick = () => window.location.href = HOME_URL;
 
-    // --- МЕДИА КОНТРОЛЛЕРЫ ---
+    // --- MEDIA CONTROLS ---
     
     document.getElementById('toggle-mic').onclick = function() {
       micEnabled = !micEnabled;
@@ -528,21 +525,15 @@
 
     document.getElementById('toggle-camera').onclick = function() {
       cameraEnabled = !cameraEnabled;
-      
-      // 1. Выключаем/Включаем трек видео
       if (localStream) localStream.getVideoTracks()[0].enabled = cameraEnabled;
       
-      // 2. Локально показываем/скрываем заглушку
       if (cameraEnabled) {
         localPlaceholder.style.display = 'none';
       } else {
         localPlaceholder.style.display = 'block';
       }
-
-      // 3. Отправляем сигнал собеседнику, чтобы он тоже показал заглушку
       sendSignal({ type: 'cam_toggle', value: cameraEnabled });
 
-      // 4. Меняем иконку кнопки
       this.innerHTML = `<i class="fa fa-video${cameraEnabled ? '' : '-slash'}"></i>`;
       this.style.background = cameraEnabled ? 'rgba(255,255,255,0.2)' : 'rgba(255,59,48,0.5)';
     };
@@ -553,7 +544,6 @@
       try {
         const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: false });
         const videoTrack = newStream.getVideoTracks()[0];
-        
         const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
         if (sender) sender.replaceTrack(videoTrack);
         
@@ -561,12 +551,10 @@
         localStream.removeTrack(localStream.getVideoTracks()[0]);
         localStream.addTrack(videoTrack);
         localVideo.srcObject = localStream;
-
-        // При смене камеры, если она была выключена интерфейсом, нужно учесть это, но обычно смена камеры включает её
-        if (!cameraEnabled) {
-            // Если камера была выключена, новая камера включится аппаратно, но мы должны ее заглушить программно, если хотим сохранить состояние
-            videoTrack.enabled = false;
-        }
+        
+        // Синхронизация состояния кнопки камеры
+        if (!cameraEnabled) videoTrack.enabled = false;
+        
       } catch (e) { console.error(e); }
     };
 
