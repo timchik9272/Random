@@ -3,211 +3,299 @@
 <head>
   <meta charset="utf-8" />
   <title>MiniMessenger - Звонок</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <style>
     :root {
-      --bg: #121212;
-      --bg-light: #1e1e1e;
+      --bg: #000000;
       --accent: #25D366;
+      --danger: #ff3b30;
       --text: #ffffff;
-      --gray: #888888;
-      --error: #e63946;
-      --radius: 12px;
-      --shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      --radius: 16px;
+      --btn-size: 56px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: var(--bg);
       color: var(--text);
       height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      width: 100vw;
       overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
+
     .call-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 15px;
-      padding: 20px;
-      background: var(--bg-light);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      max-width: 100%;
-      width: 100%;
-      height: 100%;
       position: relative;
-    }
-    .video-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      justify-content: center;
       width: 100%;
       height: 100%;
-      position: relative;
-    }
-    #remote-video,
-    #local-video {
-      width: 100%;
-      height: 100%;
-      border-radius: var(--radius);
       background: #000;
-      object-fit: contain;
-      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
-    #local-video {
-      width: 150px;
-      height: 200px;
+
+    .call-container:fullscreen {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* ОБЩИЙ СЛОЙ ВИДЕО */
+    .video-layer {
       position: absolute;
-      bottom: 80px;
-      right: 10px;
-      z-index: 10;
-      cursor: pointer;
-      transition: cursor 0.3s;
-    }
-    .swap-video #remote-video {
-      width: 150px;
-      height: 200px;
-      position: absolute;
-      bottom: 80px;
-      right: 10px;
-      z-index: 10;
-      cursor: default;
-    }
-    .swap-video #local-video {
+      top: 0;
+      left: 0;
       width: 100%;
       height: 100%;
-      position: static;
-      cursor: default;
+      z-index: 1;
+      background: #000;
     }
-    @media (max-width: 600px) {
-      .call-container {
-        padding: 10px;
-      }
-      #local-video {
-        width: 120px;
-        height: 160px;
-        bottom: 70px;
-        right: 5px;
-      }
-      .controls {
-        gap: 10px;
-      }
-      button {
-        width: 40px;
-        height: 40px;
-      }
-      .fa {
-        font-size: 18px;
-      }
-    }
-    .controls {
-      display: flex;
-      gap: 15px;
+
+    /* Обертка для видео */
+    .video-wrapper {
       position: absolute;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 20;
+      overflow: hidden;
+      background: #000; /* Черный фон для полос по краям */
+      /* Анимация удалена по просьбе */
     }
-    button {
-      background: var(--accent);
-      color: var(--text);
-      padding: 12px;
-      border: none;
-      border-radius: 50%;
-      width: 48px;
-      height: 48px;
+
+    video {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Картинка-заглушка */
+    .camera-placeholder {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain; /* Тоже не обрезаем аватар */
+      display: none;
+      z-index: 2;
+      background: #111;
+    }
+
+    /* === СОСТОЯНИЕ: НА ВЕСЬ ЭКРАН (ФОН) === */
+    .video-wrapper.is-full {
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      border-radius: 0;
+      z-index: 1;
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+
+    /* ГЛАВНОЕ ИЗМЕНЕНИЕ: contain вместо cover */
+    .video-wrapper.is-full video {
+      object-fit: contain; 
+      /* Видео вписывается целиком, черные полосы по краям, ничего не режется */
+    }
+
+    /* === СОСТОЯНИЕ: ПЛАВАЮЩЕЕ ОКНО (МАЛЕНЬКОЕ) === */
+    .video-wrapper.is-floating {
+      width: 120px;
+      height: 160px;
+      bottom: 100px; 
+      right: 16px;
+      border-radius: var(--radius);
+      box-shadow: 0 4px 10px rgba(255,255,255,0.1); /* Легкая рамка для контраста */
+      z-index: 10;
       cursor: pointer;
-      transition: background 0.3s;
+      border: 1px solid rgba(255,255,255,0.2);
     }
-    button:disabled {
-      background: var(--gray);
-      cursor: not-allowed;
+
+    /* Маленькое видео оставляем cover, чтобы оно не было "точкой", но можно поменять */
+    .video-wrapper.is-floating video {
+      object-fit: cover; 
     }
-    button:hover:not(:disabled) {
-      background: #20b858;
-    }
-    .end-call-btn {
-      background: #e63946;
-    }
-    .end-call-btn:hover:not(:disabled) {
-      background: #b32d39;
-    }
-    #status {
-      font-size: 14px;
-      color: var(--gray);
-      margin-bottom: 10px;
+
+    /* ИНТЕРФЕЙС */
+    .top-bar {
       position: absolute;
-      top: 80px;
-      z-index: 10;
-      text-align: center;
+      top: 0;
+      left: 0;
       width: 100%;
+      padding: 16px;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+      z-index: 20;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: none;
     }
-    #call-title {
-      font-size: 20px;
-      font-weight: 500;
-      color: var(--text);
+
+    .call-info {
+      pointer-events: auto;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    }
+    .call-info h2 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .status-text {
+      font-size: 13px;
+      opacity: 0.8;
+      margin-top: 4px;
+      display: block;
+    }
+
+    .top-btn {
+      pointer-events: auto;
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ПАНЕЛЬ УПРАВЛЕНИЯ */
+    .controls-bar {
       position: absolute;
-      top: 110px;
-      z-index: 10;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      padding: 20px 0 30px 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+      z-index: 20;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
     }
-    .fullscreen-btn {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      z-index: 30;
-    }
-    .fa {
+
+    .ctrl-btn {
+      width: var(--btn-size);
+      height: var(--btn-size);
+      border-radius: 50%;
+      border: none;
+      color: white;
       font-size: 20px;
+      cursor: pointer;
+      background: rgba(255,255,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-    #redirect-now {
-      margin-top: 20px;
-      padding: 12px 24px;
+
+    .ctrl-btn:active {
+      background: rgba(255,255,255,0.4); /* Простой эффект нажатия без анимации размера */
+    }
+
+    .btn-end {
+      background: var(--danger);
+    }
+    
+    /* ЭКРАН ЗАВЕРШЕНИЯ */
+    .end-screen {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #121212;
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      text-align: center;
+      padding: 20px;
+    }
+    
+    .end-screen h3 {
+      font-size: 24px;
+      margin-bottom: 20px;
+      color: #888;
+    }
+
+    .action-btn {
+      width: 100%;
+      max-width: 250px;
+      padding: 16px;
+      border-radius: 12px;
+      border: none;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-restart {
       background: var(--accent);
       color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 16px;
     }
-    #redirect-now:hover {
-      background: #20b858;
+    
+    .btn-home {
+      background: #333;
+      color: white;
     }
   </style>
 </head>
 <body>
-  <div class="call-container">
-    <h2 id="call-title">Звонок</h2>
-    <button id="fullscreen-toggle" class="fullscreen-btn" title="На весь экран"><i class="fa fa-expand"></i></button>
-    <div class="video-grid" id="video-grid">
-      <video id="remote-video" autoplay playsinline></video>
-      <video id="local-video" autoplay playsinline muted></video>
+
+  <div class="call-container" id="call-root">
+    
+    <div class="video-layer">
+      <div id="remote-wrapper" class="video-wrapper is-full">
+        <img src="https://2nwatpeu4k.ucarecd.net/601bc32d-258d-4e79-9fcb-d2e067f2f353/" class="camera-placeholder" id="remote-placeholder">
+        <video id="remote-video" autoplay playsinline></video>
+      </div>
+
+      <div id="local-wrapper" class="video-wrapper is-floating">
+        <img src="https://2nwatpeu4k.ucarecd.net/601bc32d-258d-4e79-9fcb-d2e067f2f353/" class="camera-placeholder" id="local-placeholder">
+        <video id="local-video" autoplay playsinline muted></video>
+      </div>
     </div>
-    <div id="status">Инициализация...</div>
-    <div class="controls">
-      <button id="toggle-mic" title="Вкл/выкл микрофон"><i class="fa fa-microphone"></i></button>
-      <button id="toggle-camera" title="Вкл/выкл камеру"><i class="fa fa-video"></i></button>
-      <button id="switch-camera" title="Переключить камеру"><i class="fa fa-sync-alt"></i></button>
-      <button id="end-call" class="end-call-btn"><i class="fa fa-phone-slash"></i></button>
+
+    <div class="top-bar">
+      <div class="call-info">
+        <h2 id="call-title">Собеседник</h2>
+        <span id="status" class="status-text">Инициализация...</span>
+      </div>
+      <button id="fullscreen-toggle" class="top-btn" title="На весь экран">
+        <i class="fa fa-expand"></i>
+      </button>
     </div>
+
+    <div class="controls-bar" id="controls">
+      <button id="toggle-mic" class="ctrl-btn" title="Микрофон"><i class="fa fa-microphone"></i></button>
+      <button id="toggle-camera" class="ctrl-btn" title="Камера"><i class="fa fa-video"></i></button>
+      <button id="switch-camera" class="ctrl-btn" title="Повернуть камеру"><i class="fa fa-sync-alt"></i></button>
+      <button id="end-call" class="ctrl-btn btn-end" title="Сбросить"><i class="fa fa-phone-slash"></i></button>
+    </div>
+
+    <div id="end-screen" class="end-screen">
+      <h3>Звонок завершён</h3>
+      <button class="action-btn btn-restart" onclick="window.location.reload()">
+        <i class="fa fa-phone"></i> Позвонить ещё раз
+      </button>
+      <button class="action-btn btn-home" id="go-home-btn">
+        <i class="fa fa-home"></i> На главную
+      </button>
+    </div>
+
   </div>
 
   <script>
+    // --- CONFIG ---
     const supabaseClient = supabase.createClient(
       "https://zmewwzlzujsrhstjehrp.supabase.co",
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24"
     );
+    const HOME_URL = 'https://super-random.netlify.app/my_messenger'; 
 
+    // --- VARS ---
     let currentUser = null;
     let otherUserId = null;
     let chatId = null;
@@ -218,162 +306,99 @@
     let micEnabled = true;
     let cameraEnabled = true;
     let facingMode = 'user';
+    let isSwapped = false;
 
+    // --- ELEMENTS ---
     const localVideo = document.getElementById('local-video');
     const remoteVideo = document.getElementById('remote-video');
+    const localWrapper = document.getElementById('local-wrapper');
+    const remoteWrapper = document.getElementById('remote-wrapper');
+    const localPlaceholder = document.getElementById('local-placeholder');
+    const remotePlaceholder = document.getElementById('remote-placeholder');
+    
     const statusEl = document.getElementById('status');
     const callTitle = document.getElementById('call-title');
-    const videoGrid = document.getElementById('video-grid');
+    const callRoot = document.getElementById('call-root');
+    const endScreen = document.getElementById('end-screen');
 
+    // --- ICE SERVERS ---
     const servers = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:stun3.l.google.com:19302' },
-        { urls: 'stun:stun4.l.google.com:19302' },
-        { urls: 'stun:stun.ekiga.net:3478' },
-        { urls: 'stun:stun.schlund.de:3478' },
-        { urls: 'stun:stun.voipbuster.com:3478' },
-        { urls: 'stun:stun.ideasip.com:3478' },
-        { urls: 'stun:stun.iptel.org:3478' },
-        { urls: 'stun:stun.stunprotocol.org:3478' },
-        { urls: 'stun:stun.voiparound.com:3478' },
-        {
-          urls: 'turn:openrelay.metered.ca:80',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        }
+        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
       ]
     };
 
+    // --- INIT ---
     const urlParams = new URLSearchParams(window.location.search);
     chatId = urlParams.get('chat_id');
 
     async function init() {
-      if (!chatId) {
-        statusEl.innerText = 'Ошибка: нет chat_id в URL';
-        return;
-      }
+      if (!chatId) { statusEl.innerText = 'Нет ID чата'; return; }
 
       const { data: { session } } = await supabaseClient.auth.getSession();
-      if (!session) {
-        statusEl.innerText = 'Ошибка авторизации';
-        return;
-      }
+      if (!session) { statusEl.innerText = 'Нет авторизации'; return; }
       currentUser = session.user;
 
-      const { data: profileData, error: profileError } = await supabaseClient
-        .from('profiles')
-        .select('ban, username')
-        .eq('id', currentUser.id)
-        .single();
+      const { data: profile } = await supabaseClient.from('profiles').select('ban, username').eq('id', currentUser.id).single();
+      if (!profile || profile.ban) { statusEl.innerText = 'Доступ запрещён'; return; }
+      const username = profile.username;
 
-      if (profileError || profileData.ban) {
-        statusEl.innerText = 'Доступ запрещён';
-        return;
-      }
-      const username = profileData.username;
-
-      const { data: chat, error: chatError } = await supabaseClient
-        .from('chats')
-        .select('user1, user2')
-        .eq('id', chatId)
-        .single();
-
-      if (chatError || !chat) {
-        statusEl.innerText = 'Чат не найден';
-        return;
-      }
+      const { data: chat } = await supabaseClient.from('chats').select('user1, user2').eq('id', chatId).single();
+      if (!chat) { statusEl.innerText = 'Чат не найден'; return; }
 
       otherUserId = chat.user1 === currentUser.id ? chat.user2 : chat.user1;
-
-      const { data: otherProfile } = await supabaseClient
-        .from('profiles')
-        .select('username')
-        .eq('id', otherUserId)
-        .single();
-
-      callTitle.innerText = `Звонок с ${otherProfile?.username || 'Пользователь'}`;
+      const { data: otherProfile } = await supabaseClient.from('profiles').select('username').eq('id', otherUserId).single();
+      callTitle.innerText = otherProfile?.username || 'Собеседник';
 
       try {
         localStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode },
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+          audio: { echoCancellation: true, noiseSuppression: true }
         });
         localVideo.srcObject = localStream;
       } catch (err) {
-        statusEl.innerText = 'Нет доступа к камере/микрофону';
-        console.error('Media error:', err);
+        statusEl.innerText = 'Ошибка камеры/микрофона';
         return;
       }
 
-      peerConnection = new RTCPeerConnection(servers);
-      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-      const remoteStream = new MediaStream();
-      remoteVideo.srcObject = remoteStream;
-
-      peerConnection.ontrack = event => {
-        console.log('Remote track received:', event.track.kind);
-        event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
-      };
-
-      peerConnection.onicecandidate = event => {
-        if (event.candidate) {
-          console.log('New ICE candidate');
-          sendSignal({ type: 'candidate', candidate: event.candidate.toJSON() });
-        }
-      };
-
-      peerConnection.onconnectionstatechange = () => {
-        console.log('Connection state:', peerConnection.connectionState);
-        if (peerConnection.connectionState === 'connected') {
-          statusEl.innerText = 'Соединение установлено';
-        } else if (peerConnection.connectionState === 'failed') {
-          statusEl.innerText = 'Соединение не удалось';
-          endCall();
-        }
-      };
-
-      peerConnection.oniceconnectionstatechange = () => {
-        console.log('ICE connection state:', peerConnection.iceConnectionState);
-        if (peerConnection.iceConnectionState === 'connected' || peerConnection.iceConnectionState === 'completed') {
-          statusEl.innerText = 'Соединение установлено (видео/аудио активно)';
-        } else if (peerConnection.iceConnectionState === 'disconnected' || peerConnection.iceConnectionState === 'failed') {
-          statusEl.innerText = 'Соединение потеряно (проблема с сетью)';
-          endCall();
-        } else if (peerConnection.iceConnectionState === 'checking') {
-          statusEl.innerText = 'Поиск пути соединения...';
-        }
-      };
+      setupPeerConnection();
 
       channel = supabaseClient.channel(`call:${chatId}`);
-
       channel
         .on('presence', { event: 'sync' }, handlePresenceSync)
-        .on('presence', { event: 'join' }, () => updateStatus())
+        .on('presence', { event: 'join' }, updateStatus)
         .on('presence', { event: 'leave' }, () => {
-          const peers = getPeers();
-          if (peers.length === 0) endCall();
+          if (getPeers().length === 0) endCall();
         })
         .on('broadcast', { event: 'signal' }, ({ payload }) => handleSignal(payload))
-        .subscribe(async (status) => {
+        .subscribe(status => {
           if (status === 'SUBSCRIBED') {
-            await channel.track({ user_id: currentUser.id, username });
+            channel.track({ user_id: currentUser.id, username });
             updateStatus();
           }
         });
+    }
+
+    function setupPeerConnection() {
+      peerConnection = new RTCPeerConnection(servers);
+      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+      peerConnection.ontrack = event => {
+        remoteVideo.srcObject = event.streams[0];
+      };
+      
+      peerConnection.onicecandidate = event => {
+        if (event.candidate) sendSignal({ type: 'candidate', candidate: event.candidate.toJSON() });
+      };
+
+      peerConnection.onconnectionstatechange = () => {
+        if (peerConnection.connectionState === 'connected') statusEl.innerText = 'Идёт разговор';
+        else if (peerConnection.connectionState === 'failed') endCall();
+      };
     }
 
     function getPeers() {
@@ -383,181 +408,157 @@
 
     function handlePresenceSync() {
       const peers = getPeers();
-      if (peers.length === 0) {
-        statusEl.innerText = 'Ожидание собеседника...';
-        return;
-      }
-      if (peers.length > 1) {
-        statusEl.innerText = 'Ошибка: слишком много пользователей';
-        return;
-      }
+      if (peers.length === 0) { statusEl.innerText = 'Ожидание...'; return; }
+      
+      callTitle.innerText = peers[0].username || 'Собеседник';
+      updateStatus();
 
-      const peer = peers[0];
-      callTitle.innerText = `Звонок с ${peer.username || 'Пользователь'}`;
-
-      if (!offered && currentUser.id < peer.user_id) {
-        createAndSendOffer();
+      if (!offered && currentUser.id < peers[0].user_id) {
+        createOffer();
         offered = true;
       }
-      updateStatus();
     }
 
     function updateStatus() {
       const peers = getPeers();
-      if (peers.length === 0) {
-        statusEl.innerText = 'Ожидание собеседника...';
-      } else if (peerConnection?.iceConnectionState === 'connected' || peerConnection?.iceConnectionState === 'completed') {
-        statusEl.innerText = 'Соединение установлено';
-      } else {
-        statusEl.innerText = 'Установка соединения...';
-      }
+      if (peers.length === 0) statusEl.innerText = 'Ожидание собеседника...';
+      else if (peerConnection?.connectionState === 'connected') statusEl.innerText = 'В эфире';
+      else statusEl.innerText = 'Соединение...';
     }
 
-    async function createAndSendOffer() {
-      try {
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        sendSignal({ type: 'offer', sdp: peerConnection.localDescription });
-        statusEl.innerText = 'Звонок... Ожидание ответа';
-      } catch (err) {
-        console.error('Offer error:', err);
-      }
+    async function createOffer() {
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      sendSignal({ type: 'offer', sdp: peerConnection.localDescription });
     }
 
     async function sendSignal(signal) {
-      if (channel) {
-        await channel.send({
-          type: 'broadcast',
-          event: 'signal',
-          payload: signal
-        });
-      }
+      if (channel) await channel.send({ type: 'broadcast', event: 'signal', payload: signal });
     }
 
     async function handleSignal(signal) {
-      try {
-        if (signal.type === 'offer') {
-          if (peerConnection.signalingState !== 'stable') return;
+      if (!peerConnection) return;
+
+      if (signal.type === 'offer') {
+        if (peerConnection.signalingState !== 'stable') return;
+        await peerConnection.setRemoteDescription(signal.sdp);
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        sendSignal({ type: 'answer', sdp: peerConnection.localDescription });
+        
+      } else if (signal.type === 'answer') {
+        if (peerConnection.signalingState === 'have-local-offer') {
           await peerConnection.setRemoteDescription(signal.sdp);
-          const answer = await peerConnection.createAnswer();
-          await peerConnection.setLocalDescription(answer);
-          sendSignal({ type: 'answer', sdp: peerConnection.localDescription });
-        } else if (signal.type === 'answer') {
-          if (peerConnection.signalingState === 'have-local-offer') {
-            await peerConnection.setRemoteDescription(signal.sdp);
-          }
-        } else if (signal.type === 'candidate') {
-          if (peerConnection.remoteDescription) {
-            await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
-            console.log('ICE candidate added');
-          }
         }
-      } catch (err) {
-        console.error('Signal error:', err);
-      }
-    }
-
-    async function endCall() {
-      if (peerConnection) {
-        peerConnection.close();
-        peerConnection = null;
-      }
-      if (localStream) {
-        localStream.getTracks().forEach(t => t.stop());
-        localStream = null;
-      }
-      if (channel) {
-        await channel.untrack();
-        await channel.unsubscribe();
-        channel = null;
-      }
-      localVideo.srcObject = null;
-      remoteVideo.srcObject = null;
-
-      // Скрываем элементы управления
-      document.querySelector('.controls').style.display = 'none';
-      document.getElementById('fullscreen-toggle').style.display = 'none';
-      document.getElementById('call-title').style.display = 'none';
-
-      // Показываем сообщение об окончании и обратный отсчёт
-      const redirectUrl = 'https://super-random.netlify.app/test';
-      let countdown = 10;
-
-      statusEl.innerHTML = `
-        <div style="font-size: 18px; margin-bottom: 10px;">Звонок завершён</div>
-        <div>Перенаправление через <strong id="countdown-span">${countdown}</strong> секунд</div>
-        <button id="redirect-now">Перейти сейчас</button>
-      `;
-
-      document.getElementById('redirect-now').onclick = () => {
-        clearInterval(countdownInterval);
-        window.location.href = redirectUrl;
-      };
-
-      const countdownInterval = setInterval(() => {
-        countdown--;
-        if (countdown > 0) {
-          document.getElementById('countdown-span').innerText = countdown;
+      } else if (signal.type === 'candidate') {
+        if (peerConnection.remoteDescription) {
+          await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+        }
+      } else if (signal.type === 'cam_toggle') {
+        if (signal.value === false) {
+          remotePlaceholder.style.display = 'block';
         } else {
-          clearInterval(countdownInterval);
-          window.location.href = redirectUrl;
+          remotePlaceholder.style.display = 'none';
         }
-      }, 1000);
+      }
     }
 
-    document.getElementById('toggle-mic').onclick = () => {
-      if (localStream) {
-        micEnabled = !micEnabled;
-        localStream.getAudioTracks().forEach(t => t.enabled = micEnabled);
-        document.getElementById('toggle-mic').innerHTML = `<i class="fa fa-microphone${micEnabled ? '' : '-slash'}"></i>`;
+    // --- UI INTERACTION (NO ANIMATION) ---
+
+    function handleWrapperClick(wrapper) {
+      // Меняем только при клике на плавающее окно
+      if (wrapper.classList.contains('is-floating')) {
+        isSwapped = !isSwapped;
+        
+        // Мгновенное переключение классов без анимации
+        if (isSwapped) {
+          localWrapper.className = 'video-wrapper is-full';
+          remoteWrapper.className = 'video-wrapper is-floating';
+          
+          remoteWrapper.style.zIndex = '10';
+          localWrapper.style.zIndex = '1';
+        } else {
+          localWrapper.className = 'video-wrapper is-floating';
+          remoteWrapper.className = 'video-wrapper is-full';
+          
+          localWrapper.style.zIndex = '10';
+          remoteWrapper.style.zIndex = '1';
+        }
       }
-    };
+    }
 
-    document.getElementById('toggle-camera').onclick = () => {
-      if (localStream) {
-        cameraEnabled = !cameraEnabled;
-        localStream.getVideoTracks().forEach(t => t.enabled = cameraEnabled);
-        document.getElementById('toggle-camera').innerHTML = `<i class="fa fa-video${cameraEnabled ? '' : '-slash'}"></i>`;
-      }
-    };
+    localWrapper.onclick = () => handleWrapperClick(localWrapper);
+    remoteWrapper.onclick = () => handleWrapperClick(remoteWrapper);
 
-    document.getElementById('switch-camera').onclick = async () => {
-      if (localStream) {
-        facingMode = facingMode === 'user' ? 'environment' : 'user';
-        const newStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode },
-          audio: false
-        });
-        const newTrack = newStream.getVideoTracks()[0];
-        const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
-        if (sender) sender.replaceTrack(newTrack);
-        localStream.getVideoTracks()[0].stop();
-        localStream.removeTrack(localStream.getVideoTracks()[0]);
-        localStream.addTrack(newTrack);
-        localVideo.srcObject = localStream;
-      }
-    };
-
-    // Смена местами по клику на своё видео (local-video)
-    localVideo.onclick = () => {
-      videoGrid.classList.toggle('swap-video');
-    };
-
-    // Нативный fullscreen для remote-video
-    document.getElementById('fullscreen-toggle').onclick = async () => {
+    document.getElementById('fullscreen-toggle').onclick = () => {
       if (!document.fullscreenElement) {
-        await remoteVideo.requestFullscreen();
+        if (callRoot.requestFullscreen) callRoot.requestFullscreen();
+        else if (callRoot.webkitRequestFullscreen) callRoot.webkitRequestFullscreen();
         document.getElementById('fullscreen-toggle').innerHTML = '<i class="fa fa-compress"></i>';
       } else {
-        await document.exitFullscreen();
+        if (document.exitFullscreen) document.exitFullscreen();
         document.getElementById('fullscreen-toggle').innerHTML = '<i class="fa fa-expand"></i>';
       }
     };
 
+    async function endCall() {
+      if (localStream) localStream.getTracks().forEach(t => t.stop());
+      if (peerConnection) peerConnection.close();
+      if (channel) await supabaseClient.removeChannel(channel);
+
+      document.querySelector('.top-bar').style.display = 'none';
+      document.getElementById('controls').style.display = 'none';
+      endScreen.style.display = 'flex';
+    }
+
     document.getElementById('end-call').onclick = endCall;
+    document.getElementById('go-home-btn').onclick = () => window.location.href = HOME_URL;
+
+    // --- MEDIA CONTROLS ---
+    
+    document.getElementById('toggle-mic').onclick = function() {
+      micEnabled = !micEnabled;
+      if (localStream) localStream.getAudioTracks()[0].enabled = micEnabled;
+      this.innerHTML = `<i class="fa fa-microphone${micEnabled ? '' : '-slash'}"></i>`;
+      this.style.background = micEnabled ? 'rgba(255,255,255,0.2)' : 'rgba(255,59,48,0.5)';
+    };
+
+    document.getElementById('toggle-camera').onclick = function() {
+      cameraEnabled = !cameraEnabled;
+      if (localStream) localStream.getVideoTracks()[0].enabled = cameraEnabled;
+      
+      if (cameraEnabled) {
+        localPlaceholder.style.display = 'none';
+      } else {
+        localPlaceholder.style.display = 'block';
+      }
+      sendSignal({ type: 'cam_toggle', value: cameraEnabled });
+
+      this.innerHTML = `<i class="fa fa-video${cameraEnabled ? '' : '-slash'}"></i>`;
+      this.style.background = cameraEnabled ? 'rgba(255,255,255,0.2)' : 'rgba(255,59,48,0.5)';
+    };
+
+    document.getElementById('switch-camera').onclick = async () => {
+      if (!localStream) return;
+      facingMode = facingMode === 'user' ? 'environment' : 'user';
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: false });
+        const videoTrack = newStream.getVideoTracks()[0];
+        const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+        if (sender) sender.replaceTrack(videoTrack);
+        
+        localStream.getVideoTracks()[0].stop();
+        localStream.removeTrack(localStream.getVideoTracks()[0]);
+        localStream.addTrack(videoTrack);
+        localVideo.srcObject = localStream;
+        
+        // Синхронизация состояния кнопки камеры
+        if (!cameraEnabled) videoTrack.enabled = false;
+        
+      } catch (e) { console.error(e); }
+    };
 
     window.addEventListener('load', init);
-    window.addEventListener('beforeunload', endCall);
   </script>
 </body>
 </html>
