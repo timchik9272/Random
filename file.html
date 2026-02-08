@@ -2,233 +2,344 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <title>P2P Transfer Fix</title>
+  <title>P2P Transfer Elite</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <style>
-    :root { --bg: #0a0a0a; --accent: #00ff88; --panel: #161616; --text: #eee; }
-    body { background: var(--bg); color: var(--text); font-family: monospace; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-    .card { background: var(--panel); padding: 30px; border-radius: 20px; width: 90%; max-width: 450px; border: 1px solid #333; text-align: center; }
+    :root {
+      --bg: #080808;
+      --card: #121212;
+      --accent: #00f2ff;
+      --text: #e0e0e0;
+      --border: #222;
+      --success: #00ff88;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      display: flex; justify-content: center; align-items: center; min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .container { width: 95%; max-width: 500px; z-index: 10; }
+
+    /* ГЛАВНАЯ ПАНЕЛЬ */
+    .glass-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      padding: 35px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+
+    h1 { font-size: 18px; font-weight: 400; letter-spacing: 4px; text-align: center; margin-bottom: 30px; opacity: 0.5; }
+
+    /* ЭКРАН ВХОДА */
+    .big-code { 
+      font-size: 72px; font-family: 'Courier New', monospace; color: var(--accent); 
+      text-align: center; margin: 20px 0; font-weight: bold; cursor: pointer;
+      text-shadow: 0 0 20px rgba(0, 242, 255, 0.3);
+    }
     
-    /* Код и Ввод */
-    .code-box { font-size: 50px; color: var(--accent); margin: 20px 0; letter-spacing: 5px; font-weight: bold; }
-    input { width: 100%; background: #000; border: 2px solid #333; color: var(--accent); font-size: 40px; text-align: center; padding: 10px; border-radius: 12px; outline: none; margin-bottom: 15px; }
+    input#room-input {
+      width: 100%; background: #000; border: 2px solid var(--border);
+      border-radius: 18px; color: var(--accent); font-size: 50px;
+      text-align: center; font-family: monospace; padding: 15px; outline: none;
+      margin-bottom: 20px; transition: 0.3s;
+    }
+    input#room-input:focus { border-color: var(--accent); }
+
+    .btn {
+      width: 100%; padding: 20px; border-radius: 18px; border: none;
+      font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 242, 255, 0.4); }
+    .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); margin-top: 15px; }
+
+    /* РАБОЧИЙ ИНТЕРФЕЙС */
+    #main-ui { display: none; flex-direction: column; gap: 20px; }
+
+    .status-bar { font-size: 12px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; opacity: 0.8; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
+    .dot.online { background: var(--success); box-shadow: 0 0 10px var(--success); }
+
+    textarea {
+      width: 100%; height: 100px; background: #000; border: 1px solid var(--border);
+      border-radius: 15px; color: #fff; padding: 15px; resize: none; font-size: 15px; outline: none;
+    }
+
+    /* ЗОНА ФАЙЛОВ */
+    .drop-zone {
+      border: 2px dashed var(--border); border-radius: 20px; padding: 40px 20px;
+      text-align: center; cursor: pointer; transition: 0.3s; color: #666;
+    }
+    .drop-zone.active { border-color: var(--accent); background: rgba(0, 242, 255, 0.05); color: var(--accent); }
+    .drop-zone i { font-size: 30px; margin-bottom: 10px; }
+
+    /* СПИСОК ФАЙЛОВ */
+    .file-item {
+      background: #1a1a1a; border-radius: 15px; padding: 15px; margin-top: 10px;
+      border: 1px solid var(--border); position: relative; overflow: hidden;
+    }
+    .file-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .file-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
+    .file-btn { color: var(--accent); text-decoration: none; font-size: 18px; }
     
-    .btn { width: 100%; padding: 18px; border-radius: 12px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 10px; }
-    .btn-main { background: var(--accent); color: #000; }
-    .btn-sec { background: transparent; color: #888; border: 1px solid #333; }
-    
-    /* Интерфейс передачи */
-    #transfer-ui { display: none; flex-direction: column; gap: 15px; }
-    textarea { width: 100%; height: 100px; background: #000; color: #fff; border: 1px solid #333; border-radius: 10px; padding: 10px; resize: none; }
-    .drop-zone { border: 2px dashed #333; padding: 30px; border-radius: 10px; cursor: pointer; }
-    
-    /* Логи отладки */
-    #debug-log { font-size: 10px; color: #555; text-align: left; margin-top: 20px; max-height: 60px; overflow-y: auto; border-top: 1px solid #222; padding-top: 10px; }
+    .progress-bg { width: 100%; height: 4px; background: #000; border-radius: 2px; overflow: hidden; }
+    .progress-bar { height: 100%; background: var(--accent); width: 0%; transition: 0.1s; }
   </style>
 </head>
 <body>
 
-  <div class="card">
-    <div id="setup-screen">
-      <h2 style="font-weight: 200; opacity: 0.6;">P2P TRANSFER</h2>
-      
-      <div id="main-menu">
-        <button class="btn btn-main" onclick="createRoom()">СОЗДАТЬ</button>
-        <p style="margin: 15px 0; color: #444;">ИЛИ</p>
-        <input type="number" id="room-input" placeholder="00000" oninput="if(value.length>5)value=value.slice(0,5)">
-        <button class="btn btn-sec" onclick="joinRoom()">ВОЙТИ</button>
+  <div class="container">
+    <div class="glass-card">
+      <h1>P2P TRANSFER</h1>
+
+      <div id="setup-screen">
+        <div id="initial-actions">
+          <button class="btn btn-primary" onclick="createRoom()"><i class="fa fa-plus"></i> Создать комнату</button>
+          <div style="text-align: center; margin: 20px; opacity: 0.3; font-size: 12px;">ИЛИ ВВЕДИТЕ КОД</div>
+          <input type="number" id="room-input" placeholder="00000" oninput="if(value.length>5)value=value.slice(0,5)">
+          <button class="btn btn-secondary" onclick="joinRoom()">Присоединиться</button>
+        </div>
+
+        <div id="waiting-area" style="display: none; text-align: center;">
+          <p style="opacity: 0.5; font-size: 13px;">Код для подключения:</p>
+          <div class="big-code" id="active-code" onclick="copyCode()">-----</div>
+          <div class="status-bar" style="justify-content: center;">
+            <div class="dot"></div> <span id="wait-msg">Ожидание гостя...</span>
+          </div>
+          <button class="btn btn-secondary" onclick="location.reload()">Отмена</button>
+        </div>
       </div>
 
-      <div id="wait-area" style="display: none;">
-        <p>Код комнаты:</p>
-        <div class="code-box" id="active-code">-----</div>
-        <p id="conn-status" style="color: var(--accent); font-size: 12px;">Ожидание гостя...</p>
-        <button class="btn btn-sec" onclick="location.reload()">ОТМЕНА</button>
+      <div id="main-ui">
+        <div class="status-bar">
+          <div class="dot online"></div> <span>Защищенное P2P соединение</span>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <textarea id="text-data" placeholder="Общий текстовый буфер (ссылки, заметки...)" oninput="sendText()"></textarea>
+        </div>
+
+        <div class="drop-zone" id="drop-zone">
+          <i class="fa fa-cloud-arrow-up"></i>
+          <p>Перетащите файлы или кликните</p>
+          <input type="file" id="file-input" multiple style="display: none;">
+        </div>
+
+        <div id="file-list"></div>
+        
+        <button class="btn btn-secondary" style="margin-top: 20px;" onclick="location.reload()">Завершить сеанс</button>
       </div>
     </div>
-
-    <div id="transfer-ui">
-      <div style="text-align: left; font-size: 11px; color: var(--accent); margin-bottom: 5px;">ОБЩИЙ ТЕКСТ:</div>
-      <textarea id="text-data" placeholder="Текст появится у обоих..." oninput="sendText()"></textarea>
-      
-      <div class="drop-zone" onclick="document.getElementById('file-input').click()">
-        ФАЙЛЫ (Клик / Drop)
-        <input type="file" id="file-input" multiple style="display: none;">
-      </div>
-      <div id="file-list" style="text-align: left; font-size: 12px; margin-top: 10px;"></div>
-      <button class="btn btn-sec" onclick="location.reload()">ВЫЙТИ</button>
-    </div>
-
-    <div id="debug-log">Система готова...</div>
   </div>
 
   <script>
-    const SB_URL = "https://zmewwzlzujsrhstjehrp.supabase.co";
-    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24";
-    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+    const supabaseClient = supabase.createClient(
+      "https://zmewwzlzujsrhstjehrp.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24"
+    );
 
-    let pc, dc, channel, roomId, isOfferer = false;
-    const ice = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    let pc, dc, channel, roomId, isOfferer;
+    const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    let activeFiles = {}; // Для отслеживания прогресса
 
-    function log(msg) {
-      const d = document.getElementById('debug-log');
-      d.innerHTML += `> ${msg}<br>`;
-      d.scrollTop = d.scrollHeight;
-      console.log(msg);
-    }
-
-    // --- ИНИЦИАЛИЗАЦИЯ ---
+    // --- ЛОГИКА ПОДКЛЮЧЕНИЯ ---
 
     function createRoom() {
       roomId = Math.floor(10000 + Math.random() * 90000).toString();
       isOfferer = true;
-      showWaitArea();
+      document.getElementById('initial-actions').style.display = 'none';
+      document.getElementById('waiting-area').style.display = 'block';
+      document.getElementById('active-code').innerText = roomId;
       initSignaling();
     }
 
     function joinRoom() {
       roomId = document.getElementById('room-input').value;
-      if (roomId.length !== 5) return alert("5 цифр!");
+      if (roomId.length !== 5) return alert("Введите 5 цифр");
       isOfferer = false;
-      showWaitArea();
+      document.getElementById('initial-actions').style.display = 'none';
+      document.getElementById('waiting-area').style.display = 'block';
+      document.getElementById('active-code').innerText = roomId;
+      document.getElementById('wait-msg').innerText = "Подключение...";
       initSignaling();
     }
 
-    function showWaitArea() {
-      document.getElementById('main-menu').style.display = 'none';
-      document.getElementById('wait-area').style.display = 'block';
-      document.getElementById('active-code').innerText = roomId;
+    function copyCode() {
+      navigator.clipboard.writeText(roomId);
+      alert("Код скопирован");
     }
 
     async function initSignaling() {
-      log(`Подключение к каналу: ${roomId}`);
-      channel = supabaseClient.channel(`room_${roomId}`, { config: { broadcast: { ack: true } } });
-
+      channel = supabaseClient.channel(`room_${roomId}`);
       channel
         .on('broadcast', { event: 'signal' }, ({ payload }) => handleSignal(payload))
-        .subscribe(async (status) => {
-          if (status === 'SUBSCRIBED') {
-            log("Вы в сети. Ждем партнера...");
-            if (!isOfferer) {
-              // Гость зашел — сообщает об этом Создателю
-              log("Отправляем запрос на соединение...");
-              sendSignal({ type: 'join-ready' });
-            }
-          }
+        .subscribe(status => {
+          if (status === 'SUBSCRIBED' && !isOfferer) sendSignal({ type: 'ready' });
         });
     }
 
-    // --- WebRTC ЛОГИКА ---
+    // --- WebRTC ---
 
     function startWebRTC() {
-      log("Запуск WebRTC...");
-      pc = new RTCPeerConnection(ice);
-
+      pc = new RTCPeerConnection(servers);
       if (isOfferer) {
-        dc = pc.createDataChannel("transfer");
+        dc = pc.createDataChannel("data");
         setupDC();
+        pc.createOffer().then(o => { pc.setLocalDescription(o); sendSignal({ type: 'offer', sdp: o }); });
       } else {
-        pc.ondatachannel = (e) => {
-          dc = e.channel;
-          setupDC();
-        };
+        pc.ondatachannel = e => { dc = e.channel; setupDC(); };
       }
-
-      pc.onicecandidate = (e) => {
-        if (e.candidate) sendSignal({ type: 'candidate', cand: e.candidate });
-      };
-
+      pc.onicecandidate = e => { if (e.candidate) sendSignal({ type: 'candidate', cand: e.candidate }); };
       pc.onconnectionstatechange = () => {
-        log(`Статус связи: ${pc.connectionState}`);
         if (pc.connectionState === 'connected') {
           document.getElementById('setup-screen').style.display = 'none';
-          document.getElementById('transfer-ui').style.display = 'flex';
+          document.getElementById('main-ui').style.display = 'flex';
         }
       };
     }
 
-    async function handleSignal(sig) {
-      if (sig.type === 'join-ready' && isOfferer) {
-        log("Гость найден! Начинаю соединение...");
+    async function sendSignal(payload) { await channel.send({ type: 'broadcast', event: 'signal', payload }); }
+
+    function handleSignal(sig) {
+      if (sig.type === 'ready' && isOfferer) startWebRTC();
+      if (sig.type === 'offer') {
         startWebRTC();
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        sendSignal({ type: 'offer', sdp: offer });
-      } 
-      else if (sig.type === 'offer' && !isOfferer) {
-        log("Получен Offer...");
-        startWebRTC();
-        await pc.setRemoteDescription(new RTCSessionDescription(sig.sdp));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        sendSignal({ type: 'answer', sdp: answer });
-      } 
-      else if (sig.type === 'answer' && isOfferer) {
-        log("Получен Answer...");
-        await pc.setRemoteDescription(new RTCSessionDescription(sig.sdp));
-      } 
-      else if (sig.type === 'candidate' && pc) {
-        await pc.addIceCandidate(new RTCIceCandidate(sig.cand));
+        pc.setRemoteDescription(new RTCSessionDescription(sig.sdp));
+        pc.createAnswer().then(a => { pc.setLocalDescription(a); sendSignal({ type: 'answer', sdp: a }); });
       }
+      if (sig.type === 'answer') pc.setRemoteDescription(new RTCSessionDescription(sig.sdp));
+      if (sig.type === 'candidate') pc.addIceCandidate(new RTCIceCandidate(sig.cand));
     }
 
-    async function sendSignal(payload) {
-      await channel.send({ type: 'broadcast', event: 'signal', payload });
-    }
-
-    // --- DATA CHANNEL ---
+    // --- ПЕРЕДАЧА ДАННЫХ ---
 
     function setupDC() {
-      dc.onopen = () => log("P2P Канал открыт!");
-      dc.onmessage = (e) => {
+      dc.onmessage = e => {
         if (typeof e.data === 'string') {
-          const msg = JSON.parse(e.data);
-          if (msg.type === 'text') document.getElementById('text-data').value = msg.val;
-          if (msg.type === 'file-start') { window.chunks = []; window.fInfo = msg; }
-          if (msg.type === 'file-end') finalizeFile();
+          const m = JSON.parse(e.data);
+          if (m.type === 'text') document.getElementById('text-data').value = m.val;
+          if (m.type === 'file-start') {
+            activeFiles[m.id] = { name: m.name, size: m.size, chunks: [], received: 0 };
+            createFileUI(m.id, m.name, false);
+          }
+          if (m.type === 'file-end') finalizeFile(m.id);
         } else {
-          window.chunks.push(e.data);
+          // Получение чанка (первые 32 байта - ID файла для идентификации)
+          const id = new TextDecoder().decode(e.data.slice(0, 8)).trim();
+          const chunk = e.data.slice(8);
+          const f = activeFiles[id];
+          if (f) {
+            f.chunks.push(chunk);
+            f.received += chunk.byteLength;
+            updateProgress(id, (f.received / f.size) * 100);
+          }
         }
       };
     }
 
     function sendText() {
       const val = document.getElementById('text-data').value;
-      if (dc && dc.readyState === 'open') {
-        dc.send(JSON.stringify({ type: 'text', val }));
-      }
+      if (dc?.readyState === 'open') dc.send(JSON.stringify({ type: 'text', val }));
     }
 
-    // Файлы
-    document.getElementById('file-input').onchange = async (e) => {
-      const files = e.target.files;
+    // --- ФАЙЛОВЫЙ ДВИЖОК ---
+
+    async function sendFiles(files) {
       for (let f of files) {
-        log(`Отправка: ${f.name}`);
-        dc.send(JSON.stringify({ type: 'file-start', name: f.name, size: f.size }));
-        const slice = 16384;
-        for (let i = 0; i < f.size; i += slice) {
-          const chunk = await f.slice(i, i + slice).arrayBuffer();
-          dc.send(chunk);
+        const fileId = Math.random().toString(36).substring(2, 10); // Уникальный ID для этого файла
+        createFileUI(fileId, f.name, true, f);
+        
+        dc.send(JSON.stringify({ type: 'file-start', id: fileId, name: f.name, size: f.size }));
+
+        const chunkSize = 16000; // ~16KB
+        const idUint8 = new TextEncoder().encode(fileId.padEnd(8)); // Фиксируем ID в 8 байтах
+
+        for (let i = 0; i < f.size; i += chunkSize) {
+          const chunk = await f.slice(i, i + chunkSize).arrayBuffer();
+          // Склеиваем ID и данные, чтобы получатель знал, какому файлу принадлежит чанк
+          const combined = new Uint8Array(idUint8.length + chunk.byteLength);
+          combined.set(idUint8);
+          combined.set(new Uint8Array(chunk), idUint8.length);
+          
+          dc.send(combined);
+          updateProgress(fileId, (i / f.size) * 100);
         }
-        dc.send(JSON.stringify({ type: 'file-end' }));
-        addFileRow(f.name, null, true);
+        
+        dc.send(JSON.stringify({ type: 'file-end', id: fileId }));
+        updateProgress(fileId, 100);
       }
-    };
-
-    function finalizeFile() {
-      const b = new Blob(window.chunks);
-      const url = URL.createObjectURL(b);
-      addFileRow(window.fInfo.name, url, false);
-      log(`Получен файл: ${window.fInfo.name}`);
     }
 
-    function addFileRow(name, url, isSent) {
-      const row = document.createElement('div');
-      row.style.margin = "5px 0";
-      row.innerHTML = `${isSent ? '📤' : '📥'} ${name} ${url ? `<a href="${url}" download="${name}" style="color:var(--accent)">[СКАЧАТЬ]</a>` : ''}`;
-      document.getElementById('file-list').prepend(row);
+    function createFileUI(id, name, isOwner, fileObj = null) {
+      const div = document.createElement('div');
+      div.className = 'file-item';
+      div.id = `file-${id}`;
+      div.innerHTML = `
+        <div class="file-info">
+          <span class="file-name">${isOwner ? '📤' : '📥'} ${name}</span>
+          <a href="#" class="file-btn" id="dl-${id}" style="display:none;"><i class="fa fa-download"></i></a>
+        </div>
+        <div class="progress-bg"><div class="progress-bar" id="pb-${id}"></div></div>
+      `;
+      document.getElementById('file-list').prepend(div);
+
+      if (isOwner && fileObj) {
+        // У отправителя кнопка доступна сразу
+        const btn = div.querySelector(`#dl-${id}`);
+        btn.style.display = 'block';
+        btn.href = URL.createObjectURL(fileObj);
+        btn.download = name;
+      }
     }
+
+    function updateProgress(id, percent) {
+      const bar = document.getElementById(`pb-${id}`);
+      if (bar) bar.style.width = percent + '%';
+    }
+
+    function finalizeFile(id) {
+      const f = activeFiles[id];
+      const blob = new Blob(f.chunks);
+      const url = URL.createObjectURL(blob);
+      const btn = document.getElementById(`dl-${id}`);
+      if (btn) {
+        btn.style.display = 'block';
+        btn.href = url;
+        btn.download = f.name;
+      }
+      updateProgress(id, 100);
+    }
+
+    // --- DRAG & DROP ---
+
+    const dz = document.getElementById('drop-zone');
+    
+    // Предотвращаем стандартное поведение браузера (открытие файла)
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+      dz.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); }, false);
+    });
+
+    dz.addEventListener('dragover', () => dz.classList.add('active'));
+    dz.addEventListener('dragleave', () => dz.classList.remove('active'));
+    dz.addEventListener('drop', e => {
+      dz.classList.remove('active');
+      const files = e.dataTransfer.files;
+      if (files.length > 0) sendFiles(files);
+    });
+
+    dz.addEventListener('click', () => document.getElementById('file-input').click());
+    document.getElementById('file-input').onchange = e => sendFiles(e.target.files);
+
   </script>
 </body>
 </html>
