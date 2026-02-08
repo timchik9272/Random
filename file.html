@@ -2,123 +2,165 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <title>P2P Transfer Ultra</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>P2P Transfer Clean</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <style>
     :root {
-      --bg: #050505;
-      --card: #121212;
-      --accent: #00f2ff;
-      --text: #ffffff;
-      --border: #333;
-      --btn-bg: #1e1e1e;
-      --danger: #ff3b30;
+      --bg: #0a0a0a;
+      --card-bg: #141414;
+      --accent: #00e5ff;
+      --text-main: #ffffff;
+      --text-muted: #888888;
+      --border: #2a2a2a;
+      --radius: 12px;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; outline: none; -webkit-tap-highlight-color: transparent; }
+    
     body {
       background: var(--bg);
-      color: var(--text);
-      font-family: 'Inter', -apple-system, sans-serif;
-      display: flex; justify-content: center; align-items: center; min-height: 100vh;
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
     }
 
-    .container { width: 95%; max-width: 480px; }
-
-    .card {
-      background: var(--card);
+    /* ОСНОВНОЙ КОНТЕЙНЕР (Фиксируем ширину, чтобы не разъезжалось) */
+    .app-shell {
+      width: 100%;
+      max-width: 420px; /* Оптимальная ширина для "утилиты" */
+      background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 24px;
-      padding: 30px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+      border-radius: 20px;
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow: hidden; /* Обрезаем всё, что пытается вылезти */
     }
 
-    h1 { font-size: 14px; text-transform: uppercase; letter-spacing: 3px; text-align: center; margin-bottom: 25px; opacity: 0.4; }
+    h1 { font-size: 14px; text-transform: uppercase; color: var(--text-muted); text-align: center; letter-spacing: 2px; margin-bottom: 10px; }
 
-    /* ВХОД */
-    .big-code { 
-      font-size: 60px; font-family: monospace; color: var(--accent); 
-      text-align: center; margin: 20px 0; font-weight: bold;
-    }
-    
-    input#room-input {
-      width: 100%; background: #000; border: 2px solid var(--border);
-      border-radius: 16px; color: var(--accent); font-size: 40px;
-      text-align: center; padding: 12px; outline: none; margin-bottom: 20px;
+    /* ВВОД КОДА */
+    .code-display {
+      font-size: 48px; font-family: 'Courier New', monospace; 
+      color: var(--accent); text-align: center; font-weight: bold;
+      margin: 10px 0; letter-spacing: 4px; cursor: pointer;
     }
 
+    input.input-code {
+      width: 100%; background: #000; border: 1px solid var(--border);
+      border-radius: var(--radius); color: #fff; font-size: 32px;
+      text-align: center; padding: 15px; font-family: monospace;
+      transition: border 0.2s;
+    }
+    input.input-code:focus { border-color: var(--accent); }
+
+    /* КНОПКИ */
     .btn {
-      width: 100%; padding: 18px; border-radius: 16px; border: none;
-      font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s;
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      margin-top: 10px;
+      width: 100%; padding: 16px; border-radius: var(--radius); border: none;
+      font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
     }
     .btn-primary { background: var(--accent); color: #000; }
-    .btn-secondary { background: var(--btn-bg); color: var(--text); border: 1px solid #444; }
-    .btn-danger { background: rgba(255, 59, 48, 0.1); color: var(--danger); border: 1px solid var(--danger); }
-    .btn:hover { filter: brightness(1.2); }
+    .btn-primary:active { opacity: 0.8; transform: scale(0.98); }
+    
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+    .btn-outline:hover { border-color: #555; color: #fff; }
+
+    /* Кнопка выхода - нейтральная */
+    .btn-exit { 
+      background: #222; color: #ccc; margin-top: 10px; 
+      border: 1px solid transparent;
+    }
+    .btn-exit:hover { background: #333; color: #fff; border-color: #444; }
 
     /* РАБОЧАЯ ЗОНА */
-    #main-ui { display: none; flex-direction: column; gap: 20px; }
+    #workspace { display: none; flex-direction: column; gap: 15px; }
 
     textarea {
-      width: 100%; height: 100px; background: #000; border: 1px solid var(--border);
-      border-radius: 14px; color: #fff; padding: 15px; resize: none; font-size: 15px; outline: none;
+      width: 100%; height: 80px; background: #080808; border: 1px solid var(--border);
+      border-radius: var(--radius); color: #ddd; padding: 12px; resize: none; font-size: 14px;
     }
+    textarea:focus { border-color: #444; }
 
+    /* DROP ZONE */
     .drop-zone {
-      border: 2px dashed #444; border-radius: 20px; padding: 30px;
-      text-align: center; cursor: pointer; color: #888; transition: 0.3s;
+      border: 2px dashed #333; border-radius: var(--radius); padding: 25px;
+      text-align: center; cursor: pointer; transition: 0.2s; background: rgba(255,255,255,0.02);
     }
-    .drop-zone.active { border-color: var(--accent); background: rgba(0, 242, 255, 0.05); color: var(--accent); }
+    .drop-zone:hover, .drop-zone.active { border-color: var(--accent); background: rgba(0, 229, 255, 0.05); }
+    .drop-zone i { font-size: 24px; color: var(--text-muted); margin-bottom: 8px; display: block; }
+    .drop-zone p { font-size: 13px; color: var(--text-muted); }
 
-    /* ФАЙЛЫ */
-    .file-item {
-      background: #000; border-radius: 14px; padding: 15px; margin-top: 10px;
-      border: 1px solid var(--border);
+    /* СПИСОК ФАЙЛОВ (Исправление вылезания) */
+    .file-list { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+    
+    .file-card {
+      background: #1a1a1a; padding: 10px 14px; border-radius: 8px;
+      border: 1px solid #2a2a2a; display: flex; flex-direction: column; gap: 6px;
     }
-    .file-info { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
-    .progress-bg { width: 100%; height: 6px; background: #222; border-radius: 3px; overflow: hidden; }
-    .progress-bar { height: 100%; background: var(--accent); width: 0%; transition: 0.1s; }
+    
+    .file-header { display: flex; justify-content: space-between; align-items: center; overflow: hidden; }
+    
+    /* Обрезаем длинный текст */
+    .file-name { 
+      font-size: 13px; white-space: nowrap; overflow: hidden; 
+      text-overflow: ellipsis; max-width: 75%; color: #eee;
+    }
+    
+    .file-btn { color: var(--accent); text-decoration: none; font-size: 14px; }
+    
+    .progress-track { width: 100%; height: 4px; background: #333; border-radius: 2px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.2s linear; }
+
   </style>
 </head>
 <body>
 
-  <div class="container">
-    <div class="card">
-      <h1>P2P Transfer</h1>
+  <div class="app-shell">
+    <h1>P2P Transfer</h1>
 
-      <div id="setup-screen">
-        <div id="initial-actions">
-          <button class="btn btn-primary" onclick="createRoom()">Создать комнату</button>
-          <div style="text-align: center; margin: 15px; font-size: 11px; opacity: 0.3;">ИЛИ</div>
-          <input type="number" id="room-input" placeholder="00000" oninput="if(value.length>5)value=value.slice(0,5)">
-          <button class="btn btn-secondary" onclick="joinRoom()">Присоединиться</button>
-        </div>
-
-        <div id="waiting-area" style="display: none; text-align: center;">
-          <p style="opacity: 0.5;">Код комнаты:</p>
-          <div class="big-code" id="active-code">-----</div>
-          <p id="wait-msg">Ожидание подключения...</p>
-          <button class="btn btn-secondary" onclick="location.reload()">Отмена</button>
-        </div>
+    <div id="screen-login">
+      <button class="btn btn-primary" onclick="createRoom()">Создать комнату</button>
+      
+      <div style="display: flex; align-items: center; gap: 10px; margin: 20px 0;">
+        <div style="height: 1px; background: #333; flex: 1;"></div>
+        <span style="font-size: 12px; color: #555;">ИЛИ ВВЕДИТЕ КОД</span>
+        <div style="height: 1px; background: #333; flex: 1;"></div>
       </div>
 
-      <div id="main-ui">
-        <textarea id="text-data" placeholder="Текст или ссылки..." oninput="sendText()"></textarea>
+      <input type="number" id="input-room" class="input-code" placeholder="00000" oninput="if(value.length>5)value=value.slice(0,5)">
+      <button class="btn btn-outline" onclick="joinRoom()" style="margin-top: 15px;">Войти</button>
+    </div>
 
-        <div class="drop-zone" id="drop-zone">
-          <i class="fa fa-file-export" style="font-size: 24px; margin-bottom: 10px;"></i>
-          <p>Нажмите или перетащите файлы</p>
-          <input type="file" id="file-input" multiple style="display: none;">
-        </div>
+    <div id="screen-wait" style="display: none; text-align: center;">
+      <p style="color: #666; font-size: 13px;">Сообщите этот код собеседнику:</p>
+      <div class="code-display" id="display-code" onclick="copyCode()">-----</div>
+      <p id="status-msg" style="color: var(--accent); font-size: 12px; margin-bottom: 20px;">Ожидание подключения...</p>
+      <button class="btn btn-exit" onclick="location.reload()">Отмена</button>
+    </div>
 
-        <div id="file-list"></div>
-        
-        <button class="btn btn-danger" onclick="terminateSession()">Завершить сеанс для всех</button>
+    <div id="workspace">
+      <textarea id="text-buffer" placeholder="Текст скопируется автоматически..." oninput="sendText()"></textarea>
+
+      <div class="drop-zone" id="drop-zone">
+        <i class="fa fa-cloud-upload-alt"></i>
+        <p>Нажмите для выбора файлов</p>
+        <input type="file" id="file-input" multiple style="display: none;">
       </div>
+
+      <div id="file-list" class="file-list"></div>
+
+      <button class="btn btn-exit" onclick="terminateSession()">
+        <i class="fa fa-power-off"></i> Завершить сеанс
+      </button>
     </div>
   </div>
 
@@ -132,66 +174,49 @@
     const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
     let activeFiles = {};
 
-    // --- СИГНАЛИНГ ---
+    // --- НАВИГАЦИЯ ---
+    function showScreen(id) {
+      ['screen-login', 'screen-wait', 'workspace'].forEach(s => document.getElementById(s).style.display = 'none');
+      document.getElementById(id).style.display = (id === 'workspace') ? 'flex' : 'block';
+    }
 
     function createRoom() {
       roomId = Math.floor(10000 + Math.random() * 90000).toString();
       isOfferer = true;
-      document.getElementById('initial-actions').style.display = 'none';
-      document.getElementById('waiting-area').style.display = 'block';
-      document.getElementById('active-code').innerText = roomId;
+      document.getElementById('display-code').innerText = roomId;
+      showScreen('screen-wait');
       initSignaling();
     }
 
     function joinRoom() {
-      roomId = document.getElementById('room-input').value;
+      roomId = document.getElementById('input-room').value;
       if (roomId.length !== 5) return;
       isOfferer = false;
-      document.getElementById('initial-actions').style.display = 'none';
-      document.getElementById('waiting-area').style.display = 'block';
-      document.getElementById('active-code').innerText = roomId;
+      document.getElementById('display-code').innerText = roomId;
+      document.getElementById('status-msg').innerText = "Подключение...";
+      showScreen('screen-wait');
       initSignaling();
     }
 
+    function copyCode() {
+      navigator.clipboard.writeText(roomId);
+      // Визуальный отклик можно добавить, но не обязательно
+    }
+
+    // --- LOGIC ---
     async function initSignaling() {
-      channel = supabaseClient.channel(`p2p_${roomId}`);
-      channel
-        .on('broadcast', { event: 'signal' }, ({ payload }) => handleSignal(payload))
-        .subscribe(status => {
-          if (status === 'SUBSCRIBED' && !isOfferer) sendSignal({ type: 'ready' });
-        });
-    }
-
-    async function terminateSession() {
-      await sendSignal({ type: 'end-session' });
-      location.reload();
-    }
-
-    // --- WebRTC ---
-
-    function startWebRTC() {
-      pc = new RTCPeerConnection(servers);
-      if (isOfferer) {
-        dc = pc.createDataChannel("data", { bufferedAmountLowThreshold: 65536 });
-        setupDC();
-        pc.createOffer().then(o => { pc.setLocalDescription(o); sendSignal({ type: 'offer', sdp: o }); });
-      } else {
-        pc.ondatachannel = e => { dc = e.channel; dc.bufferedAmountLowThreshold = 65536; setupDC(); };
-      }
-      pc.onicecandidate = e => { if (e.candidate) sendSignal({ type: 'candidate', cand: e.candidate }); };
-      pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'connected') {
-          document.getElementById('setup-screen').style.display = 'none';
-          document.getElementById('main-ui').style.display = 'flex';
-        }
-      };
+      channel = supabaseClient.channel(`room_${roomId}`);
+      channel.on('broadcast', { event: 'signal' }, ({ payload }) => handleSignal(payload))
+             .subscribe(status => {
+               if (status === 'SUBSCRIBED' && !isOfferer) sendSignal({ type: 'ready' });
+             });
     }
 
     async function sendSignal(payload) { await channel.send({ type: 'broadcast', event: 'signal', payload }); }
 
     function handleSignal(sig) {
       if (sig.type === 'ready' && isOfferer) startWebRTC();
-      if (sig.type === 'end-session') location.reload();
+      if (sig.type === 'bye') location.reload();
       if (sig.type === 'offer') {
         startWebRTC();
         pc.setRemoteDescription(new RTCSessionDescription(sig.sdp));
@@ -201,115 +226,147 @@
       if (sig.type === 'candidate') pc.addIceCandidate(new RTCIceCandidate(sig.cand));
     }
 
-    // --- ПЕРЕДАЧА ДАННЫХ ---
+    async function terminateSession() {
+      await sendSignal({ type: 'bye' });
+      location.reload();
+    }
 
+    function startWebRTC() {
+      pc = new RTCPeerConnection(servers);
+      const config = { ordered: true };
+      
+      if (isOfferer) {
+        dc = pc.createDataChannel("chat", config);
+        setupDC();
+        pc.createOffer().then(o => { pc.setLocalDescription(o); sendSignal({ type: 'offer', sdp: o }); });
+      } else {
+        pc.ondatachannel = e => { dc = e.channel; setupDC(); };
+      }
+      pc.onicecandidate = e => { if (e.candidate) sendSignal({ type: 'candidate', cand: e.candidate }); };
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'connected') showScreen('workspace');
+      };
+    }
+
+    // --- DATA HANDLING ---
     function setupDC() {
+      dc.bufferedAmountLowThreshold = 65536; // 64KB trigger
       dc.onmessage = e => {
         if (typeof e.data === 'string') {
-          const m = JSON.parse(e.data);
-          if (m.type === 'text') document.getElementById('text-data').value = m.val;
-          if (m.type === 'file-start') {
-            activeFiles[m.id] = { name: m.name, size: m.size, chunks: [], received: 0 };
-            createFileUI(m.id, m.name, false);
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'text') document.getElementById('text-buffer').value = msg.val;
+          if (msg.type === 'f-start') {
+            activeFiles[msg.id] = { ...msg, chunks: [], received: 0 };
+            uiAddFile(msg.id, msg.name, false);
           }
-          if (m.type === 'file-end') finalizeFile(m.id);
+          if (msg.type === 'f-end') uiFinishFile(msg.id);
         } else {
-          const id = new TextDecoder().decode(e.data.slice(0, 8)).trim();
+          // Binary chunk
+          const head = new Uint8Array(e.data.slice(0, 8));
+          const id = new TextDecoder().decode(head).trim();
           const chunk = e.data.slice(8);
           const f = activeFiles[id];
           if (f) {
             f.chunks.push(chunk);
             f.received += chunk.byteLength;
-            updateProgress(id, (f.received / f.size) * 100);
+            uiUpdateProgress(id, (f.received / f.size) * 100);
           }
         }
       };
     }
 
     function sendText() {
-      const val = document.getElementById('text-data').value;
+      const val = document.getElementById('text-buffer').value;
       if (dc?.readyState === 'open') dc.send(JSON.stringify({ type: 'text', val }));
     }
 
-    // --- ФАЙЛОВЫЙ МОТОР (ОПТИМИЗИРОВАНО) ---
-
+    // --- FILE TRANSFER ENGINE ---
     async function sendFiles(files) {
-      for (let f of files) {
-        const fileId = Math.random().toString(36).substring(2, 10);
-        createFileUI(fileId, f.name, true, f);
-        dc.send(JSON.stringify({ type: 'file-start', id: fileId, name: f.name, size: f.size }));
-
-        const chunkSize = 65536; // 64KB
-        const idUint8 = new TextEncoder().encode(fileId.padEnd(8));
+      for (let file of files) {
+        const fid = Math.random().toString(36).substr(2, 8);
+        uiAddFile(fid, file.name, true, file);
+        
+        dc.send(JSON.stringify({ type: 'f-start', id: fid, name: file.name, size: file.size }));
+        
+        const CHUNK = 16384 * 4; // 64KB
+        const idBytes = new TextEncoder().encode(fid.padEnd(8)); // 8 bytes ID
         let offset = 0;
 
-        const sendChunk = async () => {
-          while (offset < f.size) {
-            // Flow Control: ждем, если буфер забит (больше 1Мб)
-            if (dc.bufferedAmount > 1048576) {
-              await new Promise(r => dc.onbufferedamountlow = r);
-            }
-
-            const chunk = await f.slice(offset, offset + chunkSize).arrayBuffer();
-            const combined = new Uint8Array(8 + chunk.byteLength);
-            combined.set(idUint8);
-            combined.set(new Uint8Array(chunk), 8);
-            
-            dc.send(combined);
-            offset += chunk.byteLength;
-            updateProgress(fileId, (offset / f.size) * 100);
+        while (offset < file.size) {
+          if (dc.bufferedAmount > 1000000) {
+            await new Promise(r => dc.onbufferedamountlow = r);
           }
-          dc.send(JSON.stringify({ type: 'file-end', id: fileId }));
-        };
-
-        sendChunk();
+          const slice = await file.slice(offset, offset + CHUNK).arrayBuffer();
+          const packet = new Uint8Array(8 + slice.byteLength);
+          packet.set(idBytes);
+          packet.set(new Uint8Array(slice), 8);
+          
+          dc.send(packet);
+          offset += slice.byteLength;
+          uiUpdateProgress(fid, (offset / file.size) * 100);
+        }
+        dc.send(JSON.stringify({ type: 'f-end', id: fid }));
+        uiUpdateProgress(fid, 100); // Ensure full bar
       }
     }
 
-    function createFileUI(id, name, isOwner, fileObj = null) {
+    // --- UI HELPERS ---
+    function uiAddFile(id, name, isOwner, fileBlob = null) {
       const div = document.createElement('div');
-      div.className = 'file-item';
-      div.id = `file-${id}`;
+      div.className = 'file-card';
+      div.id = `f-${id}`;
       div.innerHTML = `
-        <div class="file-info">
-          <span>${isOwner ? '📤' : '📥'} ${name}</span>
-          <a href="#" id="dl-${id}" style="display:none; color:var(--accent);"><i class="fa fa-download"></i></a>
+        <div class="file-header">
+          <div class="file-name" title="${name}">${isOwner ? '📤' : '📥'} ${name}</div>
+          <a href="#" class="file-btn" id="dl-${id}" style="display:none"><i class="fa fa-download"></i></a>
         </div>
-        <div class="progress-bg"><div class="progress-bar" id="pb-${id}"></div></div>
+        <div class="progress-track"><div class="progress-fill" id="p-${id}"></div></div>
       `;
       document.getElementById('file-list').prepend(div);
-      if (isOwner) {
+      
+      if (isOwner && fileBlob) {
         const btn = div.querySelector(`#dl-${id}`);
-        btn.style.display = 'block'; btn.href = URL.createObjectURL(fileObj); btn.download = name;
+        btn.style.display = 'block';
+        btn.href = URL.createObjectURL(fileBlob);
+        btn.download = name;
       }
     }
 
-    function updateProgress(id, percent) {
-      const bar = document.getElementById(`pb-${id}`);
-      if (bar) bar.style.width = percent + '%';
+    function uiUpdateProgress(id, perc) {
+      const bar = document.getElementById(`p-${id}`);
+      if (bar) bar.style.width = perc + '%';
     }
 
-    function finalizeFile(id) {
+    function uiFinishFile(id) {
       const f = activeFiles[id];
       const blob = new Blob(f.chunks);
       const url = URL.createObjectURL(blob);
-      const btn = document.getElementById(`dl-${id}`);
-      btn.style.display = 'block'; btn.href = url; btn.download = f.name;
+      const btn = document.querySelector(`#f-${id} #dl-${id}`);
+      if (btn) {
+        btn.style.display = 'block';
+        btn.href = url;
+        btn.download = f.name;
+      }
+      uiUpdateProgress(id, 100);
     }
 
-    // --- EVENTS ---
+    // --- DRAG & DROP & EVENTS ---
     const dz = document.getElementById('drop-zone');
+    const fi = document.getElementById('file-input');
+
+    dz.onclick = () => fi.click();
+    fi.onchange = e => sendFiles(e.target.files);
+
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => {
-      dz.addEventListener(e, x => { x.preventDefault(); x.stopPropagation(); });
+      dz.addEventListener(e, ev => { ev.preventDefault(); ev.stopPropagation(); });
     });
     dz.addEventListener('dragover', () => dz.classList.add('active'));
     dz.addEventListener('dragleave', () => dz.classList.remove('active'));
-    dz.addEventListener('drop', x => {
+    dz.addEventListener('drop', ev => {
       dz.classList.remove('active');
-      sendFiles(x.dataTransfer.files);
+      sendFiles(ev.dataTransfer.files);
     });
-    dz.onclick = () => document.getElementById('file-input').click();
-    document.getElementById('file-input').onchange = e => sendFiles(e.target.files);
+
   </script>
 </body>
 </html>
