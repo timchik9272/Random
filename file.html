@@ -9,19 +9,21 @@
   <style>
     :root {
       --bg: #000000;
+      --card-bg: #000000;
       --accent: #00e5ff;
       --text: #ffffff;
       --muted: #666666;
-      --panel: #0a0a0a;
+      --border: #222222;
     }
 
-    /* ПРИМЕНЯЕМ МОНОШИРИННЫЙ ШРИФТ ВЕЗДЕ */
+    /* ВЕЗДЕ ОДИНАКОВЫЙ ШРИФТ */
     * { 
       box-sizing: border-box; 
-      margin: 0; padding: 0; 
+      margin: 0; 
+      padding: 0; 
       outline: none; 
-      font-family: 'Courier New', Courier, monospace; 
-      -webkit-tap-highlight-color: transparent; 
+      font-family: 'Courier New', Courier, monospace; /* Тот самый шрифт */
+      -webkit-tap-highlight-color: transparent;
     }
     
     body {
@@ -34,45 +36,25 @@
       padding: 20px;
     }
 
+    /* УБРАНА РАМКА У КОНТЕЙНЕРА */
     .app-shell {
       width: 100%;
       max-width: 400px;
+      background: var(--card-bg);
       display: flex;
       flex-direction: column;
       gap: 25px;
-      /* РАМКА И ТЕНЬ УДАЛЕНЫ */
     }
 
     h1 { 
-      font-size: 16px; 
+      font-size: 18px; 
+      color: var(--text); 
       text-align: center; 
       letter-spacing: 5px; 
-      color: var(--muted); 
-    }
-
-    /* КОД И ПОЛЕ ВВОДА */
-    .code-view {
-      font-size: 54px; 
-      color: var(--accent); 
-      text-align: center; 
       font-weight: bold;
-      letter-spacing: 6px;
     }
 
-    input.input-code {
-      width: 100%; 
-      background: transparent; 
-      border: none;
-      border-bottom: 2px solid #222; 
-      color: var(--accent); 
-      font-size: 42px;
-      text-align: center; 
-      padding: 10px;
-      transition: border-color 0.3s;
-    }
-    input.input-code:focus { border-bottom-color: var(--accent); }
-
-    /* УБИРАЕМ СТРЕЛОЧКИ У ПОЛЯ NUMBER */
+    /* УБИРАЕМ СТРЕЛКИ У INPUT */
     input::-webkit-outer-spin-button,
     input::-webkit-inner-spin-button {
       -webkit-appearance: none;
@@ -82,49 +64,92 @@
       -moz-appearance: textfield;
     }
 
-    /* КНОПКИ */
+    .code-display {
+      font-size: 56px; 
+      color: var(--accent); 
+      text-align: center; 
+      font-weight: bold;
+      margin: 10px 0; 
+      letter-spacing: 6px;
+    }
+
+    input.input-code {
+      width: 100%; 
+      background: #000; 
+      border: 2px solid var(--border);
+      border-radius: 0px; 
+      color: var(--accent); 
+      font-size: 40px;
+      text-align: center; 
+      padding: 15px;
+      transition: border 0.3s;
+    }
+    input.input-code:focus { border-color: var(--accent); }
+
     .btn {
       width: 100%; 
       padding: 18px; 
-      border-radius: 4px; 
-      border: none;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
       font-size: 14px; 
       font-weight: bold; 
-      cursor: pointer; 
+      cursor: pointer;
       text-transform: uppercase;
       letter-spacing: 2px;
       transition: 0.2s;
     }
-    .btn-primary { background: var(--accent); color: #000; }
-    .btn-outline { background: transparent; color: var(--muted); border: 1px solid #222; }
-    .btn-exit { background: transparent; color: #444; border: 1px solid #111; margin-top: 10px; }
-    .btn:active { transform: scale(0.98); opacity: 0.8; }
+    .btn-primary { border-color: var(--accent); color: var(--accent); }
+    .btn:active { background: var(--accent); color: #000; }
 
-    /* РАБОЧАЯ ЗОНА */
     #workspace { display: none; flex-direction: column; gap: 20px; }
 
     textarea {
-      width: 100%; height: 100px; background: #050505; border: 1px solid #111;
-      color: #fff; padding: 15px; resize: none; font-size: 14px;
+      width: 100%; 
+      height: 100px; 
+      background: #000; 
+      border: 1px solid var(--border);
+      color: #fff; 
+      padding: 12px; 
+      resize: none; 
+      font-size: 14px;
     }
 
     .drop-zone {
-      border: 1px dashed #222; padding: 30px;
-      text-align: center; cursor: pointer; color: var(--muted);
+      border: 2px dashed var(--border); 
+      padding: 30px;
+      text-align: center; 
+      cursor: pointer;
     }
-    .drop-zone:hover { border-color: var(--accent); color: var(--accent); }
+    .drop-zone p { font-size: 12px; color: var(--muted); margin-top: 10px; }
 
     /* ФАЙЛЫ */
-    .file-item {
-      background: #050505; padding: 12px; border-bottom: 1px solid #111;
-      display: flex; flex-direction: column; gap: 8px;
+    .file-list { display: flex; flex-direction: column; gap: 12px; }
+    
+    .file-card {
+      background: #000; 
+      padding: 12px; 
+      border-bottom: 1px solid var(--border);
+      display: flex; 
+      flex-direction: column; 
+      gap: 8px;
     }
-    .file-row { display: flex; justify-content: space-between; align-items: center; }
-    .file-name { font-size: 13px; color: #aaa; }
-    .dl-link { color: var(--accent); text-decoration: none; font-weight: bold; }
-
-    .progress-track { width: 100%; height: 2px; background: #111; }
-    .progress-fill { height: 100%; background: var(--accent); width: 0%; transition: 0.1s; }
+    
+    .file-header { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+    }
+    
+    .file-name { 
+      font-size: 13px; 
+      color: #eee;
+    }
+    
+    .file-btn { color: var(--accent); text-decoration: none; font-size: 16px; }
+    
+    .progress-track { width: 100%; height: 2px; background: #222; }
+    .progress-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.2s; }
 
   </style>
 </head>
@@ -135,28 +160,32 @@
 
     <div id="screen-login">
       <button class="btn btn-primary" onclick="createRoom()">CREATE ROOM</button>
-      <div style="text-align:center; margin: 20px; font-size:10px; color:#333;">OR ENTER CODE</div>
+      <div style="text-align: center; margin: 20px 0; font-size: 11px; color: var(--muted);">ENTER CODE BELOW</div>
       <input type="number" id="input-room" class="input-code" placeholder="00000" oninput="if(value.length>5)value=value.slice(0,5)">
-      <button class="btn btn-outline" onclick="joinRoom()" style="margin-top: 20px;">JOIN</button>
+      <button class="btn" onclick="joinRoom()" style="margin-top: 20px;">JOIN</button>
     </div>
 
     <div id="screen-wait" style="display: none; text-align: center;">
-      <div class="code-view" id="display-code" onclick="copyCode()">-----</div>
-      <p id="status-msg" style="font-size: 11px; color: var(--muted); margin-top: 10px;">WAITING FOR PEER...</p>
-      <button class="btn btn-exit" onclick="location.reload()" style="margin-top: 30px;">CANCEL</button>
+      <p style="color: var(--muted); font-size: 12px;">ROOM CODE:</p>
+      <div class="code-display" id="display-code">-----</div>
+      <p id="status-msg" style="color: var(--accent); font-size: 11px; margin-bottom: 25px;">WAITING FOR PEER...</p>
+      <button class="btn" onclick="location.reload()">CANCEL</button>
     </div>
 
     <div id="workspace">
       <textarea id="text-buffer" placeholder="Type something..." oninput="sendText()"></textarea>
 
       <div class="drop-zone" id="drop-zone">
-        <i class="fa fa-plus"></i><br><br>ADD FILES
+        <i class="fa fa-upload" style="color: var(--accent)"></i>
+        <p>SELECT OR DROP FILES</p>
         <input type="file" id="file-input" multiple style="display: none;">
       </div>
 
-      <div id="file-list"></div>
+      <div id="file-list" class="file-list"></div>
 
-      <button class="btn btn-exit" onclick="terminateSession()">CLOSE SESSION</button>
+      <button class="btn" onclick="terminateSession()" style="color: #666; border-color: #333;">
+        CLOSE SESSION
+      </button>
     </div>
   </div>
 
@@ -170,20 +199,17 @@
     const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
     let activeFiles = {};
 
-    // СОКРАЩЕНИЕ ИМЕНИ ФАЙЛА
+    // --- СОКРАЩЕНИЕ ИМЕНИ ---
     function formatFileName(name) {
-      if (name.length <= 16) return name;
-      const extIndex = name.lastIndexOf('.');
-      const ext = extIndex !== -1 ? name.substring(extIndex) : '';
-      const base = extIndex !== -1 ? name.substring(0, extIndex) : name;
-      // Берем начало имени, ставим троеточие и расширение
-      return base.substring(0, 10) + "..." + ext;
+      if (name.length <= 20) return name;
+      const parts = name.split('.');
+      const ext = parts.length > 1 ? parts.pop() : '';
+      const base = parts.join('.');
+      return base.substring(0, 12) + '... .' + ext;
     }
 
     function showScreen(id) {
-      document.getElementById('screen-login').style.display = 'none';
-      document.getElementById('screen-wait').style.display = 'none';
-      document.getElementById('workspace').style.display = 'none';
+      ['screen-login', 'screen-wait', 'workspace'].forEach(s => document.getElementById(s).style.display = 'none');
       document.getElementById(id).style.display = (id === 'workspace') ? 'flex' : 'block';
     }
 
@@ -226,7 +252,10 @@
       if (sig.type === 'candidate') pc.addIceCandidate(new RTCIceCandidate(sig.cand));
     }
 
-    async function terminateSession() { await sendSignal({ type: 'bye' }); location.reload(); }
+    async function terminateSession() {
+      await sendSignal({ type: 'bye' });
+      location.reload();
+    }
 
     function startWebRTC() {
       pc = new RTCPeerConnection(servers);
@@ -238,27 +267,30 @@
         pc.ondatachannel = e => { dc = e.channel; setupDC(); };
       }
       pc.onicecandidate = e => { if (e.candidate) sendSignal({ type: 'candidate', cand: e.candidate }); };
-      pc.onconnectionstatechange = () => { if (pc.connectionState === 'connected') showScreen('workspace'); };
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'connected') showScreen('workspace');
+      };
     }
 
     function setupDC() {
       dc.bufferedAmountLowThreshold = 65536;
       dc.onmessage = e => {
         if (typeof e.data === 'string') {
-          const m = JSON.parse(e.data);
-          if (m.type === 'text') document.getElementById('text-buffer').value = m.val;
-          if (m.type === 'f-start') {
-            activeFiles[m.id] = { ...m, chunks: [], received: 0 };
-            uiAddFile(m.id, m.name, false);
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'text') document.getElementById('text-buffer').value = msg.val;
+          if (msg.type === 'f-start') {
+            activeFiles[msg.id] = { ...msg, chunks: [], received: 0 };
+            uiAddFile(msg.id, msg.name, false);
           }
-          if (m.type === 'f-end') uiFinishFile(m.id);
+          if (msg.type === 'f-end') uiFinishFile(msg.id);
         } else {
-          const id = new TextDecoder().decode(e.data.slice(0, 8)).trim();
+          const head = new TextDecoder().decode(e.data.slice(0, 8)).trim();
           const chunk = e.data.slice(8);
-          if (activeFiles[id]) {
-            activeFiles[id].chunks.push(chunk);
-            activeFiles[id].received += chunk.byteLength;
-            uiUpdProg(id, (activeFiles[id].received / activeFiles[id].size) * 100);
+          const f = activeFiles[head];
+          if (f) {
+            f.chunks.push(chunk);
+            f.received += chunk.byteLength;
+            uiUpdateProgress(head, (f.received / f.size) * 100);
           }
         }
       };
@@ -275,16 +307,16 @@
         uiAddFile(fid, file.name, true, file);
         dc.send(JSON.stringify({ type: 'f-start', id: fid, name: file.name, size: file.size }));
         const CHUNK = 65536;
-        const idB = new TextEncoder().encode(fid.padEnd(8));
-        let off = 0;
-        while (off < file.size) {
+        const idBytes = new TextEncoder().encode(fid.padEnd(8));
+        let offset = 0;
+        while (offset < file.size) {
           if (dc.bufferedAmount > 1000000) await new Promise(r => dc.onbufferedamountlow = r);
-          const s = await file.slice(off, off + CHUNK).arrayBuffer();
-          const p = new Uint8Array(8 + s.byteLength);
-          p.set(idB); p.set(new Uint8Array(s), 8);
-          dc.send(p);
-          off += s.byteLength;
-          uiUpdProg(fid, (off / file.size) * 100);
+          const slice = await file.slice(offset, offset + CHUNK).arrayBuffer();
+          const packet = new Uint8Array(8 + slice.byteLength);
+          packet.set(idBytes); packet.set(new Uint8Array(slice), 8);
+          dc.send(packet);
+          offset += slice.byteLength;
+          uiUpdateProgress(fid, (offset / file.size) * 100);
         }
         dc.send(JSON.stringify({ type: 'f-end', id: fid }));
       }
@@ -292,35 +324,35 @@
 
     function uiAddFile(id, name, isOwner, fileBlob = null) {
       const div = document.createElement('div');
-      div.className = 'file-item';
+      div.className = 'file-card';
       div.id = `f-${id}`;
-      // ПРИМЕНЯЕМ ФОРМАТ ИМЕНИ
-      const shortName = formatFileName(name);
       div.innerHTML = `
-        <div class="file-row">
-          <div class="file-name">${isOwner ? 'UP' : 'DN'}: ${shortName}</div>
-          <a href="#" class="dl-link" id="dl-${id}" style="display:none">GET</a>
+        <div class="file-header">
+          <div class="file-name">${isOwner ? '>' : '<'} ${formatFileName(name)}</div>
+          <a href="#" class="file-btn" id="dl-${id}" style="display:none"><i class="fa fa-download"></i></a>
         </div>
         <div class="progress-track"><div class="progress-fill" id="p-${id}"></div></div>
       `;
       document.getElementById('file-list').prepend(div);
-      if (isOwner) {
-        const a = div.querySelector(`#dl-${id}`);
-        a.style.display = 'block'; a.href = URL.createObjectURL(fileBlob); a.download = name;
+      if (isOwner && fileBlob) {
+        const btn = div.querySelector(`#dl-${id}`);
+        btn.style.display = 'block'; btn.href = URL.createObjectURL(fileBlob); btn.download = name;
+        uiUpdateProgress(id, 100);
       }
     }
 
-    function uiUpdProg(id, p) { 
-      const b = document.getElementById(`p-${id}`); 
-      if (b) b.style.width = p + '%'; 
+    function uiUpdateProgress(id, perc) {
+      const bar = document.getElementById(`p-${id}`);
+      if (bar) bar.style.width = perc + '%';
     }
 
     function uiFinishFile(id) {
       const f = activeFiles[id];
-      const url = URL.createObjectURL(new Blob(f.chunks));
-      const a = document.querySelector(`#f-${id} #dl-${id}`);
-      if (a) { a.style.display = 'block'; a.href = url; a.download = f.name; }
-      uiUpdProg(id, 100);
+      const blob = new Blob(f.chunks);
+      const url = URL.createObjectURL(blob);
+      const btn = document.querySelector(`#f-${id} #dl-${id}`);
+      if (btn) { btn.style.display = 'block'; btn.href = url; btn.download = f.name; }
+      uiUpdateProgress(id, 100);
     }
 
     const dz = document.getElementById('drop-zone');
