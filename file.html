@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>P2P Transfer 5.0</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    :root {
+      --bg: #050505;
+      --panel: #111;
+      --accent: #00ff88;
+      --text: #ffffff;
+      --border: #333;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, sans-serif;
+      display: flex; justify-content: center; align-items: center; min-height: 100vh;
+    }
+
+    .container { width: 90%; max-width: 500px; }
+
+    /* ЭКРАН ВХОДА */
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 24px; padding: 40px; text-align: center; }
+    h1 { font-size: 24px; margin-bottom: 30px; font-weight: 300; opacity: 0.7; }
+
+    .code-view { 
+      font-size: 64px; font-family: monospace; color: var(--accent); 
+      letter-spacing: 8px; margin: 20px 0; font-weight: bold; cursor: pointer;
+    }
+    .hint { font-size: 14px; opacity: 0.5; margin-bottom: 20px; }
+
+    input#room-input {
+      width: 100%; background: #000; border: 2px solid var(--border);
+      border-radius: 16px; color: var(--accent); font-size: 48px;
+      text-align: center; font-family: monospace; padding: 15px; outline: none;
+      margin-bottom: 20px;
+    }
+    input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+    .btn {
+      width: 100%; padding: 20px; border-radius: 16px; border: none;
+      font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); margin-top: 15px; }
+    .btn:active { transform: scale(0.98); }
+
+    /* ЭКРАН ПЕРЕДАЧИ */
+    #transfer-ui { display: none; flex-direction: column; gap: 20px; }
+    .data-block { background: var(--panel); border-radius: 20px; padding: 25px; border: 1px solid var(--border); }
+    .label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 15px; display: block; }
+
+    textarea {
+      width: 100%; height: 120px; background: #000; border: 1px solid var(--border);
+      border-radius: 12px; color: #fff; padding: 15px; resize: none; font-size: 16px; outline: none;
+    }
+
+    .drop-zone {
+      border: 2px dashed var(--border); border-radius: 12px; padding: 40px;
+      text-align: center; cursor: pointer; transition: 0.3s;
+    }
+    .drop-zone.active { border-color: var(--accent); background: rgba(0, 255, 136, 0.05); }
+
+    .file-row {
+      display: flex; justify-content: space-between; align-items: center;
+      background: #000; padding: 12px; border-radius: 10px; margin-top: 10px;
+    }
+    .progress-container { width: 100%; height: 4px; background: #222; border-radius: 2px; margin-top: 10px; overflow: hidden; display: none; }
+    .progress-fill { height: 100%; background: var(--accent); width: 0%; transition: 0.1s; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div id="setup-screen" class="card">
+      <h1>P2P TRANSFER</h1>
+      
+      <div id="main-actions">
+        <button class="btn btn-primary" onclick="createRoom()">СОЗДАТЬ КОМНАТУ</button>
+        <div style="margin: 20px 0; opacity: 0.3;">или</div>
+        <input type="number" id="room-input" placeholder="00000" oninput="if(value.length>5)value=value.slice(0,5)">
+        <button class="btn btn-secondary" onclick="joinRoom()">ВОЙТИ ПО КОДУ</button>
+      </div>
+
+      <div id="code-display-area" style="display: none;">
+        <div class="hint">Код комнаты (нажмите, чтобы скопировать):</div>
+        <div class="code-view" id="active-code" onclick="copyCode()">-----</div>
+        <div id="status-wait">Ожидание подключения...</div>
+        <button class="btn btn-secondary" onclick="location.reload()">ОТМЕНА</button>
+      </div>
+    </div>
+
+    <div id="transfer-ui">
+      <div class="data-block">
+        <span class="label">Общий текстовый буфер</span>
+        <textarea id="text-data" placeholder="Вставьте текст или ссылку..." oninput="sendText()"></textarea>
+        <button class="btn btn-secondary" style="padding: 10px; font-size: 14px;" onclick="copyBuffer()">СКОПИРОВАТЬ ВСЁ</button>
+      </div>
+
+      <div class="data-block">
+        <span class="label">Файлы (P2P)</span>
+        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+          <i class="fa fa-upload" style="font-size: 24px; margin-bottom: 10px;"></i>
+          <div>Нажмите или перетащите</div>
+          <input type="file" id="file-input" multiple style="display: none;">
+        </div>
+        <div class="progress-container" id="p-cont"><div class="progress-fill" id="p-fill"></div></div>
+        <div id="file-list" style="margin-top: 15px;"></div>
+      </div>
+
+      <button class="btn btn-secondary" onclick="location.reload()">ВЫЙТИ</button>
+    </div>
+  </div>
+
+  <script>
+    const supabaseClient = supabase.createClient(
+      "https://zmewwzlzujsrhstjehrp.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZXd3emx6dWpzcmhzdGplaHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NjM4MDksImV4cCI6MjA3MTUzOTgwOX0.kBBXwlCEl5szgK4vKgaPBhPOVYmoFzly2TXR-fI8D24"
+    );
+
+    let peerConnection, dataChannel, channel, roomId, isOfferer;
+    const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+    // --- ЛОГИКА ВХОДА ---
+
+    function createRoom() {
+      roomId = Math.floor(10000 + Math.random() * 90000).toString();
+      isOfferer = true;
+      document.getElementById('main-actions').style.display = 'none';
+      document.getElementById('code-display-area').style.display = 'block';
+      document.getElementById('active-code').innerText = roomId;
+      initSignaling();
+    }
+
+    function joinRoom() {
+      roomId = document.getElementById('room-input').value;
+      if (roomId.length !== 5) return alert("Введите 5 цифр");
+      isOfferer = false;
+      initSignaling();
+    }
+
+    function copyCode() {
+      navigator.clipboard.writeText(roomId);
+      alert("Код скопирован!");
+    }
+
+    // --- WebRTC СИГНАЛИНГ ---
+
+    function initSignaling() {
+      channel = supabaseClient.channel(`p2p_v5_${roomId}`);
+      channel
+        .on('broadcast', { event: 'signal' }, ({ payload }) => handleSignal(payload))
+        .subscribe(status => {
+          if (status === 'SUBSCRIBED') startWebRTC();
+        });
+    }
+
+    function startWebRTC() {
+      peerConnection = new RTCPeerConnection(servers);
+
+      if (isOfferer) {
+        dataChannel = peerConnection.createDataChannel("data");
+        setupDataChannel();
+        peerConnection.createOffer().then(o => {
+          peerConnection.setLocalDescription(o);
+          sendSignal({ type: 'offer', sdp: o });
+        });
+      } else {
+        peerConnection.ondatachannel = e => {
+          dataChannel = e.channel;
+          setupDataChannel();
+        };
+      }
+
+      peerConnection.onicecandidate = e => { if (e.candidate) sendSignal({ type: 'candidate', candidate: e.candidate }); };
+      
+      peerConnection.onconnectionstatechange = () => {
+        if (peerConnection.connectionState === 'connected') {
+          document.getElementById('setup-screen').style.display = 'none';
+          document.getElementById('transfer-ui').style.display = 'flex';
+        }
+      };
+    }
+
+    async function sendSignal(payload) { await channel.send({ type: 'broadcast', event: 'signal', payload }); }
+
+    function handleSignal(signal) {
+      if (signal.type === 'offer' && !isOfferer) {
+        peerConnection.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+        peerConnection.createAnswer().then(a => {
+          peerConnection.setLocalDescription(a);
+          sendSignal({ type: 'answer', sdp: a });
+        });
+      } else if (signal.type === 'answer' && isOfferer) {
+        peerConnection.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+      } else if (signal.type === 'candidate') {
+        peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+      }
+    }
+
+    // --- ПЕРЕДАЧА ДАННЫХ ---
+
+    function setupDataChannel() {
+      dataChannel.onmessage = e => {
+        if (typeof e.data === 'string') {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'text') document.getElementById('text-data').value = msg.data;
+          if (msg.type === 'file-start') {
+            window.receivedChunks = [];
+            window.currentFileInfo = msg;
+            document.getElementById('p-cont').style.display = 'block';
+          }
+          if (msg.type === 'file-end') finalizeFile();
+        } else {
+          window.receivedChunks.push(e.data);
+          const currentSize = window.receivedChunks.reduce((acc, c) => acc + c.byteLength, 0);
+          document.getElementById('p-fill').style.width = (currentSize / window.currentFileInfo.size * 100) + '%';
+        }
+      };
+    }
+
+    function sendText() {
+      const val = document.getElementById('text-data').value;
+      if (dataChannel?.readyState === 'open') {
+        dataChannel.send(JSON.stringify({ type: 'text', data: val }));
+      }
+    }
+
+    function copyBuffer() {
+      const ta = document.getElementById('text-data');
+      ta.select();
+      document.execCommand('copy');
+    }
+
+    // Файлы
+    async function sendFiles(files) {
+      if (!dataChannel || dataChannel.readyState !== 'open') return;
+      const pFill = document.getElementById('p-fill');
+      const pCont = document.getElementById('p-cont');
+
+      for (let file of files) {
+        dataChannel.send(JSON.stringify({ type: 'file-start', name: file.name, size: file.size }));
+        pCont.style.display = 'block';
+
+        const chunkSize = 16384;
+        for (let i = 0; i < file.size; i += chunkSize) {
+          const chunk = await file.slice(i, i + chunkSize).arrayBuffer();
+          dataChannel.send(chunk);
+          pFill.style.width = (i / file.size * 100) + '%';
+        }
+        dataChannel.send(JSON.stringify({ type: 'file-end' }));
+        pCont.style.display = 'none';
+        addFileRow(file.name, '#', true);
+      }
+    }
+
+    function finalizeFile() {
+      const blob = new Blob(window.receivedChunks);
+      const url = URL.createObjectURL(blob);
+      addFileRow(window.currentFileInfo.name, url, false);
+      document.getElementById('p-cont').style.display = 'none';
+    }
+
+    function addFileRow(name, url, isSent) {
+      const row = document.createElement('div');
+      row.className = 'file-row';
+      row.innerHTML = `
+        <span style="font-size:14px; opacity:0.8;">${isSent ? '📤' : '📥'} ${name}</span>
+        ${isSent ? '' : `<a href="${url}" download="${name}" style="color:var(--accent); text-decoration:none;"><i class="fa fa-download"></i></a>`}
+      `;
+      document.getElementById('file-list').prepend(row);
+    }
+
+    // Файловые события
+    const dz = document.getElementById('drop-zone');
+    dz.ondragover = e => { e.preventDefault(); dz.classList.add('active'); };
+    dz.ondragleave = () => dz.classList.remove('active');
+    dz.ondrop = e => { e.preventDefault(); dz.classList.remove('active'); sendFiles(e.dataTransfer.files); };
+    document.getElementById('file-input').onchange = e => sendFiles(e.target.files);
+
+  </script>
+</body>
+</html>
