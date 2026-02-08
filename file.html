@@ -2,142 +2,122 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <title>P2P Transfer Elite</title>
+  <title>P2P Transfer Ultra</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <style>
     :root {
-      --bg: #080808;
+      --bg: #050505;
       --card: #121212;
       --accent: #00f2ff;
-      --text: #e0e0e0;
-      --border: #222;
-      --success: #00ff88;
+      --text: #ffffff;
+      --border: #333;
+      --btn-bg: #1e1e1e;
+      --danger: #ff3b30;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-family: 'Inter', -apple-system, sans-serif;
       display: flex; justify-content: center; align-items: center; min-height: 100vh;
-      overflow-x: hidden;
     }
 
-    .container { width: 95%; max-width: 500px; z-index: 10; }
+    .container { width: 95%; max-width: 480px; }
 
-    /* ГЛАВНАЯ ПАНЕЛЬ */
-    .glass-card {
+    .card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 28px;
-      padding: 35px;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+      border-radius: 24px;
+      padding: 30px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.8);
     }
 
-    h1 { font-size: 18px; font-weight: 400; letter-spacing: 4px; text-align: center; margin-bottom: 30px; opacity: 0.5; }
+    h1 { font-size: 14px; text-transform: uppercase; letter-spacing: 3px; text-align: center; margin-bottom: 25px; opacity: 0.4; }
 
-    /* ЭКРАН ВХОДА */
+    /* ВХОД */
     .big-code { 
-      font-size: 72px; font-family: 'Courier New', monospace; color: var(--accent); 
-      text-align: center; margin: 20px 0; font-weight: bold; cursor: pointer;
-      text-shadow: 0 0 20px rgba(0, 242, 255, 0.3);
+      font-size: 60px; font-family: monospace; color: var(--accent); 
+      text-align: center; margin: 20px 0; font-weight: bold;
     }
     
     input#room-input {
       width: 100%; background: #000; border: 2px solid var(--border);
-      border-radius: 18px; color: var(--accent); font-size: 50px;
-      text-align: center; font-family: monospace; padding: 15px; outline: none;
-      margin-bottom: 20px; transition: 0.3s;
+      border-radius: 16px; color: var(--accent); font-size: 40px;
+      text-align: center; padding: 12px; outline: none; margin-bottom: 20px;
     }
-    input#room-input:focus { border-color: var(--accent); }
 
     .btn {
-      width: 100%; padding: 20px; border-radius: 18px; border: none;
-      font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s;
-      display: flex; align-items: center; justify-content: center; gap: 12px;
-      text-transform: uppercase; letter-spacing: 1px;
+      width: 100%; padding: 18px; border-radius: 16px; border: none;
+      font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      margin-top: 10px;
     }
     .btn-primary { background: var(--accent); color: #000; }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 242, 255, 0.4); }
-    .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); margin-top: 15px; }
+    .btn-secondary { background: var(--btn-bg); color: var(--text); border: 1px solid #444; }
+    .btn-danger { background: rgba(255, 59, 48, 0.1); color: var(--danger); border: 1px solid var(--danger); }
+    .btn:hover { filter: brightness(1.2); }
 
-    /* РАБОЧИЙ ИНТЕРФЕЙС */
+    /* РАБОЧАЯ ЗОНА */
     #main-ui { display: none; flex-direction: column; gap: 20px; }
-
-    .status-bar { font-size: 12px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; opacity: 0.8; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
-    .dot.online { background: var(--success); box-shadow: 0 0 10px var(--success); }
 
     textarea {
       width: 100%; height: 100px; background: #000; border: 1px solid var(--border);
-      border-radius: 15px; color: #fff; padding: 15px; resize: none; font-size: 15px; outline: none;
+      border-radius: 14px; color: #fff; padding: 15px; resize: none; font-size: 15px; outline: none;
     }
 
-    /* ЗОНА ФАЙЛОВ */
     .drop-zone {
-      border: 2px dashed var(--border); border-radius: 20px; padding: 40px 20px;
-      text-align: center; cursor: pointer; transition: 0.3s; color: #666;
+      border: 2px dashed #444; border-radius: 20px; padding: 30px;
+      text-align: center; cursor: pointer; color: #888; transition: 0.3s;
     }
     .drop-zone.active { border-color: var(--accent); background: rgba(0, 242, 255, 0.05); color: var(--accent); }
-    .drop-zone i { font-size: 30px; margin-bottom: 10px; }
 
-    /* СПИСОК ФАЙЛОВ */
+    /* ФАЙЛЫ */
     .file-item {
-      background: #1a1a1a; border-radius: 15px; padding: 15px; margin-top: 10px;
-      border: 1px solid var(--border); position: relative; overflow: hidden;
+      background: #000; border-radius: 14px; padding: 15px; margin-top: 10px;
+      border: 1px solid var(--border);
     }
-    .file-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .file-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
-    .file-btn { color: var(--accent); text-decoration: none; font-size: 18px; }
-    
-    .progress-bg { width: 100%; height: 4px; background: #000; border-radius: 2px; overflow: hidden; }
+    .file-info { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+    .progress-bg { width: 100%; height: 6px; background: #222; border-radius: 3px; overflow: hidden; }
     .progress-bar { height: 100%; background: var(--accent); width: 0%; transition: 0.1s; }
   </style>
 </head>
 <body>
 
   <div class="container">
-    <div class="glass-card">
-      <h1>P2P TRANSFER</h1>
+    <div class="card">
+      <h1>P2P Transfer</h1>
 
       <div id="setup-screen">
         <div id="initial-actions">
-          <button class="btn btn-primary" onclick="createRoom()"><i class="fa fa-plus"></i> Создать комнату</button>
-          <div style="text-align: center; margin: 20px; opacity: 0.3; font-size: 12px;">ИЛИ ВВЕДИТЕ КОД</div>
+          <button class="btn btn-primary" onclick="createRoom()">Создать комнату</button>
+          <div style="text-align: center; margin: 15px; font-size: 11px; opacity: 0.3;">ИЛИ</div>
           <input type="number" id="room-input" placeholder="00000" oninput="if(value.length>5)value=value.slice(0,5)">
           <button class="btn btn-secondary" onclick="joinRoom()">Присоединиться</button>
         </div>
 
         <div id="waiting-area" style="display: none; text-align: center;">
-          <p style="opacity: 0.5; font-size: 13px;">Код для подключения:</p>
-          <div class="big-code" id="active-code" onclick="copyCode()">-----</div>
-          <div class="status-bar" style="justify-content: center;">
-            <div class="dot"></div> <span id="wait-msg">Ожидание гостя...</span>
-          </div>
+          <p style="opacity: 0.5;">Код комнаты:</p>
+          <div class="big-code" id="active-code">-----</div>
+          <p id="wait-msg">Ожидание подключения...</p>
           <button class="btn btn-secondary" onclick="location.reload()">Отмена</button>
         </div>
       </div>
 
       <div id="main-ui">
-        <div class="status-bar">
-          <div class="dot online"></div> <span>Защищенное P2P соединение</span>
-        </div>
-
-        <div style="margin-bottom: 20px;">
-          <textarea id="text-data" placeholder="Общий текстовый буфер (ссылки, заметки...)" oninput="sendText()"></textarea>
-        </div>
+        <textarea id="text-data" placeholder="Текст или ссылки..." oninput="sendText()"></textarea>
 
         <div class="drop-zone" id="drop-zone">
-          <i class="fa fa-cloud-arrow-up"></i>
-          <p>Перетащите файлы или кликните</p>
+          <i class="fa fa-file-export" style="font-size: 24px; margin-bottom: 10px;"></i>
+          <p>Нажмите или перетащите файлы</p>
           <input type="file" id="file-input" multiple style="display: none;">
         </div>
 
         <div id="file-list"></div>
         
-        <button class="btn btn-secondary" style="margin-top: 20px;" onclick="location.reload()">Завершить сеанс</button>
+        <button class="btn btn-danger" onclick="terminateSession()">Завершить сеанс для всех</button>
       </div>
     </div>
   </div>
@@ -150,9 +130,9 @@
 
     let pc, dc, channel, roomId, isOfferer;
     const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-    let activeFiles = {}; // Для отслеживания прогресса
+    let activeFiles = {};
 
-    // --- ЛОГИКА ПОДКЛЮЧЕНИЯ ---
+    // --- СИГНАЛИНГ ---
 
     function createRoom() {
       roomId = Math.floor(10000 + Math.random() * 90000).toString();
@@ -165,22 +145,16 @@
 
     function joinRoom() {
       roomId = document.getElementById('room-input').value;
-      if (roomId.length !== 5) return alert("Введите 5 цифр");
+      if (roomId.length !== 5) return;
       isOfferer = false;
       document.getElementById('initial-actions').style.display = 'none';
       document.getElementById('waiting-area').style.display = 'block';
       document.getElementById('active-code').innerText = roomId;
-      document.getElementById('wait-msg').innerText = "Подключение...";
       initSignaling();
     }
 
-    function copyCode() {
-      navigator.clipboard.writeText(roomId);
-      alert("Код скопирован");
-    }
-
     async function initSignaling() {
-      channel = supabaseClient.channel(`room_${roomId}`);
+      channel = supabaseClient.channel(`p2p_${roomId}`);
       channel
         .on('broadcast', { event: 'signal' }, ({ payload }) => handleSignal(payload))
         .subscribe(status => {
@@ -188,16 +162,21 @@
         });
     }
 
+    async function terminateSession() {
+      await sendSignal({ type: 'end-session' });
+      location.reload();
+    }
+
     // --- WebRTC ---
 
     function startWebRTC() {
       pc = new RTCPeerConnection(servers);
       if (isOfferer) {
-        dc = pc.createDataChannel("data");
+        dc = pc.createDataChannel("data", { bufferedAmountLowThreshold: 65536 });
         setupDC();
         pc.createOffer().then(o => { pc.setLocalDescription(o); sendSignal({ type: 'offer', sdp: o }); });
       } else {
-        pc.ondatachannel = e => { dc = e.channel; setupDC(); };
+        pc.ondatachannel = e => { dc = e.channel; dc.bufferedAmountLowThreshold = 65536; setupDC(); };
       }
       pc.onicecandidate = e => { if (e.candidate) sendSignal({ type: 'candidate', cand: e.candidate }); };
       pc.onconnectionstatechange = () => {
@@ -212,6 +191,7 @@
 
     function handleSignal(sig) {
       if (sig.type === 'ready' && isOfferer) startWebRTC();
+      if (sig.type === 'end-session') location.reload();
       if (sig.type === 'offer') {
         startWebRTC();
         pc.setRemoteDescription(new RTCSessionDescription(sig.sdp));
@@ -234,7 +214,6 @@
           }
           if (m.type === 'file-end') finalizeFile(m.id);
         } else {
-          // Получение чанка (первые 32 байта - ID файла для идентификации)
           const id = new TextDecoder().decode(e.data.slice(0, 8)).trim();
           const chunk = e.data.slice(8);
           const f = activeFiles[id];
@@ -252,31 +231,38 @@
       if (dc?.readyState === 'open') dc.send(JSON.stringify({ type: 'text', val }));
     }
 
-    // --- ФАЙЛОВЫЙ ДВИЖОК ---
+    // --- ФАЙЛОВЫЙ МОТОР (ОПТИМИЗИРОВАНО) ---
 
     async function sendFiles(files) {
       for (let f of files) {
-        const fileId = Math.random().toString(36).substring(2, 10); // Уникальный ID для этого файла
+        const fileId = Math.random().toString(36).substring(2, 10);
         createFileUI(fileId, f.name, true, f);
-        
         dc.send(JSON.stringify({ type: 'file-start', id: fileId, name: f.name, size: f.size }));
 
-        const chunkSize = 16000; // ~16KB
-        const idUint8 = new TextEncoder().encode(fileId.padEnd(8)); // Фиксируем ID в 8 байтах
+        const chunkSize = 65536; // 64KB
+        const idUint8 = new TextEncoder().encode(fileId.padEnd(8));
+        let offset = 0;
 
-        for (let i = 0; i < f.size; i += chunkSize) {
-          const chunk = await f.slice(i, i + chunkSize).arrayBuffer();
-          // Склеиваем ID и данные, чтобы получатель знал, какому файлу принадлежит чанк
-          const combined = new Uint8Array(idUint8.length + chunk.byteLength);
-          combined.set(idUint8);
-          combined.set(new Uint8Array(chunk), idUint8.length);
-          
-          dc.send(combined);
-          updateProgress(fileId, (i / f.size) * 100);
-        }
-        
-        dc.send(JSON.stringify({ type: 'file-end', id: fileId }));
-        updateProgress(fileId, 100);
+        const sendChunk = async () => {
+          while (offset < f.size) {
+            // Flow Control: ждем, если буфер забит (больше 1Мб)
+            if (dc.bufferedAmount > 1048576) {
+              await new Promise(r => dc.onbufferedamountlow = r);
+            }
+
+            const chunk = await f.slice(offset, offset + chunkSize).arrayBuffer();
+            const combined = new Uint8Array(8 + chunk.byteLength);
+            combined.set(idUint8);
+            combined.set(new Uint8Array(chunk), 8);
+            
+            dc.send(combined);
+            offset += chunk.byteLength;
+            updateProgress(fileId, (offset / f.size) * 100);
+          }
+          dc.send(JSON.stringify({ type: 'file-end', id: fileId }));
+        };
+
+        sendChunk();
       }
     }
 
@@ -286,19 +272,15 @@
       div.id = `file-${id}`;
       div.innerHTML = `
         <div class="file-info">
-          <span class="file-name">${isOwner ? '📤' : '📥'} ${name}</span>
-          <a href="#" class="file-btn" id="dl-${id}" style="display:none;"><i class="fa fa-download"></i></a>
+          <span>${isOwner ? '📤' : '📥'} ${name}</span>
+          <a href="#" id="dl-${id}" style="display:none; color:var(--accent);"><i class="fa fa-download"></i></a>
         </div>
         <div class="progress-bg"><div class="progress-bar" id="pb-${id}"></div></div>
       `;
       document.getElementById('file-list').prepend(div);
-
-      if (isOwner && fileObj) {
-        // У отправителя кнопка доступна сразу
+      if (isOwner) {
         const btn = div.querySelector(`#dl-${id}`);
-        btn.style.display = 'block';
-        btn.href = URL.createObjectURL(fileObj);
-        btn.download = name;
+        btn.style.display = 'block'; btn.href = URL.createObjectURL(fileObj); btn.download = name;
       }
     }
 
@@ -312,34 +294,22 @@
       const blob = new Blob(f.chunks);
       const url = URL.createObjectURL(blob);
       const btn = document.getElementById(`dl-${id}`);
-      if (btn) {
-        btn.style.display = 'block';
-        btn.href = url;
-        btn.download = f.name;
-      }
-      updateProgress(id, 100);
+      btn.style.display = 'block'; btn.href = url; btn.download = f.name;
     }
 
-    // --- DRAG & DROP ---
-
+    // --- EVENTS ---
     const dz = document.getElementById('drop-zone');
-    
-    // Предотвращаем стандартное поведение браузера (открытие файла)
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
-      dz.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); }, false);
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => {
+      dz.addEventListener(e, x => { x.preventDefault(); x.stopPropagation(); });
     });
-
     dz.addEventListener('dragover', () => dz.classList.add('active'));
     dz.addEventListener('dragleave', () => dz.classList.remove('active'));
-    dz.addEventListener('drop', e => {
+    dz.addEventListener('drop', x => {
       dz.classList.remove('active');
-      const files = e.dataTransfer.files;
-      if (files.length > 0) sendFiles(files);
+      sendFiles(x.dataTransfer.files);
     });
-
-    dz.addEventListener('click', () => document.getElementById('file-input').click());
+    dz.onclick = () => document.getElementById('file-input').click();
     document.getElementById('file-input').onchange = e => sendFiles(e.target.files);
-
   </script>
 </body>
 </html>
