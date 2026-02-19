@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>TimLink - Звонок</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    :root {
+      --bg: #0b0b0b;
+      --accent: #25D366;
+      --danger: #ff3b30;
+      --text: #ffffff;
+      --radius: 16px;
+      --btn-size: 56px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .call-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ВИДЕО СЛОИ */
+    .video-wrapper {
+      position: absolute;
+      background: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      transition: all 0.3s ease; /* Мягкий переход при смене окон */
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Полноэкранное видео */
+    .video-wrapper.is-full {
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    .video-wrapper.is-full video { object-fit: contain; }
+
+    /* Плавающее окно (Адаптивное) */
+    .video-wrapper.is-floating {
+      width: 30%;
+      max-width: 150px;
+      min-width: 100px;
+      aspect-ratio: 3/4; /* По умолчанию, но изменится под контент */
+      bottom: 100px; 
+      right: 16px;
+      border-radius: var(--radius);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+      z-index: 10;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .video-wrapper.is-floating video { 
+      object-fit: contain; /* Чтобы не резать края в маленьком окне */
+    }
+
+    /* Индикаторы статуса на видео */
+    .status-overlay {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.5);
+      padding: 5px 8px;
+      border-radius: 8px;
+      display: none;
+      z-index: 15;
+    }
+    .status-overlay i { color: var(--danger); font-size: 14px; }
+
+    /* ВЕРХНЯЯ ПАНЕЛЬ */
+    .top-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      padding: 20px 16px;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid var(--accent);
+      background: #333;
+    }
+
+    .call-info h2 { font-size: 18px; font-weight: 600; }
+    .status-text { font-size: 13px; color: var(--accent); }
+
+    /* УПРАВЛЕНИЕ */
+    .controls-bar {
+      position: absolute;
+      bottom: 30px;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      z-index: 25;
+    }
+
+    .ctrl-btn {
+      width: var(--btn-size);
+      height: var(--btn-size);
+      border-radius: 50%;
+      border: none;
+      color: white;
+      font-size: 20px;
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      cursor: pointer;
+    }
+    .ctrl-btn.active-off { background: var(--danger); }
+    .btn-end { background: var(--danger); }
+
+    /* ЭКРАН ЗАГРУЗКИ / ЗАВЕРШЕНИЯ */
+    .overlay-screen {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+    }
+    .loader {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Экран загрузки (чтобы кнопки не висли при инициализации) -->
+  <div id="loading-screen" class="overlay-screen">
+    <div class="loader"></div>
+    <p>Настройка оборудования...</p>
+  </div>
+
+  <div class="call-container" id="call-root">
+    
+    <div class="top-bar">
+      <img id="remote-avatar" src="" class="user-avatar hidden" alt="">
+      <div class="call-info">
+        <h2 id="call-title">Загрузка...</h2>
+        <span id="status" class="status-text">Подключение...</span>
+      </div>
+    </div>
+
+    <div class="video-layer">
+      <!-- Собеседник -->
+      <div id="remote-wrapper" class="video-wrapper is-full">
+        <div id="remote-mic-off" class="status-overlay"><i class="fa fa-microphone-slash"></i></div>
+        <video id="remote-video" autoplay playsinline></video>
+      </div>
+
+      <!-- Я -->
+      <div id="local-wrapper" class="video-wrapper is-floating">
+        <div id="local-mic-off" class="status-overlay"><i class="fa fa-microphone-slash"></i></div>
+        <video id="local-video" autoplay playsinline muted></video>
+      </div>
+    </div>
+
+    <div class="controls-bar">
+      <button id="toggle-mic" class="ctrl-btn"><i class="fa fa-microphone"></i></button>
+      <button id="toggle-camera" class="ctrl-btn"><i class="fa fa-video"></i></button>
+      <button id="switch-camera" class="ctrl-btn"><i class="fa fa-sync-alt"></i></button>
+      <button id="end-call" class="ctrl-btn btn-end"><i class="fa fa-phone-slash"></i></button>
+    </div>
+
+    <!-- Завершение -->
+    <div id="end-screen" class="overlay-screen hidden">
+      <h3>Звонок завершён</h3>
+      <p style="margin-bottom: 20px; color: #888;">TimLink Video Call</p>
+      <button class="ctrl-btn" style="width: auto; padding: 0 30px; border-radius: 12px; background: var(--accent);" onclick="location.reload()">Позвонить снова</button>
+    </div>
+  </div>
+
+  <script>
+    const supabaseClient = supabase.createClient("URL", "KEY");
+    const HOME_URL = 'HOME_URL';
+
+    let currentUser, otherUserId, chatId, localStream, peerConnection, channel;
+    let micEnabled = true, cameraEnabled = true, isSwapped = false;
+
+    // Элементы
+    const ui = {
+      loading: document.getElementById('loading-screen'),
+      end: document.getElementById('end-screen'),
+      remoteVideo: document.getElementById('remote-video'),
+      localVideo: document.getElementById('local-video'),
+      remoteWrapper: document.getElementById('remote-wrapper'),
+      localWrapper: document.getElementById('local-wrapper'),
+      status: document.getElementById('status'),
+      title: document.getElementById('call-title'),
+      avatar: document.getElementById('remote-avatar'),
+      micBtn: document.getElementById('toggle-mic'),
+      camBtn: document.getElementById('toggle-camera')
+    };
+
+    const iceServers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }] };
+
+    // --- Оптимизированная инициализация ---
+    async function init() {
+      const urlParams = new URLSearchParams(window.location.search);
+      chatId = urlParams.get('chat_id');
+      if (!chatId) return alert("ID чата отсутствует");
+
+      // 1. Быстрая проверка сессии
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) return location.href = HOME_URL;
+      currentUser = session.user;
+
+      // 2. Получение данных о собеседнике в фоне
+      loadChatData();
+
+      // 3. Запуск камеры (не блокируя UI)
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: true
+        });
+        ui.localVideo.srcObject = localStream;
+        ui.loading.classList.add('hidden'); // Скрываем загрузку только когда камера готова
+      } catch (e) {
+        console.error(e);
+        ui.status.innerText = "Ошибка доступа к камере";
+        ui.loading.innerHTML = "<p>Пожалуйста, разрешите доступ к камере и микрофону</p>";
+        return;
+      }
+
+      setupPeerConnection();
+      setupSignaling();
+    }
+
+    async function loadChatData() {
+      const { data: chat } = await supabaseClient.from('chats').select('user1, user2').eq('id', chatId).single();
+      otherUserId = chat.user1 === currentUser.id ? chat.user2 : chat.user1;
+
+      const { data: profile } = await supabaseClient.from('profiles').select('username, avatar_url').eq('id', otherUserId).single();
+      if (profile) {
+        ui.title.innerText = `Звонок: ${profile.username}`;
+        if (profile.avatar_url) {
+          // Формируем ссылку для Uploadcare (сжатую для скорости)
+          const imgUrl = `https://ucarecdn.com/${profile.avatar_url}/-/scale_crop/100x100/smart/`;
+          ui.avatar.src = imgUrl;
+          ui.avatar.classList.remove('hidden');
+        }
+      }
+    }
+
+    function setupSignaling() {
+      channel = supabaseClient.channel(`call:${chatId}`);
+      channel
+        .on('presence', { event: 'sync' }, () => {
+          const peers = Object.values(channel.presenceState()).flat().filter(p => p.user_id !== currentUser.id);
+          if (peers.length > 0 && currentUser.id < peers[0].user_id) createOffer();
+        })
+        .on('broadcast', { event: 'signal' }, ({ payload }) => handleSignal(payload))
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') await channel.track({ user_id: currentUser.id });
+        });
+    }
+
+    function setupPeerConnection() {
+      peerConnection = new RTCPeerConnection(iceServers);
+      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+      peerConnection.ontrack = (e) => ui.remoteVideo.srcObject = e.streams[0];
+      peerConnection.onicecandidate = (e) => e.candidate && sendSignal({ type: 'candidate', candidate: e.candidate });
+      peerConnection.onconnectionstatechange = () => {
+        if (peerConnection.connectionState === 'connected') ui.status.innerText = "В эфире";
+        if (peerConnection.connectionState === 'disconnected') endCall();
+      };
+    }
+
+    async function createOffer() {
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      sendSignal({ type: 'offer', sdp: offer });
+    }
+
+    async function sendSignal(payload) {
+      if (channel) channel.send({ type: 'broadcast', event: 'signal', payload });
+    }
+
+    async function handleSignal(signal) {
+      if (signal.type === 'offer') {
+        await peerConnection.setRemoteDescription(signal.sdp);
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        sendSignal({ type: 'answer', sdp: answer });
+      } else if (signal.type === 'answer') {
+        await peerConnection.setRemoteDescription(signal.sdp);
+      } else if (signal.type === 'candidate') {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+      } else if (signal.type === 'mic_toggle') {
+        // Показываем/скрываем иконку микрофона у собеседника
+        document.getElementById('remote-mic-off').style.display = signal.enabled ? 'none' : 'block';
+      }
+    }
+
+    // --- Управление UI ---
+
+    ui.micBtn.onclick = () => {
+      micEnabled = !micEnabled;
+      localStream.getAudioTracks()[0].enabled = micEnabled;
+      ui.micBtn.classList.toggle('active-off', !micEnabled);
+      ui.micBtn.innerHTML = `<i class="fa fa-microphone${micEnabled ? '' : '-slash'}"></i>`;
+      document.getElementById('local-mic-off').style.display = micEnabled ? 'none' : 'block';
+      sendSignal({ type: 'mic_toggle', enabled: micEnabled });
+    };
+
+    ui.camBtn.onclick = () => {
+      cameraEnabled = !cameraEnabled;
+      localStream.getVideoTracks()[0].enabled = cameraEnabled;
+      ui.camBtn.classList.toggle('active-off', !cameraEnabled);
+      ui.camBtn.innerHTML = `<i class="fa fa-video${cameraEnabled ? '' : '-slash'}"></i>`;
+    };
+
+    ui.localWrapper.onclick = () => {
+      isSwapped = !isSwapped;
+      if (isSwapped) {
+        ui.localWrapper.className = 'video-wrapper is-full';
+        ui.remoteWrapper.className = 'video-wrapper is-floating';
+      } else {
+        ui.localWrapper.className = 'video-wrapper is-floating';
+        ui.remoteWrapper.className = 'video-wrapper is-full';
+      }
+    };
+
+    async function endCall() {
+      if (localStream) localStream.getTracks().forEach(t => t.stop());
+      if (peerConnection) peerConnection.close();
+      ui.end.classList.remove('hidden');
+    }
+
+    document.getElementById('end-call').onclick = endCall;
+    document.getElementById('switch-camera').onclick = async () => {
+      const mode = localStream.getVideoTracks()[0].getSettings().facingMode === 'user' ? 'environment' : 'user';
+      const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
+      const videoTrack = newStream.getVideoTracks()[0];
+      const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+      sender.replaceTrack(videoTrack);
+      localStream.removeTrack(localStream.getVideoTracks()[0]);
+      localStream.addTrack(videoTrack);
+      ui.localVideo.srcObject = localStream;
+    };
+
+    window.onload = init;
+  </script>
+</body>
+</html>
