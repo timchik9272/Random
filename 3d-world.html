@@ -2,46 +2,140 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>VR City Walk</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <title>VR City Walk - Pro</title>
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
 
   <style>
-    /* Стили для текста с авторскими правами */
-    #attribution {
-      position: absolute;
-      bottom: 10px;
-      left: 10px;
-      z-index: 1000;
-      background: rgba(0, 0, 0, 0.6);
-      color: rgba(255, 255, 255, 0.8);
-      padding: 10px;
-      font-family: sans-serif;
-      font-size: 10px;
-      border-radius: 5px;
-      pointer-events: none; /* Чтобы не мешало кликам */
+    /* Отключаем системные жесты браузера (чтобы тройной тап не делал зум экрана) */
+    body, html { touch-action: none; overflow: hidden; }
+
+    /* UI слой поверх VR */
+    #ui-layer {
+      position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+      pointer-events: none; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between;
     }
-    
-    /* Экран паузы */
-    #pause-screen {
-      display: none;
-      position: absolute;
-      top: 0; left: 0; width: 100vw; height: 100vh;
-      background: black;
-      color: white;
-      z-index: 2000;
-      text-align: center;
-      font-family: sans-serif;
-      padding-top: 40vh;
+
+    /* Статус-бар вверху */
+    #status-bar {
+      background: rgba(0, 0, 0, 0.7); color: #00FF00; padding: 15px; text-align: center;
+      font-family: sans-serif; font-size: 18px; font-weight: bold; transition: 0.3s;
+      border-bottom: 3px solid #00FF00;
+    }
+
+    /* Экран паузы (красная рамка + затемнение) */
+    #pause-overlay {
+      display: none; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+      box-shadow: inset 0 0 50px red; background: rgba(20, 0, 0, 0.6); pointer-events: none;
+    }
+
+    /* Панель настроек чувствительности */
+    #settings-panel {
+      pointer-events: auto; background: rgba(0, 0, 0, 0.8); color: white;
+      padding: 15px; margin: 10px; border-radius: 10px; font-family: sans-serif;
+    }
+
+    input[type=range] { width: 100%; margin-top: 10px; }
+
+    /* Авторские права */
+    #attribution {
+      background: rgba(0, 0, 0, 0.6); color: rgba(255, 255, 255, 0.6);
+      padding: 8px; font-family: sans-serif; font-size: 9px; pointer-events: none;
     }
   </style>
 
   <script>
-    // Компонент для открытия дверей
+    // --- КОМПОНЕНТ ДЛЯ УПРАВЛЕНИЯ ФИЗИЧЕСКИМ ПЕРЕМЕЩЕНИЕМ И ПАУЗОЙ ---
+    AFRAME.registerComponent('movement-manager', {
+      schema: {
+        sensitivity: {type: 'number', default: 1} // 1 = реальный шаг, 2 = шаг в VR в 2 раза больше
+      },
+      init: function () {
+        this.isPaused = false;
+        this.camera = document.querySelector('a-camera').object3D;
+        this.rig = document.querySelector('#camera-rig').object3D;
+        this.lastCameraPos = new THREE.Vector3();
+        this.initialized = false;
+
+        this.statusBar = document.getElementById('status-bar');
+        this.pauseOverlay = document.getElementById('pause-overlay');
+        this.bgm = document.getElementById('bgm');
+
+        // Обработка тапов по экрану
+        this.tapCount = 0;
+        this.tapTimer = null;
+
+        window.addEventListener('touchstart', (e) => {
+          // Игнорируем нажатия на ползунок настроек
+          if(e.target.tagName === 'INPUT') return;
+
+          this.tapCount++;
+          if (this.tapCount === 1) {
+            this.tapTimer = setTimeout(() => {
+              if (this.tapCount === 1) {
+                // ОДИНАРНЫЙ ТАП: Включение движения или запуск музыки
+                if (this.bgm.paused) this.bgm.play();
+                if (this.isPaused) this.setPause(false);
+              } else if (this.tapCount >= 3) {
+                // ТРОЙНОЙ ТАП: Пауза
+                if (!this.isPaused) this.setPause(true);
+              }
+              this.tapCount = 0;
+            }, 500); // Полсекунды на совершение тройного тапа
+          }
+        });
+      },
+
+      setPause: function(paused) {
+        this.isPaused = paused;
+        if (paused) {
+          this.statusBar.innerText = "⏸ ДВИЖЕНИЕ ЗАБЛОКИРОВАНО (Отойдите в центр)";
+          this.statusBar.style.color = "#FF4444";
+          this.statusBar.style.borderBottomColor = "#FF4444";
+          this.pauseOverlay.style.display = "block";
+        } else {
+          this.statusBar.innerText = "▶ ДВИЖЕНИЕ АКТИВНО (Можно ходить)";
+          this.statusBar.style.color = "#00FF00";
+          this.statusBar.style.borderBottomColor = "#00FF00";
+          this.pauseOverlay.style.display = "none";
+        }
+      },
+
+      tick: function () {
+        // Ждем первого кадра, чтобы записать начальную позицию
+        if (!this.initialized) {
+          this.lastCameraPos.copy(this.camera.position);
+          this.initialized = true;
+          return;
+        }
+
+        // Вычисляем, насколько телефон сдвинулся физически с прошлого кадра
+        let delta = new THREE.Vector3().subVectors(this.camera.position, this.lastCameraPos);
+
+        if (this.isPaused) {
+          // МАГИЯ ПАУЗЫ: Если мы на паузе, мы двигаем всю сцену (Rig) в ПРОТИВОПОЛОЖНУЮ сторону 
+          // от вашего физического шага. В итоге вы идете в реальности, но стоите в VR.
+          this.rig.position.x -= delta.x;
+          this.rig.position.z -= delta.z;
+        } else {
+          // УСКОРЕНИЕ ШАГА: Если чувствительность > 1, мы добавляем бонусное движение Rig'у
+          let extraMultiplier = this.data.sensitivity - 1;
+          if (extraMultiplier > 0) {
+            this.rig.position.x += delta.x * extraMultiplier;
+            this.rig.position.z += delta.z * extraMultiplier;
+          }
+        }
+
+        // Сохраняем текущую позицию для следующего кадра
+        this.lastCameraPos.copy(this.camera.position);
+      }
+    });
+
+    // --- КОМПОНЕНТ ДВЕРЕЙ ---
     AFRAME.registerComponent('door-interact', {
       init: function () {
         let isOpen = false;
         this.el.addEventListener('click', () => {
-          // Анимация вращения двери на 90 градусов
           let targetRotation = isOpen ? '0 0 0' : '0 90 0';
           this.el.setAttribute('animation', `property: rotation; to: ${targetRotation}; dur: 800; easing: easeInOutQuad`);
           isOpen = !isOpen;
@@ -49,72 +143,48 @@
       }
     });
 
-    // Компонент для управления тапами (Тройной тап для паузы)
-    AFRAME.registerComponent('tap-manager', {
-      init: function () {
-        this.tapCount = 0;
-        this.tapTimer = null;
-        this.isPaused = false;
-        this.bgm = document.querySelector('#bgm');
-        this.pauseScreen = document.getElementById('pause-screen');
-        this.cameraRig = document.querySelector('#camera-rig');
-
-        window.addEventListener('touchstart', (e) => {
-          this.tapCount++;
-          
-          if (this.tapCount === 1) {
-            this.tapTimer = setTimeout(() => {
-              // --- ОДИНАРНЫЙ ТАП ---
-              if (this.tapCount === 1) {
-                // Включаем музыку при первом тапе (если она не играет)
-                if (this.bgm.paused) this.bgm.play();
-                
-                // Если мы были на паузе — снимаем её
-                if (this.isPaused) {
-                  this.isPaused = false;
-                  this.pauseScreen.style.display = 'none';
-                  // В идеале здесь нужен сложный математический расчет смещения (Rig Offset), 
-                  // но для браузера достаточно просто скрыть черный экран.
-                }
-              } 
-              // --- ТРОЙНОЙ ТАП ---
-              else if (this.tapCount === 3) {
-                this.isPaused = true;
-                this.pauseScreen.style.display = 'block';
-              }
-              
-              this.tapCount = 0; // Сбрасываем счетчик
-            }, 400); // Окно времени для тапов (400 мс)
-          }
-        });
-      }
-    });
+    // Привязка ползунка к чувствительности
+    window.onload = () => {
+      const slider = document.getElementById('speed-slider');
+      const speedVal = document.getElementById('speed-val');
+      const scene = document.querySelector('a-scene');
+      
+      slider.addEventListener('input', (e) => {
+        let val = e.target.value;
+        speedVal.innerText = val + 'x';
+        scene.setAttribute('movement-manager', 'sensitivity', val);
+      });
+    };
   </script>
 </head>
 <body>
 
-  <div id="attribution">
-    Run Amok by Kevin MacLeod | https://incompetech.com/<br>
-    Music promoted by https://www.chosic.com/free-music/all/<br>
-    Creative Commons CC BY 3.0<br>
-    https://creativecommons.org/licenses/by/3.0/
-  </div>
+  <div id="ui-layer">
+    <div id="status-bar">▶ ДВИЖЕНИЕ АКТИВНО (Можно ходить)</div>
+    
+    <div id="settings-panel">
+      <label>Чувствительность шага: <span id="speed-val">1x</span></label><br>
+      <input type="range" id="speed-slider" min="1" max="5" step="0.5" value="1">
+    </div>
 
-  <div id="pause-screen">
-    <h2>Передвижение на паузе</h2>
-    <p>Отойдите в центр вашей реальной комнаты.<br>Нажмите на экран 1 раз, чтобы продолжить.</p>
+    <div id="attribution">
+      Run Amok by Kevin MacLeod | https://incompetech.com/<br>
+      Promoted by https://www.chosic.com/free-music/all/<br>
+      Creative Commons CC BY 3.0
+    </div>
   </div>
+  
+  <div id="pause-overlay"></div>
 
-  <a-scene tap-manager>
+  <a-scene movement-manager="sensitivity: 1">
     <a-assets>
       <audio id="bgm" src="https://www.chosic.com/wp-content/uploads/2022/06/Run-Amok(chosic.com).mp3" preload="auto" loop></audio>
     </a-assets>
 
     <a-entity id="camera-rig" position="0 0 0">
-      <a-camera position="0 1.6 0">
+      <a-camera position="0 1.6 0" look-controls="pointerLockEnabled: false">
         <a-entity cursor="fuse: false; rayOrigin: entity;"
-                  position="0 0 -1"
-                  geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+                  position="0 0 -1" geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
                   material="color: white; shader: flat"
                   animation__click="property: scale; startEvents: click; easing: easeInCubic; dur: 150; from: 0.1 0.1 0.1; to: 1 1 1">
         </a-entity>
@@ -122,12 +192,11 @@
     </a-entity>
 
     <a-sky color="#87CEEB"></a-sky>
-    <a-plane position="0 0 0" rotation="-90 0 0" width="50" height="50" color="#7BC8A4"></a-plane>
+    <a-plane position="0 0 0" rotation="-90 0 0" width="50" height="50" color="#7BC8A4" material="wireframe: true; wireframeLinewidth: 2;"></a-plane>
 
     <a-entity position="-3 0 -5">
       <a-box position="0 1.5 0" width="3" height="3" depth="3" color="#D2B48C"></a-box>
       <a-cone position="0 3.5 0" radius-bottom="2.5" height="1.5" color="#8B0000"></a-cone>
-      
       <a-entity position="0.5 0 1.5">
         <a-box position="-0.4 1 0" width="0.8" height="2" depth="0.1" color="#654321" door-interact class="clickable"></a-box>
       </a-entity>
@@ -144,13 +213,6 @@
       <a-cylinder position="0 1.5 0" radius="0.05" height="3" color="#2F4F4F"></a-cylinder>
       <a-sphere position="0 3 0" radius="0.3" color="#FFFFE0"></a-sphere>
       <a-light type="point" color="#FFF" intensity="0.5" position="0 3 0"></a-light>
-    </a-entity>
-
-    <a-entity position="2 0.3 -2">
-      <a-box position="0 0 0" width="1.5" height="0.1" depth="0.5" color="#8B4513"></a-box>
-      <a-box position="0 0.4 -0.2" width="1.5" height="0.6" depth="0.1" color="#8B4513"></a-box>
-      <a-box position="-0.6 -0.15 0" width="0.1" height="0.3" depth="0.4" color="#2F4F4F"></a-box>
-      <a-box position="0.6 -0.15 0" width="0.1" height="0.3" depth="0.4" color="#2F4F4F"></a-box>
     </a-entity>
 
     <a-entity position="0 0 -8">
