@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon VR Shooter</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #000; }
+        
+        /* Стили оверлея меню */
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: rgba(10, 10, 15, 0.85); z-index: 999; color: white;
+            transition: opacity 0.4s ease; backdrop-filter: blur(5px);
+        }
+        .hidden { opacity: 0; pointer-events: none; }
+        .panel {
+            background: rgba(30, 30, 40, 0.9); padding: 30px; border-radius: 15px; text-align: center;
+            box-shadow: 0 0 30px rgba(0, 255, 170, 0.4); border: 2px solid #0fa;
+            max-width: 400px; width: 80%;
+        }
+        h1 { margin-top: 0; color: #0fa; text-transform: uppercase; letter-spacing: 2px; }
+        p { color: #ccc; line-height: 1.5; font-size: 0.95rem; }
+        
+        button {
+            background: #0fa; color: #000; border: none; padding: 15px 30px; font-size: 1.2rem;
+            border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 25px;
+            text-transform: uppercase; transition: all 0.2s; box-shadow: 0 0 15px rgba(0, 255, 170, 0.5);
+        }
+        button:hover { background: #fff; box-shadow: 0 0 25px rgba(255, 255, 255, 0.8); }
+        button:active { transform: scale(0.95); }
+        
+        .slider-container { margin-top: 25px; text-align: left; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; }
+        .slider-container label { color: #0fa; font-size: 0.9rem; font-weight: bold; }
+        input[type=range] { width: 100%; margin-top: 10px; accent-color: #0fa; cursor: pointer; }
+        
+        #game-over { display: none; margin-top: 20px; font-size: 1.4rem; color: #ff0055; font-weight: bold; text-shadow: 0 0 10px rgba(255, 0, 85, 0.5); }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div class="panel">
+            <h1>Neon VR Shooter</h1>
+            <p>Осматривайтесь по сторонам (вращайте телефон или тяните мышью).<br><br><b>Нажимайте на экран</b> в любом месте, когда цель находится в прицеле, чтобы уничтожить её!</p>
+            
+            <div class="slider-container">
+                <label for="sens-slider">Чувствительность обзора: <span id="sens-val">1.0</span>x</label>
+                <input type="range" id="sens-slider" min="0.1" max="3" step="0.1" value="1">
+            </div>
+
+            <div id="game-over">Время вышло!<br>Ваш счет: <span id="final-score" style="color:#0fa; font-size: 2rem;">0</span></div>
+            
+            <button id="start-btn">Начать игру</button>
+        </div>
+    </div>
+
+    <a-scene background="color: #050508" vr-mode-ui="enabled: true">
+        
+        <script>
+            let score = 0;
+            let time = 30;
+            let isPlaying = false;
+            let timerInterval;
+            let lookSensitivity = 1.0;
+
+            // Обработка ползунка чувствительности
+            document.getElementById('sens-slider').addEventListener('input', (e) => {
+                lookSensitivity = parseFloat(e.target.value);
+                document.getElementById('sens-val').innerText = lookSensitivity.toFixed(1);
+            });
+
+            // Хак (Monkey-patching) компонента look-controls в A-Frame для изменения чувствительности мыши/тачей
+            const OriginalOnTouchMove = AFRAME.components['look-controls'].Component.prototype.onTouchMove;
+            AFRAME.components['look-controls'].Component.prototype.onTouchMove = function (evt) {
+                if (!this.touchStarted || !this.data.touchEnabled) { return; }
+                const touch = evt.touches[0];
+                const canvas = this.el.sceneEl.canvas;
+                let deltaY = 2 * Math.PI * (touch.pageY - this.touchStart.y) / canvas.clientHeight;
+                let deltaX = 2 * Math.PI * (touch.pageX - this.touchStart.x) / canvas.clientWidth;
+                
+                // Применяем множитель чувствительности
+                deltaY *= lookSensitivity;
+                deltaX *= lookSensitivity;
+                
+                let direction = this.data.reverseTouchDrag ? 1 : -1;
+                this.pitchObject.rotation.x += deltaY * direction * 0.5;
+                this.yawObject.rotation.y += deltaX * direction * 0.5;
+                this.touchStart = { x: touch.pageX, y: touch.pageY };
+            };
+
+            const OriginalOnMouseMove = AFRAME.components['look-controls'].Component.prototype.onMouseMove;
+            AFRAME.components['look-controls'].Component.prototype.onMouseMove = function (evt) {
+                if (!this.data.mouseEnabled || !this.isDragging) { return; }
+                let previousMouseEvent = this.previousMouseEvent;
+                let movementX = evt.movementX || evt.mozMovementX || 0;
+                let movementY = evt.movementY || evt.mozMovementY || 0;
+
+                if (!movementX && !movementY && previousMouseEvent) {
+                    movementX = evt.screenX - previousMouseEvent.screenX;
+                    movementY = evt.screenY - previousMouseEvent.screenY;
+                }
+                this.previousMouseEvent = evt;
+
+                // Применяем множитель чувствительности
+                movementX *= lookSensitivity;
+                movementY *= lookSensitivity;
+
+                let direction = this.data.reverseMouseDrag ? 1 : -1;
+                this.yawObject.rotation.y += movementX * 0.002 * direction;
+                this.pitchObject.rotation.x += movementY * 0.002 * direction;
+                this.pitchObject.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.pitchObject.rotation.x));
+            };
+
+            // Основной компонент игры
+            AFRAME.registerComponent('game-manager', {
+                init: function () {
+                    this.targetContainer = document.querySelector('#targets');
+                    this.scoreEl = document.querySelector('#score-text');
+                    this.timeEl = document.querySelector('#time-text');
+                    
+                    document.getElementById('start-btn').addEventListener('click', () => this.startGame());
+                },
+                
+                startGame: function () {
+                    score = 0;
+                    time = 30;
+                    isPlaying = true;
+                    this.updateUI();
+                    
+                    document.getElementById('ui-layer').classList.add('hidden');
+                    document.getElementById('game-over').style.display = 'none';
+                    
+                    this.targetContainer.innerHTML = ''; // Очистка старых целей
+                    for(let i=0; i<6; i++) this.spawnTarget(); // Спавн первых 6 целей
+                    
+                    timerInterval = setInterval(() => {
+                        time--;
+                        this.updateUI();
+                        if (time <= 0) this.endGame();
+                    }, 1000);
+                },
+                
+                spawnTarget: function () {
+                    if (!isPlaying) return;
+                    
+                    let el = document.createElement('a-sphere');
+                    el.setAttribute('radius', '0.6');
+                    
+                    // Случайная позиция вокруг игрока (радиус 5-9 метров)
+                    let radius = 5 + Math.random() * 4;
+                    let theta = Math.random() * Math.PI * 2;
+                    let phi = Math.max(Math.PI / 3, Math.min(Math.PI * 0.6, Math.acos(2 * Math.random() - 1)));
+
+                    let x = radius * Math.sin(phi) * Math.cos(theta);
+                    let y = radius * Math.cos(phi);
+                    let z = radius * Math.sin(phi) * Math.sin(theta);
+                    
+                    el.setAttribute('position', `${x} ${y} ${z}`);
+                    el.setAttribute('class', 'clickable'); // Чтобы луч реагировал только на них
+                    
+                    // Яркие неоновые цвета
+                    let colors = ['#ff0055', '#00ffaa', '#0088ff', '#ffaa00', '#b800ff'];
+                    el.setAttribute('color', colors[Math.floor(Math.random() * colors.length)]);
+                    el.setAttribute('material', 'shader: flat'); // Без теней для светящегося эффекта
+                    
+                    // Анимация левитации (движение вверх-вниз)
+                    el.setAttribute('animation', `property: position; dir: alternate; dur: ${1500 + Math.random()*1000}; easing: easeInOutSine; loop: true; to: ${x} ${y+1.5} ${z}`);
+                    
+                    // Логика выстрела (клик/тап по цели)
+                    el.addEventListener('click', () => {
+                        if (!isPlaying) return;
+                        score++;
+                        this.updateUI();
+                        
+                        // Анимация взрыва (уменьшение) перед удалением
+                        el.removeAttribute('animation');
+                        el.setAttribute('animation__scale', 'property: scale; to: 0 0 0; dur: 150; easing: easeInBack');
+                        setTimeout(() => {
+                            if (el.parentNode) el.parentNode.removeChild(el);
+                            this.spawnTarget(); // Появляется новая цель
+                        }, 150);
+                    });
+                    
+                    this.targetContainer.appendChild(el);
+                },
+                
+                updateUI: function () {
+                    this.scoreEl.setAttribute('value', `Score: ${score}`);
+                    this.timeEl.setAttribute('value', `Time: ${time}s`);
+                },
+                
+                endGame: function () {
+                    isPlaying = false;
+                    clearInterval(timerInterval);
+                    
+                    document.getElementById('ui-layer').classList.remove('hidden');
+                    document.getElementById('game-over').style.display = 'block';
+                    document.getElementById('final-score').innerText = score;
+                    document.getElementById('start-btn').innerText = 'Сыграть снова';
+                    
+                    this.targetContainer.innerHTML = '';
+                }
+            });
+        </script>
+
+        <a-entity id="rig" position="0 1.6 0">
+            <a-camera look-controls="pointerLockEnabled: false">
+                <a-text id="score-text" position="-1.5 0.8 -2" value="Score: 0" color="#0fa" scale="0.8 0.8 0.8" font="monoid"></a-text>
+                <a-text id="time-text" position="0.8 0.8 -2" value="Time: 30s" color="#fff" scale="0.8 0.8 0.8" font="monoid"></a-text>
+                
+                <a-entity cursor="fuse: false"
+                          raycaster="objects: .clickable"
+                          position="0 0 -1"
+                          geometry="primitive: ring; radiusInner: 0.015; radiusOuter: 0.025"
+                          material="color: #0fa; shader: flat; opacity: 0.8"
+                          animation__click="property: scale; startEvents: click; easing: easeOutQuad; dur: 150; from: 0.2 0.2 0.2; to: 1 1 1">
+                </a-entity>
+            </a-camera>
+        </a-entity>
+
+        <a-plane position="0 0 0" rotation="-90 0 0" width="80" height="80" color="#0fa" material="wireframe: true; wireframeLinewidth: 2; opacity: 0.15"></a-plane>
+        
+        <a-entity id="targets" game-manager></a-entity>
+        
+    </a-scene>
+
+</body>
+</html>
