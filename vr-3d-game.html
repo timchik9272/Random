@@ -2,90 +2,89 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>WebVR AR Spawner</title>
+    <title>WebVR AR Fixed</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   </head>
   <body style="margin: 0; overflow: hidden;">
 
-    <a-scene>
+    <a-scene id="mainScene" raycaster="objects: .spawned">
       <a-assets>
         <video id="webcam" autoplay muted playsinline crossorigin="anonymous"></video>
-        <a-asset-item id="duckModel" src="https://raw.githack.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF-Binary/Duck.glb"></a-asset-item>
       </a-assets>
 
       <a-videosphere src="#webcam" rotation="0 -90 0" radius="100"></a-videosphere>
 
-      <a-entity camera look-controls wasd-controls id="myCamera">
-        <a-entity cursor="fuse: false;"
-                  position="0 0 -1"
-                  geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
-                  material="color: white; shader: flat">
+      <a-entity id="cameraRig">
+        <a-entity camera look-controls id="myCamera">
+          <a-entity id="cursor"
+                    cursor="fuse: false"
+                    position="0 0 -1"
+                    geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+                    material="color: #00ff00; shader: flat">
+          </a-entity>
         </a-entity>
       </a-entity>
-
-      <a-entity id="spawn-container"></a-entity>
 
     </a-scene>
 
     <script>
       const video = document.querySelector('#webcam');
-      const sceneEl = document.querySelector('#spawn-container');
+      const sceneEl = document.querySelector('#mainScene');
       const cameraEl = document.querySelector('#myCamera');
+      const cursorEl = document.querySelector('#cursor');
 
-      // 1. Доступ к камере
+      // 1. Запуск камеры
       navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
         .then(stream => { video.srcObject = stream; video.play(); })
-        .catch(err => { console.error(err); });
+        .catch(err => alert("Нужен HTTPS и доступ к камере"));
 
-      // 2. Функция спавна объекта
-      function spawnObject() {
-        // Создаем новый элемент
+      // 2. Функция создания объекта
+      function spawn() {
+        // Визуальный отклик точки
+        cursorEl.setAttribute('material', 'color', 'red');
+        setTimeout(() => cursorEl.setAttribute('material', 'color', '#00ff00'), 200);
+
         const newEl = document.createElement('a-entity');
         
-        // Список возможных объектов
-        const shapes = ['box', 'sphere', 'cylinder', 'torus', 'duck'];
-        const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
+        // Выбираем случайную форму
+        const shapes = ['box', 'sphere', 'cylinder', 'torus'];
+        const shape = shapes[Math.floor(Math.random() * shapes.length)];
         
-        if (randomShape === 'duck') {
-          newEl.setAttribute('gltf-model', '#duckModel');
-          newEl.setAttribute('scale', '0.5 0.5 0.5');
-        } else {
-          newEl.setAttribute('geometry', {
-            primitive: randomShape,
-            radius: 0.3,
-            height: 0.6
-          });
-          newEl.setAttribute('material', {
-            color: '#' + Math.floor(Math.random()*16777215).toString(16), // случайный цвет
-            metalness: 0.5,
-            roughness: 0.2
-          });
-        }
+        newEl.setAttribute('geometry', { primitive: shape, radius: 0.3, height: 0.5 });
+        newEl.setAttribute('material', { color: '#' + Math.floor(Math.random()*16777215).toString(16) });
+        newEl.classList.add('spawned');
 
-        // Вычисляем позицию перед камерой
-        const distance = 3; // спавним в 3 метрах от лица
-        const position = new THREE.Vector3(0, 0, -distance);
-        position.applyQuaternion(cameraEl.object3D.quaternion);
-        position.add(cameraEl.object3D.position);
-        
+        // РАСЧЕТ ПОЗИЦИИ:
+        // Берем текущее положение камеры
+        const position = new THREE.Vector3();
+        cameraEl.object3D.getWorldPosition(position);
+
+        // Берем направление взгляда
+        const direction = new THREE.Vector3();
+        cameraEl.object3D.getWorldDirection(direction);
+
+        // Умножаем направление на -3 (чтобы выставить объект ПЕРЕД собой на 3 метра)
+        direction.multiplyScalar(-3);
+        position.add(direction);
+
+        // Устанавливаем координаты
         newEl.setAttribute('position', position);
         
-        // Добавляем случайное вращение
-        newEl.setAttribute('rotation', {
-          x: Math.random() * 360,
-          y: Math.random() * 360,
-          z: Math.random() * 360
-        });
-
+        // Добавляем в сцену
         sceneEl.appendChild(newEl);
       }
 
-      // 3. Обработка нажатия (клик по экрану или кнопка VR)
-      window.addEventListener('click', () => {
-        // Запускаем видео, если оно не стартануло
-        video.play();
-        // Спавним объект
-        spawnObject();
+      // 3. Обработчики нажатий (для всех типов устройств)
+      window.addEventListener('touchstart', (e) => {
+        if (video.paused) video.play();
+        spawn();
+      });
+
+      window.addEventListener('mousedown', (e) => {
+        // Чтобы не срабатывало дважды на телефонах (где есть и touch и click)
+        if (e.button === 0 && !('ontouchstart' in window)) {
+            spawn();
+        }
       });
     </script>
   </body>
