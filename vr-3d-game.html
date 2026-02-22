@@ -2,6 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8">
+    <title>WebVR AR Spawner</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   </head>
   <body style="margin: 0; overflow: hidden;">
@@ -9,34 +10,82 @@
     <a-scene>
       <a-assets>
         <video id="webcam" autoplay muted playsinline crossorigin="anonymous"></video>
+        <a-asset-item id="duckModel" src="https://raw.githack.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF-Binary/Duck.glb"></a-asset-item>
       </a-assets>
 
       <a-videosphere src="#webcam" rotation="0 -90 0" radius="100"></a-videosphere>
 
-      <a-box position="0 1.5 -3" color="red" animation="property: rotation; to: 0 360 0; loop: true; dur: 5000"></a-box>
+      <a-entity camera look-controls wasd-controls id="myCamera">
+        <a-entity cursor="fuse: false;"
+                  position="0 0 -1"
+                  geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+                  material="color: white; shader: flat">
+        </a-entity>
+      </a-entity>
 
-      <a-entity camera look-controls></a-entity>
+      <a-entity id="spawn-container"></a-entity>
+
     </a-scene>
 
     <script>
       const video = document.querySelector('#webcam');
+      const sceneEl = document.querySelector('#spawn-container');
+      const cameraEl = document.querySelector('#myCamera');
 
-      // 1. Запрашиваем камеру
-      navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
-      })
-      .then(stream => {
-        video.srcObject = stream;
-        video.play();
-      })
-      .catch(err => {
-        console.error("Ошибка:", err);
-        alert("Проверь HTTPS и разрешения камеры");
-      });
+      // 1. Доступ к камере
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(stream => { video.srcObject = stream; video.play(); })
+        .catch(err => { console.error(err); });
 
-      // 2. Хак для iOS/Android: запуск видео по клику (браузеры часто блокируют автоплей)
+      // 2. Функция спавна объекта
+      function spawnObject() {
+        // Создаем новый элемент
+        const newEl = document.createElement('a-entity');
+        
+        // Список возможных объектов
+        const shapes = ['box', 'sphere', 'cylinder', 'torus', 'duck'];
+        const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
+        
+        if (randomShape === 'duck') {
+          newEl.setAttribute('gltf-model', '#duckModel');
+          newEl.setAttribute('scale', '0.5 0.5 0.5');
+        } else {
+          newEl.setAttribute('geometry', {
+            primitive: randomShape,
+            radius: 0.3,
+            height: 0.6
+          });
+          newEl.setAttribute('material', {
+            color: '#' + Math.floor(Math.random()*16777215).toString(16), // случайный цвет
+            metalness: 0.5,
+            roughness: 0.2
+          });
+        }
+
+        // Вычисляем позицию перед камерой
+        const distance = 3; // спавним в 3 метрах от лица
+        const position = new THREE.Vector3(0, 0, -distance);
+        position.applyQuaternion(cameraEl.object3D.quaternion);
+        position.add(cameraEl.object3D.position);
+        
+        newEl.setAttribute('position', position);
+        
+        // Добавляем случайное вращение
+        newEl.setAttribute('rotation', {
+          x: Math.random() * 360,
+          y: Math.random() * 360,
+          z: Math.random() * 360
+        });
+
+        sceneEl.appendChild(newEl);
+      }
+
+      // 3. Обработка нажатия (клик по экрану или кнопка VR)
       window.addEventListener('click', () => {
+        // Запускаем видео, если оно не стартануло
         video.play();
+        // Спавним объект
+        spawnObject();
       });
     </script>
   </body>
