@@ -92,7 +92,7 @@
 
     /* === СОСТОЯНИЕ: ПЛАВАЮЩЕЕ ОКНО (МАЛЕНЬКОЕ) === */
     .video-wrapper.is-floating {
-      width: 30vw; /* Задаем ширину (30% экрана) */
+      width: 40vw; /* Задаем ширину (30% экрана) */
       max-width: 140px; /* Не больше 140px */
       min-width: 100px; /* Не меньше 100px */
       height: auto; /* Высота подстроится под камеру автоматически! */
@@ -297,10 +297,10 @@
 
   <script>
     // --- CONFIG ---
-    const HOME_URL = '/'; 
+    const HOME_URL = '/Random/my_messenger'; 
 
     // --- VARS ---
-    let chatId = null;
+    let room = null;
     let peer = null;
     let currentCall = null;
     let dataConn = null;
@@ -339,11 +339,11 @@
     // --- INIT ---
     async function init() {
       const urlParams = new URLSearchParams(window.location.search);
-      chatId = urlParams.get('chat_id');
+   room = urlParams.get('room');;
 
-      if (!chatId) {
-        chatId = Math.random().toString(36).substring(2, 8);
-        window.history.replaceState(null, '', '?chat_id=' + chatId);
+      if (!room) {
+        room = Math.random().toString(36).substring(2, 8);
+        window.history.replaceState(null, '', '?room=' + room);
       }
 
       callTitle.innerText = `Комната: ${chatId}`;
