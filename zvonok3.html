@@ -12,10 +12,18 @@
       --accent: #25D366;
       --danger: #ff3b30;
       --text: #ffffff;
-      --radius: 16px;
+      --radius: 12px;
       --btn-size: 56px;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    /* Отключаем синее выделение текста и элементов везде */
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+      user-select: none; 
+      -webkit-user-select: none;
+    }
     
     body {
       background: var(--bg);
@@ -57,10 +65,53 @@
       background: #000;
     }
 
-    video {
+    /* Зеркалим только локальное видео по умолчанию */
+    #local-video {
+      transform: scaleX(-1);
+    }
+
+    /* === СОСТОЯНИЕ: НА ВЕСЬ ЭКРАН (ФОН) === */
+    .video-wrapper.is-full {
       width: 100%;
       height: 100%;
+      top: 0;
+      left: 0;
+      border-radius: 0;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-wrapper.is-full video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain; /* Картинка полностью помещается в экран, без обрезки */
       display: block;
+    }
+
+    /* === СОСТОЯНИЕ: ПЛАВАЮЩЕЕ ОКНО (МАЛЕНЬКОЕ) === */
+    .video-wrapper.is-floating {
+      width: 30vw; /* Задаем ширину (30% экрана) */
+      max-width: 140px; /* Не больше 140px */
+      min-width: 100px; /* Не меньше 100px */
+      height: auto; /* Высота подстроится под камеру автоматически! */
+      bottom: 100px; 
+      right: 16px;
+      border-radius: var(--radius);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      z-index: 10;
+      cursor: move; /* Курсор перетаскивания */
+      border: 1px solid rgba(255,255,255,0.2);
+      touch-action: none; /* Предотвращаем скроллинг страницы при свайпе по окошку */
+    }
+
+    .video-wrapper.is-floating video {
+      width: 100%;
+      height: auto; /* Высота по пропорциям видео */
+      object-fit: contain;
+      display: block;
+      border-radius: calc(var(--radius) - 1px);
     }
 
     .camera-placeholder {
@@ -75,38 +126,7 @@
       background: #111;
     }
 
-    .video-wrapper.is-full {
-      width: 100%;
-      height: 100%;
-      top: 0;
-      left: 0;
-      border-radius: 0;
-      z-index: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .video-wrapper.is-full video {
-      object-fit: contain; 
-    }
-
-    .video-wrapper.is-floating {
-      width: 120px;
-      height: 160px;
-      bottom: 100px; 
-      right: 16px;
-      border-radius: var(--radius);
-      box-shadow: 0 4px 10px rgba(255,255,255,0.1);
-      z-index: 10;
-      cursor: pointer;
-      border: 1px solid rgba(255,255,255,0.2);
-    }
-
-    .video-wrapper.is-floating video {
-      object-fit: cover; 
-    }
-
+    /* ИНТЕРФЕЙС */
     .top-bar {
       position: absolute;
       top: 0;
@@ -304,7 +324,6 @@
     const callRoot = document.getElementById('call-root');
     const endScreen = document.getElementById('end-screen');
 
-    // Настройки серверов (оставили ваши)
     const peerConfig = {
       config: {
         iceServers: [
@@ -322,7 +341,6 @@
       const urlParams = new URLSearchParams(window.location.search);
       chatId = urlParams.get('chat_id');
 
-      // Если в ссылке нет кода, генерируем случайный и добавляем в URL (чтобы можно было ею поделиться)
       if (!chatId) {
         chatId = Math.random().toString(36).substring(2, 8);
         window.history.replaceState(null, '', '?chat_id=' + chatId);
@@ -345,7 +363,6 @@
     }
 
     function initPeerJS() {
-      // Пытаемся занять имя = chatId (стать "Хостом")
       peer = new Peer(chatId, peerConfig);
 
       peer.on('open', (id) => {
@@ -354,13 +371,11 @@
 
       peer.on('error', (err) => {
         if (err.type === 'unavailable-id') {
-          // Имя занято! Значит "Хост" уже там. Мы уничтожаем этот инстанс и заходим как "Гость"
           peer.destroy();
-          peer = new Peer(peerConfig); // Случайное имя
+          peer = new Peer(peerConfig); 
 
           peer.on('open', () => {
             statusEl.innerText = 'Соединение...';
-            // Звоним "Хосту"
             currentCall = peer.call(chatId, localStream);
             dataConn = peer.connect(chatId);
             
@@ -372,14 +387,12 @@
         }
       });
 
-      // Если мы "Хост" и нам звонят
       peer.on('call', (call) => {
         call.answer(localStream);
         currentCall = call;
         setupCallHandlers(currentCall);
       });
 
-      // Если мы "Хост" и к нам подключают канал данных
       peer.on('connection', (conn) => {
         dataConn = conn;
         setupDataHandlers(dataConn);
@@ -409,30 +422,140 @@
       }
     }
 
-    // --- UI INTERACTION ---
-    function handleWrapperClick(wrapper) {
-      if (wrapper.classList.contains('is-floating')) {
-        isSwapped = !isSwapped;
+    // --- ЛОГИКА ПЕРЕТАСКИВАНИЯ (DRAG & DROP) ---
+    let isDragging = false;
+    let hasMoved = false; // Флаг для отличия клика от перетаскивания
+    let startX, startY, initialLeft, initialTop;
+    let dragTarget = null;
+
+    function startDrag(e) {
+      const target = e.target.closest('.is-floating');
+      if (!target) return;
+      
+      dragTarget = target;
+      isDragging = true;
+      hasMoved = false;
+      
+      const rect = dragTarget.getBoundingClientRect();
+      initialLeft = rect.left;
+      initialTop = rect.top;
+      
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      
+      startX = clientX;
+      startY = clientY;
+      
+      // Переводим позиционирование исключительно в left/top
+      dragTarget.style.bottom = 'auto';
+      dragTarget.style.right = 'auto';
+      dragTarget.style.left = initialLeft + 'px';
+      dragTarget.style.top = initialTop + 'px';
+    }
+
+    function moveDrag(e) {
+      if (!isDragging || !dragTarget) return;
+      
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      
+      const dx = clientX - startX;
+      const dy = clientY - startY;
+      
+      // Если сдвинули больше чем на 5 пикселей — это перетаскивание, а не случайный клик
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        hasMoved = true;
+      }
+      
+      let newX = initialLeft + dx;
+      let newY = initialTop + dy;
+      
+      // Ограничиваем вылет за границы экрана
+      const maxX = window.innerWidth - dragTarget.offsetWidth;
+      const maxY = window.innerHeight - dragTarget.offsetHeight;
+      newX = Math.max(0, Math.min(newX, maxX));
+      newY = Math.max(0, Math.min(newY, maxY));
+      
+      dragTarget.style.left = newX + 'px';
+      dragTarget.style.top = newY + 'px';
+    }
+
+    function endDrag(e) {
+      isDragging = false;
+      dragTarget = null;
+    }
+
+    // События для мыши
+    document.addEventListener('mousedown', startDrag);
+    document.addEventListener('mousemove', moveDrag);
+    document.addEventListener('mouseup', endDrag);
+
+    // События для сенсорных экранов
+    document.addEventListener('touchstart', startDrag, { passive: false });
+    document.addEventListener('touchmove', moveDrag, { passive: false });
+    document.addEventListener('touchend', endDrag);
+
+
+    // --- UI ИНТЕРАКТИВ И СВАП ЭКРАНОВ ---
+    function handleWrapperClick(e) {
+      const wrapper = e.currentTarget;
+      if (!wrapper.classList.contains('is-floating')) return;
+      if (hasMoved) return; // Если мы перетаскивали окно, не меняем их местами
+
+      // Запоминаем текущую позицию маленького окна, чтобы применить её к новому
+      const savedLeft = wrapper.style.left;
+      const savedTop = wrapper.style.top;
+      const savedBottom = wrapper.style.bottom;
+      const savedRight = wrapper.style.right;
+
+      isSwapped = !isSwapped;
+      
+      if (isSwapped) {
+        localWrapper.className = 'video-wrapper is-full';
+        remoteWrapper.className = 'video-wrapper is-floating';
         
-        if (isSwapped) {
-          localWrapper.className = 'video-wrapper is-full';
-          remoteWrapper.className = 'video-wrapper is-floating';
-          
-          remoteWrapper.style.zIndex = '10';
-          localWrapper.style.zIndex = '1';
-        } else {
-          localWrapper.className = 'video-wrapper is-floating';
-          remoteWrapper.className = 'video-wrapper is-full';
-          
-          localWrapper.style.zIndex = '10';
-          remoteWrapper.style.zIndex = '1';
-        }
+        remoteWrapper.style.zIndex = '10';
+        localWrapper.style.zIndex = '1';
+
+        resetStyles(localWrapper);
+        applyStyles(remoteWrapper, savedLeft, savedTop, savedBottom, savedRight);
+      } else {
+        localWrapper.className = 'video-wrapper is-floating';
+        remoteWrapper.className = 'video-wrapper is-full';
+        
+        localWrapper.style.zIndex = '10';
+        remoteWrapper.style.zIndex = '1';
+
+        resetStyles(remoteWrapper);
+        applyStyles(localWrapper, savedLeft, savedTop, savedBottom, savedRight);
       }
     }
 
-    localWrapper.onclick = () => handleWrapperClick(localWrapper);
-    remoteWrapper.onclick = () => handleWrapperClick(remoteWrapper);
+    // Вспомогательные функции для корректного переноса позиций
+    function resetStyles(el) {
+      el.style.left = '';
+      el.style.top = '';
+      el.style.bottom = '';
+      el.style.right = '';
+    }
 
+    function applyStyles(el, left, top, bottom, right) {
+      if (left || top) {
+        el.style.left = left;
+        el.style.top = top;
+        el.style.bottom = 'auto';
+        el.style.right = 'auto';
+      } else {
+        // Если окно ещё ни разу не перетаскивали
+        el.style.bottom = bottom || '100px';
+        el.style.right = right || '16px';
+      }
+    }
+
+    localWrapper.addEventListener('click', handleWrapperClick);
+    remoteWrapper.addEventListener('click', handleWrapperClick);
+
+    // --- КНОПКИ УПРАВЛЕНИЯ ---
     document.getElementById('fullscreen-toggle').onclick = () => {
       if (!document.fullscreenElement) {
         if (callRoot.requestFullscreen) callRoot.requestFullscreen();
@@ -457,7 +580,6 @@
     document.getElementById('end-call').onclick = endCall;
     document.getElementById('go-home-btn').onclick = () => window.location.href = HOME_URL;
 
-    // --- MEDIA CONTROLS ---
     document.getElementById('toggle-mic').onclick = function() {
       micEnabled = !micEnabled;
       if (localStream) localStream.getAudioTracks()[0].enabled = micEnabled;
@@ -469,13 +591,7 @@
       cameraEnabled = !cameraEnabled;
       if (localStream) localStream.getVideoTracks()[0].enabled = cameraEnabled;
       
-      if (cameraEnabled) {
-        localPlaceholder.style.display = 'none';
-      } else {
-        localPlaceholder.style.display = 'block';
-      }
-      
-      // Отправляем сигнал собеседнику через DataConnection
+      localPlaceholder.style.display = cameraEnabled ? 'none' : 'block';
       sendData({ type: 'cam_toggle', value: cameraEnabled });
 
       this.innerHTML = `<i class="fa fa-video${cameraEnabled ? '' : '-slash'}"></i>`;
@@ -489,7 +605,6 @@
         const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: false });
         const videoTrack = newStream.getVideoTracks()[0];
         
-        // Подменяем трек в текущем PeerJS звонке
         if (currentCall && currentCall.peerConnection) {
             const sender = currentCall.peerConnection.getSenders().find(s => s.track.kind === 'video');
             if (sender) sender.replaceTrack(videoTrack);
@@ -500,6 +615,13 @@
         localStream.addTrack(videoTrack);
         localVideo.srcObject = localStream;
         
+        // Зеркалим фронталку, отключаем зеркало для задней
+        if (facingMode === 'user') {
+          localVideo.style.transform = 'scaleX(-1)';
+        } else {
+          localVideo.style.transform = 'scaleX(1)';
+        }
+
         if (!cameraEnabled) videoTrack.enabled = false;
         
       } catch (e) { console.error(e); }
