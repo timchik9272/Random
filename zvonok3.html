@@ -16,13 +16,15 @@
       --btn-size: 56px;
     }
     
-    /* Отключаем синее выделение текста и элементов везде */
+    /* Отключаем синее выделение текста, элементов и подсветку кликов (тап) на мобильных везде */
     * { 
       box-sizing: border-box; 
       margin: 0; 
       padding: 0; 
       user-select: none; 
       -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent; /* Убирает серое/синее мигание на телефонах */
+      outline: none;
     }
     
     body {
@@ -63,14 +65,15 @@
       position: absolute;
       overflow: hidden;
       background: #000;
+      /* Отключаем все системные реакции на клики/удержания в браузере */
+      -webkit-touch-callout: none;
     }
 
-    /* Зеркалим только локальное видео по умолчанию */
     #local-video {
       transform: scaleX(-1);
     }
 
-    /* === СОСТОЯНИЕ: НА ВЕСЬ ЭКРАН (ФОН) === */
+    /* === НА ВЕСЬ ЭКРАН (ФОН) === */
     .video-wrapper.is-full {
       width: 100%;
       height: 100%;
@@ -81,34 +84,53 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      /* Сброс всех стилей перетаскивания (оно не должно летать) */
+      bottom: auto;
+      right: auto;
+      transform: none !important;
+      transition: none !important;
     }
 
     .video-wrapper.is-full video {
       width: 100%;
       height: 100%;
-      object-fit: contain; /* Картинка полностью помещается в экран, без обрезки */
+      object-fit: contain; 
       display: block;
     }
 
-    /* === СОСТОЯНИЕ: ПЛАВАЮЩЕЕ ОКНО (МАЛЕНЬКОЕ) === */
+    /* === ПЛАВАЮЩЕЕ ОКНО (МАЛЕНЬКОЕ) === */
     .video-wrapper.is-floating {
-      width: 30vw; /* Задаем ширину (30% экрана) */
-      max-width: 140px; /* Не больше 140px */
-      min-width: 100px; /* Не меньше 100px */
-      height: auto; /* Высота подстроится под камеру автоматически! */
+      /* === ЗДЕСЬ НАСТРАИВАЕТСЯ РАЗМЕР МАЛЕНЬКОГО ОКНА === */
+      width: 35vw; /* Увеличено. Занимает 35% экрана на телефонах */
+      max-width: 180px; /* Было 140. Теперь не больше 180px на ПК */
+      min-width: 120px; /* Было 100. Теперь не меньше 120px на совсем мелких экранах */
+      height: auto; 
+      
+      /* Начальная позиция */
       bottom: 100px; 
       right: 16px;
+      
       border-radius: var(--radius);
       box-shadow: 0 4px 15px rgba(0,0,0,0.5);
       z-index: 10;
-      cursor: move; /* Курсор перетаскивания */
+      cursor: grab;
       border: 1px solid rgba(255,255,255,0.2);
-      touch-action: none; /* Предотвращаем скроллинг страницы при свайпе по окошку */
+      touch-action: none; 
+      will-change: left, top;
+    }
+
+    .video-wrapper.is-floating:active {
+      cursor: grabbing;
+    }
+
+    /* Анимация прилипания */
+    .video-wrapper.is-floating.snap {
+      transition: left 0.3s cubic-bezier(0.25, 1, 0.5, 1), top 0.3s cubic-bezier(0.25, 1, 0.5, 1);
     }
 
     .video-wrapper.is-floating video {
       width: 100%;
-      height: auto; /* Высота по пропорциям видео */
+      height: auto; 
       object-fit: contain;
       display: block;
       border-radius: calc(var(--radius) - 1px);
@@ -195,6 +217,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: background 0.2s;
     }
 
     .ctrl-btn:active {
@@ -296,10 +319,8 @@
   </div>
 
   <script>
-    // --- CONFIG ---
     const HOME_URL = '/'; 
 
-    // --- VARS ---
     let chatId = null;
     let peer = null;
     let currentCall = null;
@@ -311,7 +332,6 @@
     let facingMode = 'user';
     let isSwapped = false;
 
-    // --- ELEMENTS ---
     const localVideo = document.getElementById('local-video');
     const remoteVideo = document.getElementById('remote-video');
     const localWrapper = document.getElementById('local-wrapper');
@@ -324,19 +344,23 @@
     const callRoot = document.getElementById('call-root');
     const endScreen = document.getElementById('end-screen');
 
+    // === ФИКС ОШИБКИ NETWORK ===
+    // Принудительно задаём безопасные WSS настройки, чтобы провайдеры пропускали трафик.
     const peerConfig = {
+      secure: true,   // Используем HTTPS/WSS (порт 443) вместо открытого HTTP
+      port: 443,      // Заставляем работать только по 443 порту
+      pingInterval: 5000, // Поддерживаем соединение активным (защита от дисконнекта)
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-          { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-          { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+          { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
         ]
       }
     };
+    // Если продолжит "падать", вы можете добавить: host: 'peerjs.92k.de' (это мощный сервер комьюнити)
 
-    // --- INIT ---
     async function init() {
       const urlParams = new URLSearchParams(window.location.search);
       chatId = urlParams.get('chat_id');
@@ -370,6 +394,13 @@
       });
 
       peer.on('error', (err) => {
+        // Если ошибка в сети, выводим её текстом
+        if (err.type === 'network') {
+          statusEl.innerText = 'Ошибка сети. Сервер заблокирован.';
+          console.error("PeerJS Network Error. Возможно заблокирован порт.");
+          return;
+        }
+
         if (err.type === 'unavailable-id') {
           peer.destroy();
           peer = new Peer(peerConfig); 
@@ -422,9 +453,9 @@
       }
     }
 
-    // --- ЛОГИКА ПЕРЕТАСКИВАНИЯ (DRAG & DROP) ---
+    // --- ЛОГИКА ПРИЛИПАНИЯ И ПЕРЕТАСКИВАНИЯ ---
     let isDragging = false;
-    let hasMoved = false; // Флаг для отличия клика от перетаскивания
+    let hasMoved = false; 
     let startX, startY, initialLeft, initialTop;
     let dragTarget = null;
 
@@ -436,6 +467,9 @@
       isDragging = true;
       hasMoved = false;
       
+      // Убираем класс прилипания на время ручного таскания
+      dragTarget.classList.remove('snap');
+
       const rect = dragTarget.getBoundingClientRect();
       initialLeft = rect.left;
       initialTop = rect.top;
@@ -446,7 +480,7 @@
       startX = clientX;
       startY = clientY;
       
-      // Переводим позиционирование исключительно в left/top
+      // Переключаем позиционирование строго на left/top
       dragTarget.style.bottom = 'auto';
       dragTarget.style.right = 'auto';
       dragTarget.style.left = initialLeft + 'px';
@@ -462,7 +496,6 @@
       const dx = clientX - startX;
       const dy = clientY - startY;
       
-      // Если сдвинули больше чем на 5 пикселей — это перетаскивание, а не случайный клик
       if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
         hasMoved = true;
       }
@@ -470,7 +503,6 @@
       let newX = initialLeft + dx;
       let newY = initialTop + dy;
       
-      // Ограничиваем вылет за границы экрана
       const maxX = window.innerWidth - dragTarget.offsetWidth;
       const maxY = window.innerHeight - dragTarget.offsetHeight;
       newX = Math.max(0, Math.min(newX, maxX));
@@ -481,16 +513,46 @@
     }
 
     function endDrag(e) {
+      if (!isDragging || !dragTarget) return;
       isDragging = false;
-      dragTarget = null;
+      
+      if (hasMoved) {
+        // Добавляем класс анимации
+        dragTarget.classList.add('snap');
+        
+        const rect = dragTarget.getBoundingClientRect();
+        const winW = window.innerWidth;
+        const winH = window.innerHeight;
+        
+        // Отступы от краев (чтобы не улетало прямо в границу)
+        const paddingX = 16;
+        const paddingY = 80; // Сверху отступ для статуса
+        const bottomPaddingY = 110; // Снизу отступ для кнопок
+        
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        // Математика прилипания: Лево или Право? Верх или Низ?
+        let targetLeft = centerX < winW / 2 ? paddingX : winW - rect.width - paddingX;
+        let targetTop = centerY < winH / 2 ? paddingY : winH - rect.height - bottomPaddingY; 
+        
+        dragTarget.style.left = targetLeft + 'px';
+        dragTarget.style.top = targetTop + 'px';
+        
+        // Снимаем класс анимации, чтобы следующее таскание было мгновенным
+        setTimeout(() => {
+          if (dragTarget) dragTarget.classList.remove('snap');
+          dragTarget = null;
+        }, 300);
+      } else {
+        dragTarget = null;
+      }
     }
 
-    // События для мыши
     document.addEventListener('mousedown', startDrag);
     document.addEventListener('mousemove', moveDrag);
     document.addEventListener('mouseup', endDrag);
 
-    // События для сенсорных экранов
     document.addEventListener('touchstart', startDrag, { passive: false });
     document.addEventListener('touchmove', moveDrag, { passive: false });
     document.addEventListener('touchend', endDrag);
@@ -500,13 +562,12 @@
     function handleWrapperClick(e) {
       const wrapper = e.currentTarget;
       if (!wrapper.classList.contains('is-floating')) return;
-      if (hasMoved) return; // Если мы перетаскивали окно, не меняем их местами
+      if (hasMoved) return; // Если тащили окно — не свапаем
 
-      // Запоминаем текущую позицию маленького окна, чтобы применить её к новому
-      const savedLeft = wrapper.style.left;
-      const savedTop = wrapper.style.top;
-      const savedBottom = wrapper.style.bottom;
-      const savedRight = wrapper.style.right;
+      // Фиксируем координаты старого маленького окна, чтобы новое открылось там же
+      const rect = wrapper.getBoundingClientRect();
+      const savedLeft = rect.left + 'px';
+      const savedTop = rect.top + 'px';
 
       isSwapped = !isSwapped;
       
@@ -518,7 +579,7 @@
         localWrapper.style.zIndex = '1';
 
         resetStyles(localWrapper);
-        applyStyles(remoteWrapper, savedLeft, savedTop, savedBottom, savedRight);
+        applyStyles(remoteWrapper, savedLeft, savedTop);
       } else {
         localWrapper.className = 'video-wrapper is-floating';
         remoteWrapper.className = 'video-wrapper is-full';
@@ -527,11 +588,10 @@
         remoteWrapper.style.zIndex = '1';
 
         resetStyles(remoteWrapper);
-        applyStyles(localWrapper, savedLeft, savedTop, savedBottom, savedRight);
+        applyStyles(localWrapper, savedLeft, savedTop);
       }
     }
 
-    // Вспомогательные функции для корректного переноса позиций
     function resetStyles(el) {
       el.style.left = '';
       el.style.top = '';
@@ -539,16 +599,12 @@
       el.style.right = '';
     }
 
-    function applyStyles(el, left, top, bottom, right) {
-      if (left || top) {
+    function applyStyles(el, left, top) {
+      if (left && top) {
         el.style.left = left;
         el.style.top = top;
         el.style.bottom = 'auto';
         el.style.right = 'auto';
-      } else {
-        // Если окно ещё ни разу не перетаскивали
-        el.style.bottom = bottom || '100px';
-        el.style.right = right || '16px';
       }
     }
 
@@ -615,7 +671,6 @@
         localStream.addTrack(videoTrack);
         localVideo.srcObject = localStream;
         
-        // Зеркалим фронталку, отключаем зеркало для задней
         if (facingMode === 'user') {
           localVideo.style.transform = 'scaleX(-1)';
         } else {
