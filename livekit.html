@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>TimLink - Звонок (LiveKit)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  
+  <!-- Подключаем LiveKit Client SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+  <!-- Библиотека для создания JWT токенов в браузере (для теста) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsrsasign/10.5.27/jsrsasign.min.js"></script>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <style>
+    :root {
+      --bg: #000000;
+      --accent: #25D366;
+      --danger: #ff3b30;
+      --text: #ffffff;
+      --radius: 12px;
+      --btn-size: 56px;
+    }
+    
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+      user-select: none; 
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent; 
+      outline: none;
+    }
+    
+    body {
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .call-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .video-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      background: #000;
+    }
+
+    .video-wrapper {
+      position: absolute;
+      overflow: hidden;
+      background: #000;
+      -webkit-touch-callout: none;
+    }
+
+    #local-video {
+      transform: scaleX(-1);
+    }
+
+    /* === НА ВЕСЬ ЭКРАН === */
+    .video-wrapper.is-full {
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      border-radius: 0;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      bottom: auto;
+      right: auto;
+      transform: none !important;
+      transition: none !important;
+    }
+
+    .video-wrapper.is-full video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain; 
+      display: block;
+    }
+
+    /* === ПЛАВАЮЩЕЕ ОКНО === */
+    .video-wrapper.is-floating {
+      width: 35vw; 
+      max-width: 180px; 
+      min-width: 120px; 
+      height: auto; 
+      bottom: 100px; 
+      right: 16px;
+      border-radius: var(--radius);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      z-index: 10;
+      cursor: grab;
+      border: 1px solid rgba(255,255,255,0.2);
+      touch-action: none; 
+      will-change: left, top;
+    }
+
+    .video-wrapper.is-floating:active {
+      cursor: grabbing;
+    }
+
+    .video-wrapper.is-floating.snap {
+      transition: left 0.3s cubic-bezier(0.25, 1, 0.5, 1), top 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    .video-wrapper.is-floating video {
+      width: 100%;
+      height: auto; 
+      object-fit: contain;
+      display: block;
+      border-radius: calc(var(--radius) - 1px);
+    }
+
+    .camera-placeholder {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: none;
+      z-index: 2;
+      background: #111;
+    }
+
+    /* ИНТЕРФЕЙС */
+    .top-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+      z-index: 20;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: none;
+    }
+
+    .call-info {
+      pointer-events: auto;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    }
+    .call-info h2 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .status-text {
+      font-size: 13px;
+      opacity: 0.8;
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* ИНДИКАТОР КАЧЕСТВА СЕТИ */
+    .network-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      margin-top: 4px;
+      opacity: 0.9;
+    }
+    .net-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #555; /* Серый - нет данных */
+      transition: background 0.3s;
+    }
+    .net-dot.excellent { background: #4cd964; } /* Зеленый */
+    .net-dot.good { background: #ffcc00; }      /* Желтый */
+    .net-dot.poor { background: #ff3b30; }      /* Красный */
+
+    .top-btn {
+      pointer-events: auto;
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .controls-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      padding: 20px 0 30px 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+      z-index: 20;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .ctrl-btn {
+      width: var(--btn-size);
+      height: var(--btn-size);
+      border-radius: 50%;
+      border: none;
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+      background: rgba(255,255,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, opacity 0.2s;
+    }
+
+    .ctrl-btn:active {
+      background: rgba(255,255,255,0.4);
+    }
+
+    .btn-end {
+      background: var(--danger);
+    }
+    
+    /* Скрываем кнопку скриншара на мобильных */
+    @media (max-width: 1024px) {
+      .btn-screen-share { display: none; }
+    }
+    
+    .end-screen {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #121212;
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      text-align: center;
+      padding: 20px;
+    }
+    
+    .end-screen h3 {
+      font-size: 24px;
+      margin-bottom: 20px;
+      color: #888;
+    }
+
+    .action-btn {
+      width: 100%;
+      max-width: 250px;
+      padding: 16px;
+      border-radius: 12px;
+      border: none;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-restart {
+      background: var(--accent);
+      color: white;
+    }
+    
+    .btn-home {
+      background: #333;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="call-container" id="call-root">
+    
+    <div class="video-layer">
+      <div id="remote-wrapper" class="video-wrapper is-full">
+        <img src="https://2nwatpeu4k.ucarecd.net/601bc32d-258d-4e79-9fcb-d2e067f2f353/" class="camera-placeholder" id="remote-placeholder">
+        <video id="remote-video" autoplay playsinline></video>
+      </div>
+
+      <div id="local-wrapper" class="video-wrapper is-floating">
+        <img src="https://2nwatpeu4k.ucarecd.net/601bc32d-258d-4e79-9fcb-d2e067f2f353/" class="camera-placeholder" id="local-placeholder">
+        <video id="local-video" autoplay playsinline muted></video>
+      </div>
+    </div>
+
+    <div class="top-bar">
+      <div class="call-info">
+        <h2 id="call-title">Комната: ...</h2>
+        <span id="status" class="status-text">Подключение к LiveKit...</span>
+        <div class="network-indicator">
+          <div id="net-dot" class="net-dot"></div>
+          <span id="net-text">Сеть: Проверка</span>
+        </div>
+      </div>
+      <button id="fullscreen-toggle" class="top-btn" title="На весь экран">
+        <i class="fa fa-expand"></i>
+      </button>
+    </div>
+
+    <div class="controls-bar" id="controls">
+      <button id="toggle-mic" class="ctrl-btn" title="Микрофон"><i class="fa fa-microphone"></i></button>
+      <button id="toggle-camera" class="ctrl-btn" title="Камера"><i class="fa fa-video"></i></button>
+      <button id="switch-camera" class="ctrl-btn" title="Повернуть камеру"><i class="fa fa-sync-alt"></i></button>
+      <!-- Кнопка Демонстрации экрана (видна только на ПК) -->
+      <button id="toggle-screen" class="ctrl-btn btn-screen-share" title="Демонстрация экрана"><i class="fa fa-desktop"></i></button>
+      <button id="end-call" class="ctrl-btn btn-end" title="Сбросить"><i class="fa fa-phone-slash"></i></button>
+    </div>
+
+    <div id="end-screen" class="end-screen">
+      <h3>Звонок завершён. Он был совершён с помощью TimLink.</h3>
+      <button class="action-btn btn-restart" onclick="window.location.reload()">
+        <i class="fa fa-phone"></i> Позвонить ещё раз
+      </button>
+      <button class="action-btn btn-home" id="go-home-btn">
+        <i class="fa fa-home"></i> На главную
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    // ==========================================
+    // НАСТРОЙКИ
+    // ==========================================
+    
+    // 1. ВКЛ/ОТКЛ ПРИЛИПАНИЕ К УГЛАМ
+    // Поставьте false, чтобы окно свободно летало и не прилипало к краям.
+    const ENABLE_SNAP = true; 
+
+    // 2. КОНФИГУРАЦИЯ LIVEKIT
+    // ВНИМАНИЕ: Для продакшена НЕ храните секрет здесь! Используйте сервер.
+    const LIVEKIT_URL = 'wss://project-g06jwp2m.livekit.cloud';
+    const API_KEY = 'APITidKD5VzodX5';
+    const API_SECRET = 'qtjTqYleN80fHli0SmaNNNnTfAhedcMa26QMPf8mlAVB'; 
+    
+    const HOME_URL = '/'; 
+
+    // ==========================================
+    // ОСНОВНОЙ КОД
+    // ==========================================
+
+    let room = null;
+    let localVideoTrack = null;
+    let localAudioTrack = null;
+    let localScreenTrack = null;
+    
+    let micEnabled = true;
+    let cameraEnabled = true;
+    let isScreenSharing = false;
+    let facingMode = 'user';
+    let isSwapped = false;
+
+    const localVideo = document.getElementById('local-video');
+    const remoteVideo = document.getElementById('remote-video');
+    const localWrapper = document.getElementById('local-wrapper');
+    const remoteWrapper = document.getElementById('remote-wrapper');
+    const localPlaceholder = document.getElementById('local-placeholder');
+    const remotePlaceholder = document.getElementById('remote-placeholder');
+    
+    const statusEl = document.getElementById('status');
+    const callTitle = document.getElementById('call-title');
+    const callRoot = document.getElementById('call-root');
+    const endScreen = document.getElementById('end-screen');
+    const netDot = document.getElementById('net-dot');
+    const netText = document.getElementById('net-text');
+
+    // Генератор токенов (JWT) прямо в браузере
+    function createLiveKitToken(roomName, identity) {
+      const header = { alg: 'HS256', typ: 'JWT' };
+      const now = Math.floor(Date.now() / 1000);
+      
+      // Права доступа (Video Grant)
+      const videoGrant = {
+        roomJoin: true,
+        room: roomName,
+        canPublish: true,
+        canSubscribe: true,
+        canPublishData: true
+      };
+
+      const payload = {
+        iss: API_KEY,
+        nbf: now - 10, // действителен с 10 сек назад
+        exp: now + 3600, // действителен 1 час
+        sub: identity, // subject (имя пользователя)
+        name: identity,
+        video: videoGrant
+      };
+
+      return KJUR.jws.JWS.sign("HS256", JSON.stringify(header), JSON.stringify(payload), { utf8: API_SECRET });
+    }
+
+    // Обновление UI индикатора сети
+    function updateNetworkQuality(stats) {
+      // LiveKit присылает quality: 'excellent' | 'good' | 'poor' | 'lost'
+      let quality = 'unknown';
+      if (stats && stats.quality) quality = stats.quality;
+
+      netDot.className = 'net-dot'; // сброс классов
+      
+      switch(quality) {
+        case 'excellent':
+          netDot.classList.add('excellent');
+          netText.innerText = 'Сеть: Отлично';
+          break;
+        case 'good':
+          netDot.classList.add('good');
+          netText.innerText = 'Сеть: Хорошо';
+          break;
+        case 'poor':
+        case 'lost':
+          netDot.classList.add('poor');
+          netText.innerText = 'Сеть: Плохо';
+          break;
+        default:
+          netText.innerText = 'Сеть: ...';
+      }
+    }
+
+    async function init() {
+      const urlParams = new URLSearchParams(window.location.search);
+      let chatId = urlParams.get('chat_id');
+
+      if (!chatId) {
+        chatId = 'room-' + Math.random().toString(36).substring(2, 8);
+        window.history.replaceState(null, '', '?chat_id=' + chatId);
+      }
+
+      callTitle.innerText = `Комната: ${chatId}`;
+      
+      try {
+        statusEl.innerText = 'Создание токена...';
+        const identity = 'user-' + Math.random().toString(36).substring(2, 6);
+        const token = createLiveKitToken(chatId, identity);
+
+        statusEl.innerText = 'Подключение к серверу...';
+        
+        // Подключение к LiveKit
+        room = new LivekitClient.Room({
+          adaptiveStream: true,
+          dynacast: true,
+        });
+
+        // События комнаты
+        room.on(LivekitClient.RoomEvent.Connected, () => {
+          statusEl.innerText = 'Подключено. Ожидание участников...';
+        });
+
+        room.on(LivekitClient.RoomEvent.ConnectionQualityChanged, (quality, participant) => {
+          if (participant.isLocal) {
+            updateNetworkQuality({ quality: quality });
+          }
+        });
+
+        // Обработка входящих треков (видео/аудио от других)
+        room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+          statusEl.innerText = 'В эфире';
+          
+          if (track.kind === 'video') {
+            // Если это скриншер, можно выводить в remote-video
+            const element = track.attach();
+            remoteVideo.srcObject = element.srcObject; 
+            // LiveKit возвращает HTMLVideoElement, но удобнее управлять через srcObject
+            // Корректный способ для LiveKit:
+            remoteVideo.srcObject = new MediaStream([track.mediaStreamTrack]);
+            
+            // Если пришел скриншер, можно автоматически переключить вид
+            if (publication.source === 'screen_share') {
+               statusEl.innerText = 'Демонстрация экрана...';
+            }
+          } else if (track.kind === 'audio') {
+            const audioElement = track.attach();
+            document.body.appendChild(audioElement); // Audio играет фоном
+          }
+        });
+        
+        room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track) => {
+           track.detach().forEach(el => el.remove());
+           // Если отвалилось видео
+           if (track.kind === 'video') {
+             remoteVideo.srcObject = null;
+             statusEl.innerText = 'Собеседник отключил видео';
+           }
+        });
+
+        room.on(LivekitClient.RoomEvent.Disconnected, () => {
+          endCall();
+        });
+
+        // Подключаемся
+        await room.connect(LIVEKIT_URL, token);
+        statusEl.innerText = 'В комнате. Ожидание других...';
+
+        // Публикуем свои треки
+        await publishLocalTracks();
+
+      } catch (err) {
+        console.error(err);
+        statusEl.innerText = 'Ошибка подключения: ' + err.message;
+      }
+    }
+
+    async function publishLocalTracks() {
+      // Камера и Микрофон
+      try {
+        localVideoTrack = await LivekitClient.createLocalVideoTrack({ facingMode: facingMode });
+        localAudioTrack = await LivekitClient.createLocalAudioTrack();
+
+        await room.localParticipant.publishTrack(localVideoTrack);
+        await room.localParticipant.publishTrack(localAudioTrack);
+
+        // Отображаем свое видео
+        localVideo.srcObject = new MediaStream([localVideoTrack.mediaStreamTrack]);
+        
+      } catch (e) {
+        console.error("Ошибка доступа к устройствам", e);
+        statusEl.innerText = 'Нет доступа к камере/микрофону';
+      }
+    }
+
+    // --- УПРАВЛЕНИЕ ---
+
+    document.getElementById('toggle-mic').onclick = async () => {
+      if (!localAudioTrack) return;
+      micEnabled = !micEnabled;
+      await localAudioTrack.set_enabled(micEnabled);
+      
+      const btn = document.getElementById('toggle-mic');
+      btn.innerHTML = `<i class="fa fa-microphone${micEnabled ? '' : '-slash'}"></i>`;
+      btn.style.background = micEnabled ? 'rgba(255,255,255,0.2)' : 'rgba(255,59,48,0.5)';
+    };
+
+    document.getElementById('toggle-camera').onclick = async () => {
+      if (!localVideoTrack) return;
+      cameraEnabled = !cameraEnabled;
+      await localVideoTrack.set_enabled(cameraEnabled);
+      
+      localPlaceholder.style.display = cameraEnabled ? 'none' : 'block';
+      
+      const btn = document.getElementById('toggle-camera');
+      btn.innerHTML = `<i class="fa fa-video${cameraEnabled ? '' : '-slash'}"></i>`;
+      btn.style.background = cameraEnabled ? 'rgba(255,255,255,0.2)' : 'rgba(255,59,48,0.5)';
+    };
+
+    document.getElementById('switch-camera').onclick = async () => {
+      if (!room) return;
+      facingMode = facingMode === 'user' ? 'environment' : 'user';
+      
+      // Останавливаем текущий трек
+      if (localVideoTrack) {
+        localVideoTrack.stop();
+        room.localParticipant.unpublishTrack(localVideoTrack);
+      }
+
+      // Создаем новый
+      localVideoTrack = await LivekitClient.createLocalVideoTrack({ facingMode: facingMode });
+      await room.localParticipant.publishTrack(localVideoTrack);
+
+      // Обновляем локальное превью
+      localVideo.srcObject = new MediaStream([localVideoTrack.mediaStreamTrack]);
+      localVideo.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+    };
+
+    // Демонстрация экрана (Только ПК)
+    document.getElementById('toggle-screen').onclick = async () => {
+      const btn = document.getElementById('toggle-screen');
+      
+      if (!isScreenSharing) {
+        try {
+          localScreenTrack = await LivekitClient.createLocalScreenVideoTrack();
+          await room.localParticipant.publishTrack(localScreenTrack);
+          
+          isScreenSharing = true;
+          btn.style.background = 'var(--accent)';
+          statusEl.innerText = 'Демонстрация экрана...';
+
+          // Если пользователь прекратил через браузерную кнопку "Стоп"
+          localScreenTrack.on(LivekitClient.TrackEvent.Ended, () => {
+             stopScreenShare();
+          });
+
+        } catch (e) {
+          console.log("Скриншер отменен или ошибка", e);
+        }
+      } else {
+        stopScreenShare();
+      }
+    };
+
+    async function stopScreenShare() {
+      if (localScreenTrack) {
+        room.localParticipant.unpublishTrack(localScreenTrack);
+        localScreenTrack.stop();
+        localScreenTrack = null;
+      }
+      isScreenSharing = false;
+      document.getElementById('toggle-screen').style.background = 'rgba(255,255,255,0.2)';
+      statusEl.innerText = 'В эфире';
+    }
+
+    function endCall() {
+      if (room) room.disconnect();
+      if (localVideoTrack) localVideoTrack.stop();
+      if (localAudioTrack) localAudioTrack.stop();
+      
+      document.querySelector('.top-bar').style.display = 'none';
+      document.getElementById('controls').style.display = 'none';
+      endScreen.style.display = 'flex';
+    }
+
+    document.getElementById('end-call').onclick = endCall;
+    document.getElementById('go-home-btn').onclick = () => window.location.href = HOME_URL;
+    document.getElementById('fullscreen-toggle').onclick = () => {
+      if (!document.fullscreenElement) {
+        callRoot.requestFullscreen().catch(err => console.log(err));
+      } else {
+        document.exitFullscreen();
+      }
+    };
+
+    // --- ЛОГИКА ПЕРЕТАСКИВАНИЯ ---
+    let isDragging = false;
+    let hasMoved = false; 
+    let startX, startY, initialLeft, initialTop;
+    let dragTarget = null;
+
+    function startDrag(e) {
+      const target = e.target.closest('.is-floating');
+      if (!target) return;
+      
+      dragTarget = target;
+      isDragging = true;
+      hasMoved = false;
+      
+      // Если прилипание включено, убираем класс snap для ручного таскания
+      if(ENABLE_SNAP) dragTarget.classList.remove('snap');
+
+      const rect = dragTarget.getBoundingClientRect();
+      initialLeft = rect.left;
+      initialTop = rect.top;
+      
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      
+      startX = clientX;
+      startY = clientY;
+      
+      dragTarget.style.bottom = 'auto';
+      dragTarget.style.right = 'auto';
+      dragTarget.style.left = initialLeft + 'px';
+      dragTarget.style.top = initialTop + 'px';
+    }
+
+    function moveDrag(e) {
+      if (!isDragging || !dragTarget) return;
+      
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      
+      const dx = clientX - startX;
+      const dy = clientY - startY;
+      
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasMoved = true;
+      
+      let newX = initialLeft + dx;
+      let newY = initialTop + dy;
+      
+      const maxX = window.innerWidth - dragTarget.offsetWidth;
+      const maxY = window.innerHeight - dragTarget.offsetHeight;
+      newX = Math.max(0, Math.min(newX, maxX));
+      newY = Math.max(0, Math.min(newY, maxY));
+      
+      dragTarget.style.left = newX + 'px';
+      dragTarget.style.top = newY + 'px';
+    }
+
+    function endDrag(e) {
+      if (!isDragging || !dragTarget) return;
+      isDragging = false;
+      
+      // Логика прилипания
+      if (hasMoved && ENABLE_SNAP) {
+        dragTarget.classList.add('snap'); // Добавляем плавность
+        
+        const rect = dragTarget.getBoundingClientRect();
+        const winW = window.innerWidth;
+        const winH = window.innerHeight;
+        
+        const paddingX = 16;
+        const paddingY = 80;
+        const bottomPaddingY = 110;
+        
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        let targetLeft = centerX < winW / 2 ? paddingX : winW - rect.width - paddingX;
+        let targetTop = centerY < winH / 2 ? paddingY : winH - rect.height - bottomPaddingY; 
+        
+        dragTarget.style.left = targetLeft + 'px';
+        dragTarget.style.top = targetTop + 'px';
+        
+        setTimeout(() => {
+          if (dragTarget) dragTarget.classList.remove('snap');
+          dragTarget = null;
+        }, 300);
+      } else {
+        dragTarget = null;
+      }
+    }
+
+    document.addEventListener('mousedown', startDrag);
+    document.addEventListener('mousemove', moveDrag);
+    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('touchstart', startDrag, { passive: false });
+    document.addEventListener('touchmove', moveDrag, { passive: false });
+    document.addEventListener('touchend', endDrag);
+
+    // --- СВАП ВИДЕО (Клик по маленькому окну) ---
+    function handleWrapperClick(e) {
+      const wrapper = e.currentTarget;
+      if (!wrapper.classList.contains('is-floating')) return;
+      if (hasMoved) return; 
+
+      const rect = wrapper.getBoundingClientRect();
+      const savedLeft = rect.left + 'px';
+      const savedTop = rect.top + 'px';
+
+      isSwapped = !isSwapped;
+      
+      if (isSwapped) {
+        localWrapper.className = 'video-wrapper is-full';
+        remoteWrapper.className = 'video-wrapper is-floating';
+        remoteWrapper.style.zIndex = '10';
+        localWrapper.style.zIndex = '1';
+        resetStyles(localWrapper);
+        applyStyles(remoteWrapper, savedLeft, savedTop);
+      } else {
+        localWrapper.className = 'video-wrapper is-floating';
+        remoteWrapper.className = 'video-wrapper is-full';
+        localWrapper.style.zIndex = '10';
+        remoteWrapper.style.zIndex = '1';
+        resetStyles(remoteWrapper);
+        applyStyles(localWrapper, savedLeft, savedTop);
+      }
+    }
+
+    function resetStyles(el) { el.style.left = ''; el.style.top = ''; el.style.bottom = ''; el.style.right = ''; }
+    function applyStyles(el, left, top) {
+      if (left && top) {
+        el.style.left = left; el.style.top = top; el.style.bottom = 'auto'; el.style.right = 'auto';
+      }
+    }
+
+    localWrapper.addEventListener('click', handleWrapperClick);
+    remoteWrapper.addEventListener('click', handleWrapperClick);
+
+    window.addEventListener('load', init);
+  </script>
+</body>
+</html>
