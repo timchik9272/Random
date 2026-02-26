@@ -7,8 +7,6 @@
   
   <!-- Подключаем LiveKit Client SDK -->
   <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
-  <!-- Библиотека для создания JWT токенов в браузере (для теста) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsrsasign/10.5.27/jsrsasign.min.js"></script>
   
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <style>
@@ -116,6 +114,7 @@
       cursor: grabbing;
     }
 
+    /* Анимация прилипания (работает только если ENABLE_SNAP = true) */
     .video-wrapper.is-floating.snap {
       transition: left 0.3s cubic-bezier(0.25, 1, 0.5, 1), top 0.3s cubic-bezier(0.25, 1, 0.5, 1);
     }
@@ -310,7 +309,7 @@
     <div class="top-bar">
       <div class="call-info">
         <h2 id="call-title">Комната: ...</h2>
-        <span id="status" class="status-text">Подключение к LiveKit...</span>
+        <span id="status" class="status-text">Инициализация...</span>
         <div class="network-indicator">
           <div id="net-dot" class="net-dot"></div>
           <span id="net-text">Сеть: Проверка</span>
@@ -331,7 +330,7 @@
     </div>
 
     <div id="end-screen" class="end-screen">
-      <h3>Звонок завершён. Он был совершён с помощью TimLink.</h3>
+      <h3>Звонок завершён.</h3>
       <button class="action-btn btn-restart" onclick="window.location.reload()">
         <i class="fa fa-phone"></i> Позвонить ещё раз
       </button>
@@ -348,11 +347,12 @@
     // ==========================================
     
     // 1. ВКЛ/ОТКЛ ПРИЛИПАНИЕ К УГЛАМ
-    // Поставьте false, чтобы окно свободно летало и не прилипало к краям.
+    // true  -> Окно прилипает к ближайшему углу после перетаскивания.
+    // false -> Окно остается там, где вы его отпустили.
     const ENABLE_SNAP = true; 
 
     // 2. КОНФИГУРАЦИЯ LIVEKIT
-    // ВНИМАНИЕ: Для продакшена НЕ храните секрет здесь! Используйте сервер.
+    // ВНИМАНИЕ: Хранить секрет здесь небезопасно! Это только для теста.
     const LIVEKIT_URL = 'wss://project-g06jwp2m.livekit.cloud';
     const API_KEY = 'APITidKD5VzodX5';
     const API_SECRET = 'qtjTqYleN80fHli0SmaNNNnTfAhedcMa26QMPf8mlAVB'; 
@@ -360,7 +360,72 @@
     const HOME_URL = '/'; 
 
     // ==========================================
-    // ОСНОВНОЙ КОД
+    // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (БЕЗ ВНЕШНИХ БИБЛИОТЕК)
+    // ==========================================
+
+    // Функция для создания JWT токена (вместо KJUR)
+    async function createLiveKitToken(roomName, identity) {
+      const header = { alg: 'HS256', typ: 'JWT' };
+      const now = Math.floor(Date.now() / 1000);
+      
+      const payload = {
+        iss: API_KEY,
+        nbf: now - 10,
+        exp: now + 3600, // Токен на 1 час
+        sub: identity,
+        name: identity,
+        video: {
+          roomJoin: true,
+          room: roomName,
+          canPublish: true,
+          canSubscribe: true,
+          canPublishData: true
+        }
+      };
+
+      // Кодируем Header и Payload в Base64Url
+      const encodedHeader = base64UrlEncode(JSON.stringify(header));
+      const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+      
+      const dataToSign = `${encodedHeader}.${encodedPayload}`;
+      
+      // Создаем подпись с помощью Web Crypto API (нативный браузерный шифр)
+      const signature = await signHMAC(dataToSign, API_SECRET);
+      
+      return `${dataToSign}.${signature}`;
+    }
+
+    function base64UrlEncode(str) {
+      return btoa(str)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    }
+
+    async function signHMAC(data, secret) {
+      const encoder = new TextEncoder();
+      const keyData = encoder.encode(secret);
+      const dataBuffer = encoder.encode(data);
+
+      const key = await crypto.subtle.importKey(
+        'raw',
+        keyData,
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+
+      const signatureBuffer = await crypto.subtle.sign('HMAC', key, dataBuffer);
+      
+      // Конвертируем ArrayBuffer в Base64Url строку
+      return btoa(String.fromCharCode(...new Uint8Array(signatureBuffer)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    }
+
+    // ==========================================
+    // ОСНОВНОЙ КОД ПРИЛОЖЕНИЯ
     // ==========================================
 
     let room = null;
@@ -388,39 +453,9 @@
     const netDot = document.getElementById('net-dot');
     const netText = document.getElementById('net-text');
 
-    // Генератор токенов (JWT) прямо в браузере
-    function createLiveKitToken(roomName, identity) {
-      const header = { alg: 'HS256', typ: 'JWT' };
-      const now = Math.floor(Date.now() / 1000);
-      
-      // Права доступа (Video Grant)
-      const videoGrant = {
-        roomJoin: true,
-        room: roomName,
-        canPublish: true,
-        canSubscribe: true,
-        canPublishData: true
-      };
-
-      const payload = {
-        iss: API_KEY,
-        nbf: now - 10, // действителен с 10 сек назад
-        exp: now + 3600, // действителен 1 час
-        sub: identity, // subject (имя пользователя)
-        name: identity,
-        video: videoGrant
-      };
-
-      return KJUR.jws.JWS.sign("HS256", JSON.stringify(header), JSON.stringify(payload), { utf8: API_SECRET });
-    }
-
     // Обновление UI индикатора сети
-    function updateNetworkQuality(stats) {
-      // LiveKit присылает quality: 'excellent' | 'good' | 'poor' | 'lost'
-      let quality = 'unknown';
-      if (stats && stats.quality) quality = stats.quality;
-
-      netDot.className = 'net-dot'; // сброс классов
+    function updateNetworkQuality(quality) {
+      netDot.className = 'net-dot'; // сброс
       
       switch(quality) {
         case 'excellent':
@@ -453,9 +488,11 @@
       callTitle.innerText = `Комната: ${chatId}`;
       
       try {
-        statusEl.innerText = 'Создание токена...';
+        statusEl.innerText = 'Генерация доступа...';
         const identity = 'user-' + Math.random().toString(36).substring(2, 6);
-        const token = createLiveKitToken(chatId, identity);
+        
+        // Используем нашу новую функцию
+        const token = await createLiveKitToken(chatId, identity);
 
         statusEl.innerText = 'Подключение к серверу...';
         
@@ -465,45 +502,32 @@
           dynacast: true,
         });
 
-        // События комнаты
-        room.on(LivekitClient.RoomEvent.Connected, () => {
-          statusEl.innerText = 'Подключено. Ожидание участников...';
+        // 1. Индикатор качества сети
+        room.on(LivekitClient.RoomEvent.ConnectionQualityChanged, (quality) => {
+          updateNetworkQuality(quality);
         });
 
-        room.on(LivekitClient.RoomEvent.ConnectionQualityChanged, (quality, participant) => {
-          if (participant.isLocal) {
-            updateNetworkQuality({ quality: quality });
-          }
-        });
-
-        // Обработка входящих треков (видео/аудио от других)
+        // 2. Обработка входящих треков
         room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
           statusEl.innerText = 'В эфире';
           
           if (track.kind === 'video') {
-            // Если это скриншер, можно выводить в remote-video
-            const element = track.attach();
-            remoteVideo.srcObject = element.srcObject; 
-            // LiveKit возвращает HTMLVideoElement, но удобнее управлять через srcObject
-            // Корректный способ для LiveKit:
             remoteVideo.srcObject = new MediaStream([track.mediaStreamTrack]);
-            
-            // Если пришел скриншер, можно автоматически переключить вид
+            // Если пришел скриншер, можно переключить вид автоматически (опционально)
             if (publication.source === 'screen_share') {
                statusEl.innerText = 'Демонстрация экрана...';
             }
           } else if (track.kind === 'audio') {
             const audioElement = track.attach();
-            document.body.appendChild(audioElement); // Audio играет фоном
+            document.body.appendChild(audioElement);
           }
         });
         
         room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track) => {
            track.detach().forEach(el => el.remove());
-           // Если отвалилось видео
            if (track.kind === 'video') {
              remoteVideo.srcObject = null;
-             statusEl.innerText = 'Собеседник отключил видео';
+             statusEl.innerText = 'Собеседник вышел';
            }
         });
 
@@ -520,13 +544,13 @@
 
       } catch (err) {
         console.error(err);
-        statusEl.innerText = 'Ошибка подключения: ' + err.message;
+        statusEl.innerText = 'Ошибка: ' + err.message;
       }
     }
 
     async function publishLocalTracks() {
-      // Камера и Микрофон
       try {
+        // Камера и Микрофон
         localVideoTrack = await LivekitClient.createLocalVideoTrack({ facingMode: facingMode });
         localAudioTrack = await LivekitClient.createLocalAudioTrack();
 
@@ -570,17 +594,14 @@
       if (!room) return;
       facingMode = facingMode === 'user' ? 'environment' : 'user';
       
-      // Останавливаем текущий трек
       if (localVideoTrack) {
         localVideoTrack.stop();
         room.localParticipant.unpublishTrack(localVideoTrack);
       }
 
-      // Создаем новый
       localVideoTrack = await LivekitClient.createLocalVideoTrack({ facingMode: facingMode });
       await room.localParticipant.publishTrack(localVideoTrack);
 
-      // Обновляем локальное превью
       localVideo.srcObject = new MediaStream([localVideoTrack.mediaStreamTrack]);
       localVideo.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
     };
@@ -598,13 +619,13 @@
           btn.style.background = 'var(--accent)';
           statusEl.innerText = 'Демонстрация экрана...';
 
-          // Если пользователь прекратил через браузерную кнопку "Стоп"
+          // Обработка кнопки "Стоп" в браузере
           localScreenTrack.on(LivekitClient.TrackEvent.Ended, () => {
              stopScreenShare();
           });
 
         } catch (e) {
-          console.log("Скриншер отменен или ошибка", e);
+          console.log("Скриншер отменен", e);
         }
       } else {
         stopScreenShare();
@@ -634,6 +655,7 @@
 
     document.getElementById('end-call').onclick = endCall;
     document.getElementById('go-home-btn').onclick = () => window.location.href = HOME_URL;
+    
     document.getElementById('fullscreen-toggle').onclick = () => {
       if (!document.fullscreenElement) {
         callRoot.requestFullscreen().catch(err => console.log(err));
@@ -656,8 +678,8 @@
       isDragging = true;
       hasMoved = false;
       
-      // Если прилипание включено, убираем класс snap для ручного таскания
-      if(ENABLE_SNAP) dragTarget.classList.remove('snap');
+      // Убираем класс анимации перед движением
+      dragTarget.classList.remove('snap');
 
       const rect = dragTarget.getBoundingClientRect();
       initialLeft = rect.left;
@@ -702,9 +724,9 @@
       if (!isDragging || !dragTarget) return;
       isDragging = false;
       
-      // Логика прилипания
+      // ЛОГИКА ПРИЛИПАНИЯ (Используем настройку ENABLE_SNAP)
       if (hasMoved && ENABLE_SNAP) {
-        dragTarget.classList.add('snap'); // Добавляем плавность
+        dragTarget.classList.add('snap'); // Включаем плавность
         
         const rect = dragTarget.getBoundingClientRect();
         const winW = window.innerWidth;
@@ -717,6 +739,7 @@
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
         
+        // Вычисляем, к какому краю ближе
         let targetLeft = centerX < winW / 2 ? paddingX : winW - rect.width - paddingX;
         let targetTop = centerY < winH / 2 ? paddingY : winH - rect.height - bottomPaddingY; 
         
