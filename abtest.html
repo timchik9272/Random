@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A/B Тест Иконок - Яндекс Игры</title>
+    <style>
+        :root {
+            --bg-color: #1a1a20;
+            --card-bg: #2b2b36;
+            --text-color: #ffffff;
+            --text-muted: #8c8c9a;
+            --accent: #ffcc00; /* Желтый цвет Яндекса */
+            --border-radius: 16px;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .header {
+            background-color: #111115;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #333;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .admin-panel {
+            background-color: var(--card-bg);
+            padding: 20px;
+            margin: 20px;
+            border-radius: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .admin-panel input {
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: #1a1a20;
+            color: #fff;
+            flex-grow: 1;
+            min-width: 200px;
+        }
+
+        .admin-panel button {
+            padding: 10px 20px;
+            background-color: var(--accent);
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .admin-panel button:hover {
+            opacity: 0.8;
+        }
+
+        .catalog-container {
+            padding: 0 20px 40px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-title {
+            font-size: 24px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        /* Сетка для ПК по умолчанию */
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 20px;
+        }
+
+        .game-card {
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            transition: transform 0.2s;
+            position: relative;
+        }
+
+        .game-card:hover {
+            transform: scale(1.03);
+        }
+
+        .game-icon {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            border-radius: var(--border-radius);
+            object-fit: cover;
+            background-color: #333;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .game-title {
+            margin-top: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .game-category {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Выбранная карточка */
+        .game-card.selected .game-icon {
+            border: 4px solid var(--accent);
+            box-sizing: border-box;
+        }
+        
+        .winner-badge {
+            display: none;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--accent);
+            color: #000;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .game-card.selected .winner-badge {
+            display: block;
+        }
+
+        /* Адаптивность для мобильных устройств */
+        @media (max-width: 600px) {
+            .games-grid {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+                gap: 12px;
+            }
+            .game-icon {
+                border-radius: 12px; /* Чуть меньше скругление на мобилках */
+            }
+            .game-title {
+                font-size: 13px;
+            }
+            .admin-panel {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .admin-panel input, .admin-panel button {
+                width: 100%;
+                box-sizing: border-box;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Яндекс Игры - Тест</h1>
+    </div>
+
+    <div class="admin-panel">
+        <input type="text" id="imgUrl" placeholder="URL картинки (оставь пустым для цвета)">
+        <input type="text" id="gameTitle" placeholder="Название игры" value="Блок на блок">
+        <button onclick="addGame()">Добавить вариант</button>
+        <button onclick="resetSelection()" style="background-color: #444; color: white;">Сбросить выбор</button>
+    </div>
+
+    <div class="catalog-container">
+        <div class="section-title">Новые игры</div>
+        <div class="games-grid" id="gamesGrid">
+            </div>
+    </div>
+
+    <script>
+        // Стартовый набор карточек
+        let games = [
+            { id: 1, title: 'Блок на блок', img: 'https://via.placeholder.com/160/FFD700/000000?text=A' },
+            { id: 2, title: 'Блок на блок: Классика', img: 'https://via.placeholder.com/160/FF8C00/ffffff?text=B' },
+            { id: 3, title: 'Лесоруб 3D', img: 'https://via.placeholder.com/160/228B22/ffffff?text=C' },
+            { id: 4, title: 'Гонки на выживание', img: 'https://via.placeholder.com/160/8B0000/ffffff?text=D' }
+        ];
+
+        const grid = document.getElementById('gamesGrid');
+
+        function renderGames() {
+            grid.innerHTML = '';
+            games.forEach(game => {
+                const card = document.createElement('div');
+                card.className = 'game-card';
+                card.onclick = () => selectGame(card);
+                
+                // Если нет картинки, генерируем случайный цветной квадрат для теста
+                const imgSrc = game.img || `https://via.placeholder.com/160/${Math.floor(Math.random()*16777215).toString(16)}/ffffff?text=Test`;
+
+                card.innerHTML = `
+                    <img src="${imgSrc}" class="game-icon" alt="Иконка">
+                    <div class="winner-badge">ВЫБОР!</div>
+                    <div class="game-title">${game.title}</div>
+                    <div class="game-category">Головоломки</div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function addGame() {
+            const urlInput = document.getElementById('imgUrl').value;
+            const titleInput = document.getElementById('gameTitle').value || 'Без названия';
+            
+            games.push({
+                id: Date.now(),
+                title: titleInput,
+                img: urlInput
+            });
+            
+            renderGames();
+            document.getElementById('imgUrl').value = ''; // очищаем поле url
+        }
+
+        function selectGame(selectedCard) {
+            // Убираем выделение со всех
+            const allCards = document.querySelectorAll('.game-card');
+            allCards.forEach(card => card.classList.remove('selected'));
+            
+            // Выделяем нажатую
+            selectedCard.classList.add('selected');
+            
+            // Можно добавить логику отправки результатов, например, в Telegram
+            console.log("Пользователь выбрал:", selectedCard.querySelector('.game-title').innerText);
+        }
+
+        function resetSelection() {
+            const allCards = document.querySelectorAll('.game-card');
+            allCards.forEach(card => card.classList.remove('selected'));
+        }
+
+        // Первичный рендер при загрузке страницы
+        renderGames();
+    </script>
+</body>
+</html>
