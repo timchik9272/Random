@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Генератор Стикерпаков (Pro)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --text-color: #f8fafc;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --error: #ef4444;
+            --success: #22c55e;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: var(--panel-bg);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        h1 { margin-top: 0; text-align: center; color: var(--text-color); }
+        .auth-box {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid var(--accent);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .auth-box a { color: var(--accent); text-decoration: none; }
+        .auth-box a:hover { text-decoration: underline; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; }
+        input[type="text"], input[type="password"], input[type="number"], select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: #0f172a;
+            color: #fff;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            margin-top: 10px;
+        }
+        button:hover { background-color: var(--accent-hover); }
+        button:disabled { background-color: var(--border); cursor: not-allowed; opacity: 0.7; }
+        
+        #downloadBtn { background-color: var(--success); display: none; }
+        #downloadBtn:hover { background-color: #16a34a; }
+
+        .log-container {
+            margin-top: 20px;
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px;
+        }
+        .log-header {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 5px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 5px;
+        }
+        #logArea {
+            height: 180px;
+            overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 13px;
+            color: #e2e8f0;
+        }
+        .log-line { margin: 2px 0; }
+        .log-error { color: var(--error); font-weight: bold; }
+        .log-success { color: var(--success); }
+        .log-warn { color: #f59e0b; }
+        
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .gallery img {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            object-fit: contain;
+            background: #fff;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border: 2px solid transparent;
+            transition: border-color 0.3s;
+        }
+        .gallery img:hover { border-color: var(--accent); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Генератор Стикерпаков 🎨</h1>
+    
+    <div class="auth-box">
+        <label for="apiKey">API Ключ Pollinations (Обязательно):</label>
+        <input type="password" id="apiKey" placeholder="pk_... или sk_...">
+        <div style="font-size: 12px; margin-top: 5px; color: #cbd5e1;">
+            Получить бесплатный ключ можно здесь: <a href="https://enter.pollinations.ai" target="_blank">enter.pollinations.ai</a>
+        </div>
+    </div>
+    
+    <div class="form-group">
+        <label for="packName">Тема стикерпака:</label>
+        <input type="text" id="packName" placeholder="Например: Забавные коты-программисты" value="Киберпанк коты">
+    </div>
+    
+    <div class="form-group">
+        <label for="packStyle">Стиль отрисовки:</label>
+        <select id="packStyle">
+            <option value="vector flat design, telegram sticker style, clean lines, white border">Плоский вектор (Telegram стиль)</option>
+            <option value="detailed 3D render, claymation style, cute, white outline">Милый 3D (Глина)</option>
+            <option value="pixel art, 8-bit, crisp, solid white background">Пиксель-арт</option>
+            <option value="anime style, vibrant colors, clear outlines, white background">Аниме стиль</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="modelSelect">Модель генерации (Только бесплатные):</label>
+        <select id="modelSelect">
+            <option value="flux">Flux Schnell (Быстрая, высокое качество)</option>
+            <option value="zimage">Z-Image Turbo (Быстрая, апскейл)</option>
+            <option value="gptimage">GPT Image 1 Mini (OpenAI, базовая)</option>
+            <option value="imagen-4">Imagen 4 (Google, реализм/детали)</option>
+            <option value="dirtberry">Dirtberry (Быстрая генерация)</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="stickerCount">Количество стикеров:</label>
+        <input type="number" id="stickerCount" min="1" max="20" value="3">
+    </div>
+
+    <button id="generateBtn" onclick="startProcess()">Сгенерировать стикерпак</button>
+    <button id="downloadBtn" onclick="downloadZip()">Скачать всё успешное (ZIP)</button>
+
+    <div class="log-container">
+        <div class="log-header">Логи системы / Ошибки</div>
+        <div id="logArea">
+            <div class="log-line">Ожидание запуска...</div>
+        </div>
+    </div>
+    
+    <div class="gallery" id="gallery"></div>
+</div>
+
+<script>
+    let generatedBlobs = [];
+    const logArea = document.getElementById('logArea');
+    const gallery = document.getElementById('gallery');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const generateBtn = document.getElementById('generateBtn');
+
+    // Функция для вывода логов в интерфейс
+    function log(message, type = 'info') {
+        const div = document.createElement('div');
+        div.className = 'log-line';
+        const time = new Date().toLocaleTimeString();
+        div.textContent = `[${time}] ${message}`;
+        
+        if (type === 'error') div.classList.add('log-error');
+        else if (type === 'success') div.classList.add('log-success');
+        else if (type === 'warn') div.classList.add('log-warn');
+        
+        logArea.appendChild(div);
+        logArea.scrollTop = logArea.scrollHeight;
+    }
+
+    async function startProcess() {
+        const apiKey = document.getElementById('apiKey').value.trim();
+        const packName = document.getElementById('packName').value.trim();
+        const packStyle = document.getElementById('packStyle').value;
+        const model = document.getElementById('modelSelect').value;
+        const count = parseInt(document.getElementById('stickerCount').value);
+
+        if (!apiKey) {
+            log('ОШИБКА: Не введен API ключ! Получите его на enter.pollinations.ai', 'error');
+            return;
+        }
+        if (!packName) {
+            log('ОШИБКА: Введите тему стикерпака!', 'error');
+            return;
+        }
+
+        // Сброс интерфейса перед новой генерацией
+        generatedBlobs = [];
+        gallery.innerHTML = '';
+        logArea.innerHTML = '';
+        downloadBtn.style.display = 'none';
+        generateBtn.disabled = true;
+
+        log(`Инициализация генерации "${packName}"...`, 'info');
+        
+        try {
+            // ШАГ 1: Генерация идей с помощью бесплатной текстовой модели (openai gpt-5 mini)
+            log('Запрашиваю идеи у текстового ИИ (модель: openai)...', 'info');
+            
+            const textResponse = await fetch('https://gen.pollinations.ai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'openai', 
+                    messages: [
+                        { role: 'system', content: 'You are a sticker designer. Respond ONLY with a numbered list of short, descriptive English prompts for stickers. No yapping, no markdown.' },
+                        { role: 'user', content: `Generate exactly ${count} distinct visual descriptions for stickers based on the theme: "${packName}".` }
+                    ],
+                    temperature: 0.7
+                })
+            });
+
+            if (!textResponse.ok) {
+                const errData = await textResponse.json();
+                throw new Error(`Ошибка API (Текст): ${errData.error?.message || textResponse.status}`);
+            }
+            
+            const textData = await textResponse.json();
+            const rawIdeas = textData.choices[0].message.content;
+            
+            // Парсим идеи (вытаскиваем строки, начинающиеся с цифр)
+            const ideas = rawIdeas.split('\n')
+                .filter(line => /^\d+[\.\)]/.test(line.trim()))
+                .map(line => line.replace(/^\d+[\.\)]\s*/, '').trim())
+                .slice(0, count);
+
+            if (ideas.length === 0) {
+                throw new Error('ИИ не вернул идеи в виде нумерованного списка. Попробуйте еще раз.');
+            }
+
+            log(`Успешно получено идей: ${ideas.length}`, 'success');
+
+            // ШАГ 2: Генерация картинок по полученным идеям
+            for (let i = 0; i < ideas.length; i++) {
+                const idea = ideas[i];
+                log(`[${i+1}/${ideas.length}] Рисуем: ${idea}`, 'info');
+                
+                // Формируем финальный промпт
+                const imagePrompt = `${idea}, sticker on solid white background, die-cut sticker, ${packStyle}`;
+                const seed = Math.floor(Math.random() * 9999999);
+                
+                // Используем GET запрос, ключ передаем параметром ?key=
+                const imageUrl = `https://gen.pollinations.ai/image/${encodeURIComponent(imagePrompt)}?model=${model}&key=${apiKey}&seed=${seed}&nologo=true`;
+
+                try {
+                    const imgResponse = await fetch(imageUrl);
+                    
+                    if (!imgResponse.ok) {
+                        // Пытаемся прочитать JSON с ошибкой
+                        let errMsg = imgResponse.status;
+                        try {
+                            const errJson = await imgResponse.json();
+                            if (errJson.error) errMsg = errJson.error.message;
+                        } catch(e) {}
+                        throw new Error(errMsg);
+                    }
+                    
+                    const blob = await imgResponse.blob();
+                    
+                    // Сохраняем успешный результат
+                    const fileName = `sticker_${i+1}.png`;
+                    generatedBlobs.push({ name: fileName, blob: blob });
+                    
+                    // Выводим в галерею
+                    const imgUrl = URL.createObjectURL(blob);
+                    const imgElement = document.createElement('img');
+                    imgElement.src = imgUrl;
+                    imgElement.title = idea; // При наведении будет виден промпт
+                    gallery.appendChild(imgElement);
+                    
+                    log(`Стикер ${i+1} успешно отрисован!`, 'success');
+                } catch (imgError) {
+                    // Если конкретный стикер упал с ошибкой - логируем, но цикл НЕ прерываем
+                    log(`ОШИБКА генерации стикера ${i+1}: ${imgError.message}`, 'error');
+                    log(`Пропускаем стикер ${i+1}, идем дальше...`, 'warn');
+                }
+            }
+
+            // ШАГ 3: Завершение и итоги
+            if (generatedBlobs.length > 0) {
+                downloadBtn.style.display = 'block';
+                if (generatedBlobs.length === count) {
+                    log('🎉 Все стикеры успешно сгенерированы!', 'success');
+                } else {
+                    log(`⚠️ Процесс завершен, но с ошибками. Готово: ${generatedBlobs.length} из ${count}. Вы можете скачать то, что получилось.`, 'warn');
+                }
+            } else {
+                log('❌ Ни один стикер не сгенерировался. Проверьте баланс ключа или попробуйте другую модель.', 'error');
+            }
+
+        } catch (error) {
+            log(`КРИТИЧЕСКАЯ ОШИБКА: ${error.message}`, 'error');
+            if (generatedBlobs.length > 0) {
+                downloadBtn.style.display = 'block';
+                log('Процесс прерван, но вы можете скачать уже готовые стикеры.', 'warn');
+            }
+        } finally {
+            generateBtn.disabled = false;
+        }
+    }
+
+    async function downloadZip() {
+        if (generatedBlobs.length === 0) return;
+        
+        log('Упаковываем файлы в ZIP-архив...', 'info');
+        const zip = new JSZip();
+        
+        generatedBlobs.forEach(item => {
+            zip.file(item.name, item.blob);
+        });
+        
+        try {
+            const content = await zip.generateAsync({ type: "blob" });
+            saveAs(content, "ai_stickerpack.zip");
+            log('✅ Архив успешно скачан!', 'success');
+        } catch (error) {
+            log(`Ошибка при создании архива: ${error.message}`, 'error');
+        }
+    }
+</script>
+</body>
+</html>
