@@ -2,494 +2,326 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Эволюция 2.0: Лазер + Колени</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Evolution: Laser Survival</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <style>
-        body { margin: 0; padding: 0; overflow: hidden; background: #111; color: #fff; font-family: 'Segoe UI', sans-serif; touch-action: none; }
+        body { margin: 0; overflow: hidden; background: #0a0a0a; color: #eee; font-family: sans-serif; }
         #ui { 
-            position: absolute; top: 10px; left: 10px; z-index: 10; 
-            background: rgba(0, 0, 0, 0.8); padding: 15px; 
-            border-radius: 12px; border: 1px solid #444;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
-            max-width: 320px; display: flex; flex-direction: column; gap: 10px;
-            backdrop-filter: blur(8px);
-            font-size: 14px;
+            position: absolute; top: 10px; left: 10px; z-index: 100; 
+            background: rgba(0,0,0,0.85); padding: 12px; border-radius: 10px;
+            border: 1px solid #444; width: 280px; font-size: 13px;
+            max-height: 95vh; overflow-y: auto;
         }
-        h2 { margin: 0 0 8px 0; font-size: 18px; color: #4CAF50; text-transform: uppercase; letter-spacing: 1px; }
-        p { margin: 0; display: flex; justify-content: space-between; align-items: center; }
-        span { font-weight: bold; color: #FFC107; }
-        .control-group { margin-top: 12px; border-top: 1px solid #555; padding-top: 12px; }
-        label { font-size: 14px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
-        input[type="range"] { width: 100%; margin-top: 4px; cursor: pointer; accent-color: #4CAF50; }
+        .row { display: flex; justify-content: space-between; margin-bottom: 5px; align-items: center; }
+        .accent { color: #00ff00; font-weight: bold; }
+        .laser-accent { color: #ff0044; font-weight: bold; }
+        hr { border: 0; border-top: 1px solid #333; margin: 10px 0; }
         button { 
-            background: #2196F3; color: white; border: none; padding: 12px; 
-            border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px;
-            margin-top: 6px; transition: all 0.2s;
+            background: #333; color: white; border: 1px solid #555; padding: 5px; 
+            border-radius: 4px; cursor: pointer; width: 100%; margin: 2px 0;
         }
-        button:hover { background: #1976D2; transform: scale(1.03); }
-        #btnTrack { background: #FF9800; }
-        .status-badge { 
-            display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: bold;
-        }
-        .mode-train { background: #4CAF50; color: #000; }
-        .mode-replay { background: #E91E63; color: #fff; }
-        #loadFile { display: none; }
+        button:hover { background: #444; }
+        input[type="range"] { width: 100%; }
+        .btn-group { display: flex; gap: 5px; }
     </style>
 </head>
 <body>
-    <div id="ui">
-        <h2>ЭВОЛЮЦИЯ 2.0</h2>
-        <p>Режим: <div id="modeBadge" class="status-badge mode-train">ОБУЧЕНИЕ</div></p>
-        <p>Поколение: <span id="gen">1</span></p>
-        <p>Время: <span id="time">0</span> / 400</p>
-        <p>Лучший результат: <span id="best">0</span> м</p>
-        
-        <div class="control-group">
-            <label>Ускорение: <span id="speedVal">1x</span></label>
-            <input type="range" id="speedSlider" min="1" max="40" value="1" step="1">
-            
-            <label style="margin-top: 8px;">
-                <input type="checkbox" id="replayToggle" checked>
-                Показывать лучшего в конце
-            </label>
-            
-            <label>
-                <input type="checkbox" id="laserToggle">
-                Режим лазера (убегай!)
-            </label>
-            <label id="laserSpeedLabel" style="display:none;">Скорость лазера: <span id="laserSpeedVal">1.5</span></label>
-            <input type="range" id="laserSpeedSlider" min="0.1" max="5" step="0.1" value="1.5" style="display:none;">
-            
-            <button id="btnTrack">Следить за лидером</button>
-        </div>
 
-        <div class="control-group">
-            <button id="saveModel">💾 Скачать лучшую модель</button>
-            <button id="loadModelBtn">📤 Загрузить модель</button>
-            <button id="replayBest">🔄 Просмотреть лучший забег</button>
-        </div>
+<div id="ui">
+    <b style="font-size: 16px;">AI Survivor v3.0</b>
+    <div class="row"><span>Поколение:</span> <span id="gen" class="accent">1</span></div>
+    <div class="row"><span>Лучший (сейчас):</span> <span id="bestCur" class="accent">0</span>м</div>
+    <div class="row"><span>Рекорд (всегда):</span> <span id="bestEver" class="accent">0</span>м</div>
+    <div class="row"><span>Время:</span> <span id="time">0</span>/600</div>
+    
+    <hr>
+    <label>Ускорение: <b id="speedTxt">1x</b></label>
+    <input type="range" id="speedRange" min="1" max="40" value="1">
+
+    <label>Скорость Лазера: <b id="laserTxt">1.5</b></label>
+    <input type="range" id="laserRange" min="0" max="10" step="0.1" value="1.5">
+
+    <hr>
+    <div class="row">
+        <label><input type="checkbox" id="showReplay" checked> Повтор лучшего</label>
     </div>
+    
+    <button id="btnTrack">Следить за лидером</button>
+    
+    <hr>
+    <b>Модель:</b>
+    <div class="btn-group">
+        <button onclick="saveModel()">💾 Сохранить</button>
+        <button onclick="document.getElementById('fileIn').click()">📂 Загрузить</button>
+    </div>
+    <input type="file" id="fileIn" style="display:none" onchange="loadModel(event)">
+    <button onclick="playHallOfFame()" style="background:#442266">🏆 Запуск Рекордсмена</button>
+</div>
 
-    <input type="file" id="loadFile" accept=".json">
+<script>
+const { Engine, Render, Runner, Bodies, Body, Composite, Constraint, Events } = Matter;
 
-    <script>
-        // Инициализация Matter.js
-        const Engine = Matter.Engine, Render = Matter.Render, 
-              Bodies = Matter.Bodies, Body = Matter.Body, 
-              Composite = Matter.Composite, Constraint = Matter.Constraint,
-              Events = Matter.Events;
+// Конфигурация
+const CONFIG = {
+    popSize: 25,
+    lifespan: 600,
+    startX: 400,
+    groundY: 600,
+    laserStart: 0
+};
 
-        const engine = Engine.create();
-        const world = engine.world;
+// Физические категории для коллизий
+const CAT_GROUND = 0x0001;
+const CAT_L_LEG = 0x0002;
+const CAT_R_LEG = 0x0004;
+const CAT_TORSO = 0x0008;
 
-        const render = Render.create({
-            element: document.body,
-            engine: engine,
-            options: {
-                width: window.innerWidth,
-                height: window.innerHeight,
-                wireframes: false,
-                background: '#111',
-                hasBounds: true
-            }
+const engine = Engine.create();
+const world = engine.world;
+const render = Render.create({
+    element: document.body,
+    engine: engine,
+    options: { width: window.innerWidth, height: window.innerHeight, wireframes: false, background: '#050505' }
+});
+Render.run(render);
+
+// Земля
+const ground = Bodies.rectangle(50000, CONFIG.groundY + 25, 100000, 50, { 
+    isStatic: true, friction: 1, collisionFilter: { category: CAT_GROUND }, render: { fillStyle: '#222' } 
+});
+Composite.add(world, ground);
+
+let creatures = [];
+let generation = 1;
+let frameCount = 0;
+let bestDnaEver = null;
+let bestDistEver = 0;
+let laserX = CONFIG.laserStart;
+let isReplay = false;
+let autoTrack = true;
+
+class Creature {
+    constructor(x, y, dna, isChampion = false) {
+        // ДНК: 40 весов (сложнее нейросеть для коленей и баланса)
+        this.dna = dna || Array.from({length: 40}, () => (Math.random() - 0.5) * 2);
+        this.alive = true;
+        this.score = 0;
+
+        const group = Body.nextGroup(true);
+        const common = { friction: 0.9, density: 0.01 };
+
+        // Торс (шире для крепления ног)
+        this.torso = Bodies.rectangle(x, y, 45, 20, { 
+            ...common, 
+            collisionFilter: { category: CAT_TORSO },
+            render: { fillStyle: isChampion ? '#FFD700' : '#E91E63' } 
         });
 
-        Render.run(render);
+        // Левая нога
+        this.thighL = Bodies.rectangle(x - 15, y + 25, 12, 35, { 
+            ...common, collisionFilter: { category: CAT_L_LEG, mask: CAT_GROUND | CAT_R_LEG | CAT_TORSO } 
+        });
+        this.calfL = Bodies.rectangle(x - 15, y + 60, 10, 35, { 
+            ...common, collisionFilter: { category: CAT_L_LEG, mask: CAT_GROUND | CAT_R_LEG | CAT_TORSO } 
+        });
 
-        // Константы
-        const GROUND_CAT = 0x0001;
-        const LASER_CAT = 0x80000000;
-        let creatureCatCounter = 0;
+        // Правая нога
+        this.thighR = Bodies.rectangle(x + 15, y + 25, 12, 35, { 
+            ...common, collisionFilter: { category: CAT_R_LEG, mask: CAT_GROUND | CAT_L_LEG | CAT_TORSO } 
+        });
+        this.calfR = Bodies.rectangle(x + 15, y + 60, 10, 35, { 
+            ...common, collisionFilter: { category: CAT_R_LEG, mask: CAT_GROUND | CAT_L_LEG | CAT_TORSO } 
+        });
 
-        const POP_SIZE = 30;
-        const LIFESPAN = 400;
-        const START_X = 500;
+        // Соединения
+        this.junts = [
+            Constraint.create({ bodyA: this.torso, pointA: {x:-15, y:0}, bodyB: this.thighL, pointB: {x:0, y:-15}, stiffness: 0.8, length:0 }),
+            Constraint.create({ bodyA: this.thighL, pointA: {x:0, y:15}, bodyB: this.calfL, pointB: {x:0, y:-15}, stiffness: 0.8, length:0 }),
+            Constraint.create({ bodyA: this.torso, pointA: {x:15, y:0}, bodyB: this.thighR, pointB: {x:0, y:-15}, stiffness: 0.8, length:0 }),
+            Constraint.create({ bodyA: this.thighR, pointA: {x:0, y:15}, bodyB: this.calfR, pointB: {x:0, y:-15}, stiffness: 0.8, length:0 })
+        ];
 
-        let frameCount = 0;
-        let generation = 1;
-        let bestScoreGlobal = 0;
-        let globalBestDna = null;
-        let globalBestScore = 0;
+        this.parts = [this.torso, this.thighL, this.calfL, this.thighR, this.calfR];
+        this.composite = Composite.create();
+        Composite.add(this.composite, [...this.parts, ...this.junts]);
+        Composite.add(world, this.composite);
+    }
 
-        let creatures = [];
-        let nextGenDna = [];
+    update() {
+        if (!this.alive) return;
 
-        let speedMultiplier = 1;
-        let isReplayMode = false;
-        let bestDnaFromGen = null;
-        let autoTrack = true;
+        // Входы: углы, угловые скорости и синус времени
+        const inputs = [
+            this.torso.angle, this.torso.angularVelocity,
+            this.thighL.angle, this.calfL.angle,
+            this.thighR.angle, this.calfR.angle,
+            Math.sin(frameCount * 0.1), 1 // Bias
+        ];
 
-        let laserMode = false;
-        let laserVel = 1.5;
-        let laser = null;
-
-        function tanh(x) { return Math.tanh(x); }
-
-        class Creature {
-            constructor(x, y, dna, isChampion = false, category = 0x0002) {
-                this.dna = dna || Array.from({length: 24}, () => (Math.random() - 0.5) * 2);
-                this.score = 0;
-                this.hitByLaser = false;
-                this.bodies = [];
-
-                const collisionProps = {
-                    collisionFilter: {
-                        group: 0,
-                        category: category,
-                        mask: GROUND_CAT | category | LASER_CAT
-                    },
-                    friction: 0.8,
-                    density: 0.02
-                };
-
-                let colorTorso = isChampion ? '#FFD700' : (dna ? '#4CAF50' : '#E91E63');
-
-                // Ноги выходят из разных точек туловища (±10 px)
-                this.torso = Bodies.rectangle(x, y, 20, 50, { ...collisionProps, render: { fillStyle: colorTorso } });
-                this.thighL = Bodies.rectangle(x - 8, y + 35, 12, 30, { ...collisionProps, render: { fillStyle: '#2196F3' } });
-                this.calfL = Bodies.rectangle(x - 8, y + 65, 10, 30, { ...collisionProps, render: { fillStyle: '#1976D2' } });
-                this.thighR = Bodies.rectangle(x + 8, y + 35, 12, 30, { ...collisionProps, render: { fillStyle: '#FF9800' } });
-                this.calfR = Bodies.rectangle(x + 8, y + 65, 10, 30, { ...collisionProps, render: { fillStyle: '#F57C00' } });
-
-                this.bodies = [this.torso, this.thighL, this.calfL, this.thighR, this.calfR];
-
-                // Суставы с разными точками крепления
-                this.hipL = Constraint.create({
-                    bodyA: this.torso, pointA: { x: -10, y: 20 },
-                    bodyB: this.thighL, pointB: { x: 0, y: -12 },
-                    stiffness: 1, length: 0
-                });
-                this.kneeL = Constraint.create({
-                    bodyA: this.thighL, pointA: { x: 0, y: 12 },
-                    bodyB: this.calfL, pointB: { x: 0, y: -12 },
-                    stiffness: 1, length: 0
-                });
-
-                this.hipR = Constraint.create({
-                    bodyA: this.torso, pointA: { x: 10, y: 20 },
-                    bodyB: this.thighR, pointB: { x: 0, y: -12 },
-                    stiffness: 1, length: 0
-                });
-                this.kneeR = Constraint.create({
-                    bodyA: this.thighR, pointA: { x: 0, y: 12 },
-                    bodyB: this.calfR, pointB: { x: 0, y: -12 },
-                    stiffness: 1, length: 0
-                });
-
-                this.composite = Composite.create();
-                Composite.add(this.composite, [
-                    this.torso, this.thighL, this.calfL, this.thighR, this.calfR,
-                    this.hipL, this.kneeL, this.hipR, this.kneeR
-                ]);
-                Composite.add(world, this.composite);
+        // Нейросеть (4 мышцы)
+        const outputs = [0, 0, 0, 0];
+        for(let i=0; i<4; i++) {
+            for(let j=0; j<8; j++) {
+                outputs[i] += inputs[j] * this.dna[i*8 + j];
             }
-
-            update() {
-                if (this.hitByLaser) {
-                    this.score = this.torso.position.x - START_X;
-                    return;
-                }
-
-                let inputs = [
-                    this.torso.angle, this.thighL.angle, this.calfL.angle,
-                    this.thighR.angle, this.calfR.angle, Math.sin(frameCount * 0.1)
-                ];
-
-                let outputs = [0, 0, 0, 0];
-                for (let i = 0; i < 4; i++) {
-                    for (let j = 0; j < 6; j++) {
-                        outputs[i] += inputs[j] * this.dna[i * 6 + j];
-                    }
-                    outputs[i] = tanh(outputs[i]) * 0.08;
-                }
-
-                this.thighL.torque = outputs[0]; this.torso.torque -= outputs[0];
-                this.calfL.torque = outputs[1]; this.thighL.torque -= outputs[1];
-                this.thighR.torque = outputs[2]; this.torso.torque -= outputs[2];
-                this.calfR.torque = outputs[3]; this.thighR.torque -= outputs[3];
-
-                this.score = this.torso.position.x - START_X;
-            }
-
-            destroy() {
-                Composite.remove(world, this.composite);
-            }
+            outputs[i] = Math.tanh(outputs[i]) * 0.2; // Мощность
         }
 
-        function clearWorld() {
-            creatures.forEach(c => c.destroy());
-            creatures = [];
+        // Применяем силы
+        this.thighL.torque = outputs[0];
+        this.calfL.torque = outputs[1];
+        this.thighR.torque = outputs[2];
+        this.calfR.torque = outputs[3];
+
+        // Ограничение вращения торса (чтобы не крутились как пропеллер)
+        if (Math.abs(this.torso.angle) > 1.5) this.torso.torque -= this.torso.angle * 0.05;
+
+        this.score = this.torso.position.x - CONFIG.startX;
+
+        // Проверка смерти от лазера
+        if (this.torso.position.x < laserX) {
+            this.die();
         }
+    }
 
-        function spawnPopulation(dnaList) {
-            clearWorld();
-            creatureCatCounter = 0;
-            for (let i = 0; i < POP_SIZE; i++) {
-                const cat = 0x0002 << creatureCatCounter++;
-                creatures.push(new Creature(START_X, ground.position.y - 150, dnaList ? dnaList[i] : null, false, cat));
-            }
-            resetLaserPosition();
-        }
+    die() {
+        this.alive = false;
+        this.parts.forEach(p => p.render.opacity = 0.2);
+    }
 
-        function spawnChampion(dna) {
-            clearWorld();
-            creatureCatCounter = 0;
-            const cat = 0x0002 << creatureCatCounter++;
-            creatures.push(new Creature(START_X, ground.position.y - 150, dna, true, cat));
-            resetLaserPosition();
-        }
+    destroy() {
+        Composite.remove(world, this.composite);
+    }
+}
 
-        function resetLaserPosition() {
-            if (laserMode && laser) {
-                Body.setPosition(laser, { x: START_X - 400, y: ground.position.y - 150 });
-            }
-        }
+function spawn(dnas) {
+    creatures.forEach(c => c.destroy());
+    creatures = [];
+    laserX = CONFIG.laserStart;
+    frameCount = 0;
+    for(let i=0; i<CONFIG.popSize; i++) {
+        creatures.push(new Creature(CONFIG.startX, CONFIG.groundY - 100, dnas ? dnas[i] : null));
+    }
+}
 
-        function calculateEvolution() {
-            creatures.sort((a, b) => b.score - a.score);
-            bestDnaFromGen = [...creatures[0].dna];
-            let bestCurrent = creatures[0].score;
+function evolve() {
+    creatures.sort((a,b) => b.score - a.score);
+    const best = creatures[0];
+    
+    if (best.score > bestDistEver) {
+        bestDistEver = Math.round(best.score);
+        bestDnaEver = [...best.dna];
+        document.getElementById('bestEver').innerText = bestDistEver;
+    }
+    document.getElementById('bestCur').innerText = Math.round(best.score);
 
-            if (bestCurrent > bestScoreGlobal) bestScoreGlobal = Math.round(bestCurrent);
-            document.getElementById('best').innerText = bestScoreGlobal;
+    const nextDnas = [];
+    const parents = creatures.slice(0, 10); // Топ 10 выживших
 
-            if (bestCurrent > globalBestScore) {
-                globalBestScore = bestCurrent;
-                globalBestDna = [...creatures[0].dna];
-            }
+    for(let i=0; i<CONFIG.popSize; i++) {
+        let p = parents[Math.floor(Math.random() * parents.length)].dna;
+        nextDnas.push(p.map(gene => Math.random() < 0.1 ? gene + (Math.random()-0.5)*0.5 : gene));
+    }
+    return nextDnas;
+}
 
-            nextGenDna = [];
-            let elite = creatures.slice(0, Math.ceil(POP_SIZE / 2));
-            for (let i = 0; i < POP_SIZE; i++) {
-                let parent = elite[Math.floor(Math.random() * elite.length)];
-                let childDNA = [...parent.dna];
-                for (let j = 0; j < childDNA.length; j++) {
-                    if (Math.random() < 0.1) childDNA[j] += (Math.random() - 0.5) * 0.8;
-                }
-                nextGenDna.push(childDNA);
-            }
-        }
+// Рендер лазера
+Events.on(render, 'afterRender', () => {
+    const ctx = render.context;
+    const screenLaserX = laserX - render.bounds.min.x;
+    ctx.strokeStyle = '#ff0044';
+    ctx.lineWidth = 5;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = 'red';
+    ctx.beginPath();
+    ctx.moveTo(screenLaserX, 0);
+    ctx.lineTo(screenLaserX, window.innerHeight);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+});
 
-        function stepLogic() {
-            frameCount++;
-            creatures.forEach(c => c.update());
+let nextDnas = null;
+function loop() {
+    const speed = isReplay ? 1 : parseInt(document.getElementById('speedRange').value);
+    const laserStep = parseFloat(document.getElementById('laserRange').value);
+    
+    document.getElementById('speedTxt').innerText = speed + 'x';
+    document.getElementById('laserTxt').innerText = laserStep;
 
-            if (frameCount >= LIFESPAN || (laserMode && creatures.every(c => c.hitByLaser))) {
-                if (!isReplayMode) {
-                    calculateEvolution();
-                    if (document.getElementById('replayToggle').checked) {
-                        isReplayMode = true;
-                        frameCount = 0;
-                        document.getElementById('modeBadge').className = 'status-badge mode-replay';
-                        document.getElementById('modeBadge').innerText = 'ПОВТОР ЧЕМПИОНА';
-                        spawnChampion(bestDnaFromGen);
-                    } else {
-                        startNextGeneration();
-                    }
+    for(let s=0; s<speed; s++) {
+        laserX += laserStep;
+        frameCount++;
+        creatures.forEach(c => c.update());
+        Engine.update(engine, 1000/60);
+
+        if (frameCount >= CONFIG.lifespan) {
+            if (!isReplay) {
+                nextDnas = evolve();
+                if (document.getElementById('showReplay').checked) {
+                    isReplay = true;
+                    spawn([bestDnaEver]); // Показываем лучшего
                 } else {
-                    startNextGeneration();
+                    generation++;
+                    spawn(nextDnas);
                 }
-            }
-        }
-
-        function startNextGeneration() {
-            isReplayMode = false;
-            generation++;
-            frameCount = 0;
-            document.getElementById('gen').innerText = generation;
-            document.getElementById('modeBadge').className = 'status-badge mode-train';
-            document.getElementById('modeBadge').innerText = 'ОБУЧЕНИЕ';
-            spawnPopulation(nextGenDna);
-        }
-
-        // === ЛАЗЕР ===
-        function createLaser() {
-            if (laser) return;
-            laser = Bodies.rectangle(START_X - 400, ground.position.y - 150, 10, 400, {
-                isSensor: true,
-                collisionFilter: { category: LASER_CAT, mask: -1 },
-                render: { fillStyle: 'rgba(255, 50, 50, 0.7)' }
-            });
-            Composite.add(world, laser);
-        }
-
-        function removeLaser() {
-            if (laser) {
-                Composite.remove(world, laser);
-                laser = null;
-            }
-        }
-
-        // Земля
-        const ground = Bodies.rectangle(50000, 800, 100000, 50, { 
-            isStatic: true, 
-            friction: 1, 
-            render: { fillStyle: '#444' },
-            collisionFilter: { category: GROUND_CAT, mask: -1 }
-        });
-        Composite.add(world, ground);
-
-        // Обработка столкновений с лазером
-        Events.on(engine, 'collisionStart', (event) => {
-            if (!laserMode || !laser) return;
-            const pairs = event.pairs;
-            for (let pair of pairs) {
-                const bodyA = pair.bodyA;
-                const bodyB = pair.bodyB;
-                if (bodyA === laser || bodyB === laser) {
-                    const hitBody = bodyA === laser ? bodyB : bodyA;
-                    for (let c of creatures) {
-                        if (c.bodies.includes(hitBody)) {
-                            c.hitByLaser = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-
-        // Камера
-        let isDragging = false;
-        let lastMouseX = 0, lastMouseY = 0;
-
-        function handleDragStart(x, y) {
-            isDragging = true; lastMouseX = x; lastMouseY = y;
-            autoTrack = false; document.getElementById('btnTrack').style.display = 'block';
-        }
-        function handleDragMove(x, y) {
-            if (isDragging) {
-                let dx = x - lastMouseX; let dy = y - lastMouseY;
-                render.bounds.min.x -= dx; render.bounds.max.x -= dx;
-                render.bounds.min.y -= dy; render.bounds.max.y -= dy;
-                lastMouseX = x; lastMouseY = y;
-            }
-        }
-
-        window.addEventListener('mousedown', e => handleDragStart(e.clientX, e.clientY));
-        window.addEventListener('mousemove', e => handleDragMove(e.clientX, e.clientY));
-        window.addEventListener('mouseup', () => isDragging = false);
-        window.addEventListener('touchstart', e => handleDragStart(e.touches[0].clientX, e.touches[0].clientY));
-        window.addEventListener('touchmove', e => handleDragMove(e.touches[0].clientX, e.touches[0].clientY));
-        window.addEventListener('touchend', () => isDragging = false);
-
-        // UI
-        document.getElementById('btnTrack').addEventListener('click', () => {
-            autoTrack = true; document.getElementById('btnTrack').style.display = 'none';
-        });
-
-        document.getElementById('speedSlider').addEventListener('input', (e) => {
-            speedMultiplier = parseInt(e.target.value);
-            document.getElementById('speedVal').innerText = speedMultiplier + 'x';
-        });
-
-        const laserToggle = document.getElementById('laserToggle');
-        const laserSpeedLabel = document.getElementById('laserSpeedLabel');
-        const laserSpeedSlider = document.getElementById('laserSpeedSlider');
-
-        laserToggle.addEventListener('change', () => {
-            laserMode = laserToggle.checked;
-            if (laserMode) {
-                createLaser();
-                laserSpeedLabel.style.display = 'flex';
-                laserSpeedSlider.style.display = 'block';
-                resetLaserPosition();
             } else {
-                removeLaser();
-                laserSpeedLabel.style.display = 'none';
-                laserSpeedSlider.style.display = 'none';
+                isReplay = false;
+                generation++;
+                spawn(nextDnas);
             }
-        });
-
-        laserSpeedSlider.addEventListener('input', (e) => {
-            laserVel = parseFloat(e.target.value);
-            document.getElementById('laserSpeedVal').innerText = laserVel.toFixed(1);
-        });
-
-        document.getElementById('saveModel').addEventListener('click', () => {
-            if (!globalBestDna) return alert('Нет сохранённой лучшей модели');
-            const dataStr = JSON.stringify(globalBestDna);
-            const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-            const link = document.createElement('a');
-            link.href = dataUri;
-            link.download = `best_creature_gen${generation}.json`;
-            link.click();
-        });
-
-        document.getElementById('loadModelBtn').addEventListener('click', () => {
-            document.getElementById('loadFile').click();
-        });
-
-        document.getElementById('loadFile').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                try {
-                    const loadedDna = JSON.parse(ev.target.result);
-                    if (loadedDna.length !== 24) throw new Error();
-                    isReplayMode = true;
-                    frameCount = 0;
-                    document.getElementById('modeBadge').className = 'status-badge mode-replay';
-                    document.getElementById('modeBadge').innerText = 'ЗАГРУЖЕННЫЙ ЧЕМПИОН';
-                    spawnChampion(loadedDna);
-                } catch {
-                    alert('Ошибка: файл должен содержать массив из 24 чисел');
-                }
-            };
-            reader.readAsText(file);
-        });
-
-        document.getElementById('replayBest').addEventListener('click', () => {
-            if (!globalBestDna) return alert('Нет лучшего забега');
-            isReplayMode = true;
-            frameCount = 0;
-            document.getElementById('modeBadge').className = 'status-badge mode-replay';
-            document.getElementById('modeBadge').innerText = 'ЛУЧШИЙ ЗАБЕГ';
-            spawnChampion(globalBestDna);
-        });
-
-        function updateCamera() {
-            if (autoTrack && creatures.length > 0) {
-                let maxPosX = START_X;
-                creatures.forEach(c => {
-                    if (c.torso.position.x > maxPosX) maxPosX = c.torso.position.x;
-                });
-                const w = window.innerWidth;
-                const h = window.innerHeight;
-                render.bounds.min.x += ((maxPosX - w / 3) - render.bounds.min.x) * 0.12;
-                render.bounds.max.x = render.bounds.min.x + w;
-                render.bounds.min.y = ground.position.y - h + 120;
-                render.bounds.max.y = ground.position.y + 120;
-            }
+            break;
         }
+    }
 
-        function physicsLoop() {
-            requestAnimationFrame(physicsLoop);
+    // Камера
+    if (autoTrack && creatures.length > 0) {
+        let leader = creatures.find(c => c.alive) || creatures[0];
+        let targetX = leader.torso.position.x;
+        render.bounds.min.x += (targetX - window.innerWidth/3 - render.bounds.min.x) * 0.1;
+        render.bounds.max.x = render.bounds.min.x + window.innerWidth;
+    }
 
-            const currentSpeed = isReplayMode ? 1 : speedMultiplier;
+    document.getElementById('time').innerText = frameCount;
+    document.getElementById('gen').innerText = generation;
+    requestAnimationFrame(loop);
+}
 
-            if (laserMode && laser) {
-                Body.setVelocity(laser, { x: laserVel, y: 0 });
-            }
+// Управление
+document.getElementById('btnTrack').onclick = () => autoTrack = true;
+window.addEventListener('wheel', () => autoTrack = false);
+window.addEventListener('touchstart', () => autoTrack = false);
 
-            for (let i = 0; i < currentSpeed; i++) {
-                Engine.update(engine, 1000 / 60);
-                stepLogic();
-            }
+function saveModel() {
+    if (!bestDnaEver) return alert("Еще нет рекорда!");
+    const data = JSON.stringify({ dna: bestDnaEver, dist: bestDistEver });
+    const blob = new Blob([data], {type: 'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `best_ai_dna_${bestDistEver}m.json`;
+    a.click();
+}
 
-            document.getElementById('time').innerText = frameCount;
-            updateCamera();
-        }
+function loadModel(e) {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        const data = JSON.parse(ev.target.result);
+        bestDnaEver = data.dna;
+        bestDistEver = data.dist;
+        document.getElementById('bestEver').innerText = bestDistEver;
+        spawn([bestDnaEver]);
+    };
+    reader.readAsText(e.target.files[0]);
+}
 
-        // Запуск
-        spawnPopulation(null);
-        physicsLoop();
+function playHallOfFame() {
+    if (!bestDnaEver) return;
+    isReplay = true;
+    spawn([bestDnaEver]);
+}
 
-        window.addEventListener('resize', () => {
-            render.canvas.width = window.innerWidth;
-            render.canvas.height = window.innerHeight;
-        });
-    </script>
+spawn(null);
+loop();
+</script>
 </body>
 </html>
