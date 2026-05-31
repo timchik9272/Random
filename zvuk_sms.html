@@ -15,7 +15,8 @@
 </head>
 <body>
     <h2>📻 Звуковой модем: SMS и фото через динамик/микрофон</h2>
-    <p>Скорость 100 бит/с, FSK 1200/2200 Гц. Для передачи по рации или любому аудиоканалу.</p>
+    <p>Скорость 100 бит/с, FSK 1200/2200 Гц. Для передачи по рации или любому аудиоканалу.<br>
+    <b>Как использовать:</b> сначала нажмите «Отправить» (появится звук), затем сразу нажмите «Начать запись» и через пару секунд «Остановить».</p>
 
     <div class="section">
         <h3>📤 Передать текст (SMS)</h3>
@@ -46,17 +47,17 @@
             const BITRATE = 100;            // бит/с
             const FREQ_MARK = 1200;         // частота для бита 1
             const FREQ_SPACE = 2200;        // частота для бита 0
-            const PREAMBLE_BITS = 16;       // бит в преамбуле (чередование 1010...)
-            const PREAMBLE_PATTERN = Array.from({length: PREAMBLE_BITS}, (_, i) => i % 2 === 0 ? 1 : 0); // 1,0,1,0...
+            const PREAMBLE_BITS = 32;       // увеличено для надёжности
+            const PREAMBLE_PATTERN = Array.from({length: PREAMBLE_BITS}, (_, i) => i % 2 === 0 ? 1 : 0);
 
             // --- Глобальные переменные ---
             let audioCtx = null;
             let mediaStream = null;
             let scriptProcessor = null;
-            let recordedSamples = [];        // накопленные семплы с микрофона
-            let sampleRate = 0;             // частота дискретизации (установится после AudioContext)
+            let recordedSamples = [];
+            let sampleRate = 0;
             let isRecording = false;
-            let TbSamples = 0;              // число семплов на бит (вычисляется после получения sampleRate)
+            let TbSamples = 0;
 
             // --- Элементы DOM ---
             const textInput = document.getElementById('textInput');
@@ -71,9 +72,8 @@
             const resultDiv = document.getElementById('result');
             const resultImg = document.getElementById('resultImg');
 
-            let pendingImageBytes = null;   // сжатые байты JPEG для отправки
+            let pendingImageBytes = null;
 
-            // --- Инициализация AudioContext ---
             function getAudioContext() {
                 if (!audioCtx) {
                     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -85,7 +85,6 @@
                 return audioCtx;
             }
 
-            // --- Генерация FSK сигнала (фазовая непрерывность) ---
             function generateFskSignal(bitSequence, sampleRate, bitRate) {
                 const totalBits = bitSequence.length;
                 const totalDuration = totalBits / bitRate;
@@ -93,11 +92,9 @@
                 const buffer = new Float32Array(totalSamples);
                 let phase = 0;
                 const dt = 1 / sampleRate;
-                let currentFreq = FREQ_SPACE; // начальная частота (не важно)
-
+                let currentFreq = FREQ_SPACE;
                 let bitIdx = 0;
-                let nextBitTime = 0; // время начала следующего бита
-
+                let nextBitTime = 0;
                 for (let i = 0; i < totalSamples; i++) {
                     const t = i * dt;
                     if (t >= nextBitTime && bitIdx < totalBits) {
@@ -112,38 +109,28 @@
                 return buffer;
             }
 
-            // --- Кодирование сообщения в битовую последовательность ---
             function encodeToBits(dataBytes, typeByte) {
-                // Формат: [len_low len_high type payload... checksum_xor]
-                const payloadLen = 1 + dataBytes.length; // type + data
-                const totalLen = 2 + payloadLen + 1;     // 2 байта длина + payload + checksum
+                const payloadLen = 1 + dataBytes.length;
+                const totalLen = 2 + payloadLen + 1;
                 const packet = new Uint8Array(totalLen);
                 packet[0] = payloadLen & 0xFF;
                 packet[1] = (payloadLen >> 8) & 0xFF;
                 packet[2] = typeByte;
                 packet.set(dataBytes, 3);
-                // контрольная сумма XOR всех предыдущих байт
                 let checksum = 0;
                 for (let i = 0; i < totalLen - 1; i++) checksum ^= packet[i];
                 packet[totalLen - 1] = checksum;
 
-                // Преобразование в битовую последовательность: преамбула + старт/стоповые биты для каждого байта
                 const bits = [];
-                // Преамбула
                 for (const b of PREAMBLE_PATTERN) bits.push(b);
-
-                // Каждый байт: старт-бит (0), 8 бит данных (LSB first), стоп-бит (1)
                 for (const byte of packet) {
                     bits.push(0); // старт
-                    for (let i = 0; i < 8; i++) {
-                        bits.push((byte >> i) & 1);
-                    }
+                    for (let i = 0; i < 8; i++) bits.push((byte >> i) & 1);
                     bits.push(1); // стоп
                 }
                 return bits;
             }
 
-            // --- Проигрывание звука ---
             function playBuffer(floatBuffer, sampleRate) {
                 const ctx = getAudioContext();
                 const audioBuffer = ctx.createBuffer(1, floatBuffer.length, sampleRate);
@@ -154,26 +141,21 @@
                 source.start();
                 statusDiv.textContent = '🔊 Воспроизведение звука...';
                 source.onended = () => {
-                    statusDiv.textContent = '✅ Звук передан.';
+                    statusDiv.textContent = '✅ Звук передан. Можно начинать запись.';
                 };
             }
 
-            // --- Отправка текста ---
             sendTextBtn.addEventListener('click', () => {
                 const text = textInput.value.trim();
-                if (!text) {
-                    statusDiv.textContent = '❌ Введите текст!';
-                    return;
-                }
+                if (!text) { statusDiv.textContent = '❌ Введите текст!'; return; }
                 const encoder = new TextEncoder();
                 const dataBytes = encoder.encode(text);
-                const bits = encodeToBits(dataBytes, 0x00); // type 0x00 = текст
+                const bits = encodeToBits(dataBytes, 0x00);
                 statusDiv.textContent = `📦 Кодирование ${dataBytes.length} байт текста...`;
                 const signal = generateFskSignal(bits, sampleRate, BITRATE);
                 playBuffer(signal, sampleRate);
             });
 
-            // --- Сжатие изображения ---
             imageFile.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -181,10 +163,8 @@
                 reader.onload = function(ev) {
                     const img = new Image();
                     img.onload = function() {
-                        // Рисуем на маленьком canvas для сильного сжатия
                         const canvas = previewCanvas;
                         const ctx = canvas.getContext('2d');
-                        // Очищаем и задаём размер (максимум 32x32, сохраняя пропорции)
                         let w = img.width, h = img.height;
                         const maxDim = 32;
                         if (w > maxDim || h > maxDim) {
@@ -194,9 +174,7 @@
                         canvas.width = w;
                         canvas.height = h;
                         ctx.drawImage(img, 0, 0, w, h);
-                        // Получаем JPEG с очень низким качеством
                         const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.15);
-                        // Преобразуем dataURL в Uint8Array
                         const base64 = jpegDataUrl.split(',')[1];
                         const binaryStr = atob(base64);
                         const bytes = new Uint8Array(binaryStr.length);
@@ -212,29 +190,25 @@
 
             sendImageBtn.addEventListener('click', () => {
                 if (!pendingImageBytes) return;
-                const bits = encodeToBits(pendingImageBytes, 0x01); // type 0x01 = JPEG
+                const bits = encodeToBits(pendingImageBytes, 0x01);
                 statusDiv.textContent = `📦 Кодирование ${pendingImageBytes.length} байт изображения...`;
                 const signal = generateFskSignal(bits, sampleRate, BITRATE);
                 playBuffer(signal, sampleRate);
             });
 
-            // --- Приём: запись с микрофона ---
             async function startRecording() {
                 const ctx = getAudioContext();
                 if (isRecording) return;
                 try {
                     mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
                     const source = ctx.createMediaStreamSource(mediaStream);
-                    // ScriptProcessorNode для захвата данных
                     scriptProcessor = ctx.createScriptProcessor(256, 1, 1);
                     source.connect(scriptProcessor);
-                    scriptProcessor.connect(ctx.destination); // чтобы не глушить звук (можно убрать)
+                    scriptProcessor.connect(ctx.destination);
                     recordedSamples = [];
                     scriptProcessor.onaudioprocess = (event) => {
                         if (!isRecording) return;
-                        const input = event.inputBuffer.getChannelData(0);
-                        // копируем новые семплы в массив
-                        recordedSamples.push(...input);
+                        recordedSamples.push(...event.inputBuffer.getChannelData(0));
                     };
                     isRecording = true;
                     startRecBtn.disabled = true;
@@ -259,14 +233,12 @@
                 startRecBtn.disabled = false;
                 stopRecBtn.disabled = true;
                 statusDiv.textContent = `📥 Записано ${recordedSamples.length} отсчётов. Идёт декодирование...`;
-                // запускаем декодирование асинхронно
                 setTimeout(() => decodeRecordedSamples(), 100);
             }
 
             startRecBtn.addEventListener('click', startRecording);
             stopRecBtn.addEventListener('click', stopRecording);
 
-            // --- Декодирование записанного сигнала ---
             function decodeRecordedSamples() {
                 if (recordedSamples.length === 0) {
                     statusDiv.textContent = '❌ Нет записанных данных.';
@@ -274,9 +246,13 @@
                 }
                 const samples = new Float32Array(recordedSamples);
                 const sr = sampleRate;
-                const tb = TbSamples; // длина окна на бит в сэмплах
+                const tb = TbSamples;
+                if (tb === 0) {
+                    statusDiv.textContent = '❌ Ошибка: неизвестная частота дискретизации.';
+                    return;
+                }
 
-                // Функция Goertzel для вычисления мощности на частоте
+                // Функция Goertzel
                 function goertzelPower(signal, targetFreq, sampleRate) {
                     const N = signal.length;
                     const k = Math.round(N * targetFreq / sampleRate);
@@ -293,44 +269,59 @@
                     return real * real + imag * imag;
                 }
 
-                // Ищем преамбулу: перебираем возможные смещения offset от 0 до tb-1
-                let bestScore = -Infinity;
-                let bestOffset = 0;
+                // Оценка энергии сигнала (среднеквадратичное)
+                function rms(windowSamples) {
+                    let sum = 0;
+                    for (let i = 0; i < windowSamples.length; i++) sum += windowSamples[i] * windowSamples[i];
+                    return Math.sqrt(sum / windowSamples.length);
+                }
+
                 const preambleLenSamples = PREAMBLE_BITS * tb;
                 if (samples.length < preambleLenSamples + tb * 2) {
                     statusDiv.textContent = '❌ Слишком короткая запись для преамбулы.';
                     return;
                 }
-                // Чтобы ускорить, ищем с шагом 1
+
+                // Поиск преамбулы с нормализованной корреляцией и проверкой энергии
+                let bestScore = -Infinity;
+                let bestOffset = 0;
+                let bestAvgEnergy = 0;
                 for (let offset = 0; offset < tb; offset++) {
                     let score = 0;
+                    let totalEnergy = 0;
                     let valid = true;
                     for (let i = 0; i < PREAMBLE_BITS; i++) {
                         const start = offset + i * tb;
                         if (start + tb > samples.length) { valid = false; break; }
                         const windowSamples = samples.slice(start, start + tb);
+                        const energy = rms(windowSamples);
+                        totalEnergy += energy;
                         const p1200 = goertzelPower(windowSamples, FREQ_MARK, sr);
                         const p2200 = goertzelPower(windowSamples, FREQ_SPACE, sr);
-                        const diff = p1200 - p2200;
+                        const diff = (p1200 - p2200) / (p1200 + p2200 + 1e-9); // нормализованная разница
                         const expected = PREAMBLE_PATTERN[i] === 1 ? 1 : -1;
                         score += diff * expected;
                     }
-                    if (valid && score > bestScore) {
-                        bestScore = score;
-                        bestOffset = offset;
+                    if (valid) {
+                        const avgEnergy = totalEnergy / PREAMBLE_BITS;
+                        // Требуем минимальную энергию (сигнал не тишина) и высокий score
+                        if (avgEnergy > 0.005 && score > bestScore) {
+                            bestScore = score;
+                            bestOffset = offset;
+                            bestAvgEnergy = avgEnergy;
+                        }
                     }
                 }
 
-                // Проверка порога (эмпирически)
-                if (bestScore < 0) {
-                    statusDiv.textContent = '❌ Преамбула не найдена (низкая корреляция).';
+                // Порог корреляции: эмпирически, для 32 бит преамбулы score должен быть > 15
+                if (bestScore < 15 || bestAvgEnergy < 0.005) {
+                    statusDiv.textContent = `❌ Сигнал не обнаружен (score=${bestScore.toFixed(1)}, energy=${bestAvgEnergy.toFixed(4)}).`;
                     return;
                 }
 
-                // Декодируем байты после преамбулы
+                // Декодирование битов
                 const dataStart = bestOffset + PREAMBLE_BITS * tb;
                 const bits = [];
-                // Считываем сырые битовые решения для каждого окна tb с шагом tb
                 for (let pos = dataStart; pos + tb <= samples.length; pos += tb) {
                     const windowSamples = samples.slice(pos, pos + tb);
                     const p1200 = goertzelPower(windowSamples, FREQ_MARK, sr);
@@ -338,29 +329,25 @@
                     bits.push(p1200 > p2200 ? 1 : 0);
                 }
 
-                // Декодируем байты из битового потока (ожидаем старт-бит 0, 8 бит данных, стоп-бит 1)
                 const decodedBytes = [];
                 let idx = 0;
                 while (idx + 10 <= bits.length) {
-                    if (bits[idx] !== 0) { idx++; continue; } // ждём старт-бит 0
+                    if (bits[idx] !== 0) { idx++; continue; }
                     let byteVal = 0;
                     for (let i = 0; i < 8; i++) {
                         byteVal |= (bits[idx + 1 + i] << i);
                     }
-                    const stopBit = bits[idx + 9];
-                    if (stopBit !== 1) { idx += 10; continue; } // ошибка стоп-бита
+                    if (bits[idx + 9] !== 1) { idx += 10; continue; }
                     decodedBytes.push(byteVal);
                     idx += 10;
-                    // После получения достаточного количества байт, проверяем длину
                     if (decodedBytes.length === 2) {
                         const payloadLen = decodedBytes[0] | (decodedBytes[1] << 8);
-                        const totalPacketLen = 2 + payloadLen + 1;
-                        if (totalPacketLen > 512) { // реалистичное ограничение
-                            statusDiv.textContent = '❌ Слишком большая длина пакета, возможно ошибка.';
+                        if (payloadLen > 2048) { // разумный лимит
+                            statusDiv.textContent = '❌ Некорректная длина пакета (возможно, ошибка декодирования).';
                             return;
                         }
                     }
-                    if (decodedBytes.length >= 3 + (decodedBytes.length >= 3 ? (decodedBytes[0] | (decodedBytes[1] << 8)) + 2 : Infinity)) break;
+                    if (decodedBytes.length >= 3 && decodedBytes.length >= (2 + (decodedBytes[0] | (decodedBytes[1] << 8)) + 1)) break;
                 }
 
                 if (decodedBytes.length < 4) {
@@ -375,7 +362,6 @@
                     return;
                 }
                 const packet = decodedBytes.slice(0, totalExpected);
-                // Проверка контрольной суммы
                 let checksum = 0;
                 for (let i = 0; i < packet.length - 1; i++) checksum ^= packet[i];
                 if (checksum !== packet[packet.length - 1]) {
@@ -384,16 +370,14 @@
                 }
 
                 const type = packet[2];
-                const payload = packet.slice(3, 3 + payloadLen - 1); // -1 потому что payloadLen включает type
-
-                // Отображаем результат
-                if (type === 0x00) { // текст
+                const payload = packet.slice(3, 3 + payloadLen - 1);
+                if (type === 0x00) {
                     const decoder = new TextDecoder();
                     const text = decoder.decode(new Uint8Array(payload));
                     resultDiv.innerHTML = `<strong>📨 Принятый текст:</strong> ${text}`;
                     resultImg.style.display = 'none';
                     statusDiv.textContent = '✅ Текст успешно декодирован!';
-                } else if (type === 0x01) { // JPEG
+                } else if (type === 0x01) {
                     const blob = new Blob([new Uint8Array(payload)], { type: 'image/jpeg' });
                     const url = URL.createObjectURL(blob);
                     resultImg.src = url;
@@ -405,7 +389,6 @@
                 }
             }
 
-            // Автоматически запрашиваем AudioContext при первом взаимодействии
             document.body.addEventListener('click', () => getAudioContext(), { once: true });
         })();
     </script>
