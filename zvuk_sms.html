@@ -2,395 +2,295 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Передача SMS и фото звуком (FSK 100 бит/с)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acoustic Modem (SSTV & FSK)</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }
-        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 8px; }
-        button { margin: 5px; padding: 8px 16px; }
-        textarea { width: 100%; height: 60px; }
-        canvas { border: 1px solid #999; display: block; margin: 10px 0; }
-        #status { color: #d44; font-weight: bold; }
-        #resultImg { max-width: 100px; display: none; }
+        body { font-family: Arial, sans-serif; background: #121212; color: #fff; padding: 20px; max-width: 600px; margin: auto; }
+        .panel { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #444; }
+        input, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; background: #333; color: #fff; border: 1px solid #555; }
+        button { background: #007bff; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        canvas { background: #000; display: block; margin: 10px auto; width: 256px; height: 256px; image-rendering: pixelated; border: 2px solid #555; }
+        .log { background: #000; color: #0f0; padding: 10px; height: 100px; overflow-y: scroll; font-family: monospace; font-size: 12px; }
+        .status { text-align: center; color: #aaa; font-size: 14px; margin-top: 5px; }
     </style>
 </head>
 <body>
-    <h2>📻 Звуковой модем: сообщения и фото через динамик/микрофон</h2>
-    <p>Скорость 100 бит/с, FSK 1200/2200 Гц. Для передачи по рации или любому аудиоканалу.<br>
-    <b>Как использовать:</b> сначала нажмите «Отправить» (появится звук), затем сразу нажмите «Начать запись» и через пару секунд «Остановить».</p>
 
-    <div class="section">
-        <h3>📤 Передать текст (SMS)</h3>
-        <textarea id="textInput" placeholder="Введите сообщение..."></textarea>
-        <button id="sendTextBtn">🔊 Отправить текст (проиграть звук)</button>
+    <h2>Акустический модем 📻</h2>
+
+    <div class="panel">
+        <h3>Отправка (Передатчик)</h3>
+        <input type="text" id="smsInput" placeholder="Введите SMS (латиница)...">
+        <button id="sendTextBtn">Передать текст звуком</button>
+        <hr style="border-color: #444;">
+        <label>Выберите фото (будет сильно сжато до 32x32):</label>
+        <input type="file" id="imageInput" accept="image/*">
+        <canvas id="txCanvas" width="32" height="32" style="display:none;"></canvas>
+        <button id="sendImgBtn">Передать фото звуком</button>
+        <div id="txStatus" class="status">Ожидание...</div>
     </div>
 
-    <div class="section">
-        <h3>🖼️ Передать фото (сильное сжатие JPEG)</h3>
-        <input type="file" id="imageFile" accept="image/*">
-        <button id="sendImageBtn" disabled>🔊 Отправить фото (проиграть звук)</button><br>
-        <canvas id="previewCanvas" width="32" height="32" style="image-rendering: pixelated; width: 64px; height: 64px;"></canvas>
-        <span id="imageInfo"></span>
+    <div class="panel">
+        <h3>Прием (Приемник)</h3>
+        <button id="listenBtn">Включить прослушивание эфира</button>
+        <div id="rxStatus" class="status">Микрофон выключен</div>
+        
+        <h4>Принятое фото:</h4>
+        <canvas id="rxCanvas" width="32" height="32"></canvas>
+        
+        <h4>Принятый текст / Лог:</h4>
+        <div id="rxLog" class="log"></div>
     </div>
 
-    <div class="section">
-        <h3>📥 Принять сообщение</h3>
-        <button id="startRecBtn">🎤 Начать запись с микрофона</button>
-        <button id="stopRecBtn" disabled>⏹️ Остановить и декодировать</button>
-        <p id="status">Ожидание...</p>
-        <div id="result"></div>
-        <img id="resultImg" alt="Принятое фото">
-    </div>
+<script>
+    // Настройки модема
+    const AUDIO_FREQ_SYNC = 1000; // Частота синхронизации (начало передачи)
+    const FREQ_BLACK = 1500;      // Частота черного пикселя
+    const FREQ_WHITE = 2500;      // Частота белого пикселя
+    const PIXEL_DURATION = 0.05;  // 50 мс на один пиксель (скорость)
+    const IMG_SIZE = 32;          // Сжатие до 32x32 пикселей для скорости
+    
+    // FSK для текста
+    const FSK_0 = 1200;
+    const FSK_1 = 2200;
+    const BIT_DURATION = 0.1; // 100 мс на бит (10 бит/с - очень надежно)
 
-    <script>
-        (function() {
-            // --- Конфигурация ---
-            const BITRATE = 100;            // бит/с
-            const FREQ_MARK = 1200;         // частота для бита 1
-            const FREQ_SPACE = 2200;        // частота для бита 0
-            const PREAMBLE_BITS = 32;       // увеличено для надёжности
-            const PREAMBLE_PATTERN = Array.from({length: PREAMBLE_BITS}, (_, i) => i % 2 === 0 ? 1 : 0);
+    let audioCtx;
 
-            // --- Глобальные переменные ---
-            let audioCtx = null;
-            let mediaStream = null;
-            let scriptProcessor = null;
-            let recordedSamples = [];
-            let sampleRate = 0;
-            let isRecording = false;
-            let TbSamples = 0;
+    // --- ИНИЦИАЛИЗАЦИЯ AUDIO API ---
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }
 
-            // --- Элементы DOM ---
-            const textInput = document.getElementById('textInput');
-            const sendTextBtn = document.getElementById('sendTextBtn');
-            const imageFile = document.getElementById('imageFile');
-            const sendImageBtn = document.getElementById('sendImageBtn');
-            const previewCanvas = document.getElementById('previewCanvas');
-            const imageInfo = document.getElementById('imageInfo');
-            const startRecBtn = document.getElementById('startRecBtn');
-            const stopRecBtn = document.getElementById('stopRecBtn');
-            const statusDiv = document.getElementById('status');
-            const resultDiv = document.getElementById('result');
-            const resultImg = document.getElementById('resultImg');
-
-            let pendingImageBytes = null;
-
-            function getAudioContext() {
-                if (!audioCtx) {
-                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    sampleRate = audioCtx.sampleRate;
-                    TbSamples = Math.round(sampleRate / BITRATE);
-                    console.log(`SampleRate: ${sampleRate}, TbSamples: ${TbSamples}`);
-                }
-                if (audioCtx.state === 'suspended') audioCtx.resume();
-                return audioCtx;
+    // --- ПЕРЕДАТЧИК (ФОТО - SSTV) ---
+    document.getElementById('imageInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = (e) => img.src = e.target.result;
+        img.onload = () => {
+            const canvas = document.getElementById('txCanvas');
+            const ctx = canvas.getContext('2d');
+            // Сильное сжатие (отрисовка в 32x32)
+            ctx.drawImage(img, 0, 0, IMG_SIZE, IMG_SIZE);
+            // Перевод в ЧБ
+            let imgData = ctx.getImageData(0, 0, IMG_SIZE, IMG_SIZE);
+            for (let i = 0; i < imgData.data.length; i += 4) {
+                let gray = (imgData.data[i] + imgData.data[i+1] + imgData.data[i+2]) / 3;
+                imgData.data[i] = imgData.data[i+1] = imgData.data[i+2] = gray;
             }
+            ctx.putImageData(imgData, 0, 0);
+        };
+        reader.readAsDataURL(file);
+    });
 
-            function generateFskSignal(bitSequence, sampleRate, bitRate) {
-                const totalBits = bitSequence.length;
-                const totalDuration = totalBits / bitRate;
-                const totalSamples = Math.ceil(totalDuration * sampleRate);
-                const buffer = new Float32Array(totalSamples);
-                let phase = 0;
-                const dt = 1 / sampleRate;
-                let currentFreq = FREQ_SPACE;
-                let bitIdx = 0;
-                let nextBitTime = 0;
-                for (let i = 0; i < totalSamples; i++) {
-                    const t = i * dt;
-                    if (t >= nextBitTime && bitIdx < totalBits) {
-                        currentFreq = bitSequence[bitIdx] === 1 ? FREQ_MARK : FREQ_SPACE;
-                        nextBitTime += 1 / bitRate;
-                        bitIdx++;
-                    }
-                    buffer[i] = Math.sin(phase);
-                    phase += 2 * Math.PI * currentFreq * dt;
-                    if (phase > 2 * Math.PI) phase -= 2 * Math.PI;
-                }
-                return buffer;
+    document.getElementById('sendImgBtn').addEventListener('click', async () => {
+        initAudio();
+        const canvas = document.getElementById('txCanvas');
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.getImageData(0, 0, IMG_SIZE, IMG_SIZE).data;
+        const status = document.getElementById('txStatus');
+        const btn = document.getElementById('sendImgBtn');
+        
+        btn.disabled = true;
+        let osc = audioCtx.createOscillator();
+        osc.type = 'sine';
+        osc.connect(audioCtx.destination);
+        
+        let startTime = audioCtx.currentTime + 0.1;
+        
+        // 1. Сигнал синхронизации (1 секунда 1000 Гц, чтобы приемник понял, что началось фото)
+        osc.frequency.setValueAtTime(AUDIO_FREQ_SYNC, startTime);
+        startTime += 1.0;
+
+        // 2. Кодирование пикселей
+        let totalPixels = IMG_SIZE * IMG_SIZE;
+        for (let i = 0; i < totalPixels; i++) {
+            let grayValue = imgData[i * 4]; // берем R (он равен G и B)
+            // Маппинг 0-255 в частоту FREQ_BLACK - FREQ_WHITE
+            let freq = FREQ_BLACK + (grayValue / 255) * (FREQ_WHITE - FREQ_BLACK);
+            osc.frequency.setValueAtTime(freq, startTime + (i * PIXEL_DURATION));
+        }
+
+        osc.start();
+        osc.stop(startTime + (totalPixels * PIXEL_DURATION));
+
+        // UI обновление прогресса
+        let durationMs = (1.0 + totalPixels * PIXEL_DURATION) * 1000;
+        let passed = 0;
+        let interval = setInterval(() => {
+            passed += 100;
+            let percent = Math.min(100, Math.floor((passed / durationMs) * 100));
+            status.innerText = `Передача: ${percent}% (поднесите к рации)`;
+            if (passed >= durationMs) {
+                clearInterval(interval);
+                status.innerText = "Передача завершена";
+                btn.disabled = false;
             }
+        }, 100);
+    });
 
-            function encodeToBits(dataBytes, typeByte) {
-                const payloadLen = 1 + dataBytes.length;
-                const totalLen = 2 + payloadLen + 1;
-                const packet = new Uint8Array(totalLen);
-                packet[0] = payloadLen & 0xFF;
-                packet[1] = (payloadLen >> 8) & 0xFF;
-                packet[2] = typeByte;
-                packet.set(dataBytes, 3);
-                let checksum = 0;
-                for (let i = 0; i < totalLen - 1; i++) checksum ^= packet[i];
-                packet[totalLen - 1] = checksum;
 
-                const bits = [];
-                for (const b of PREAMBLE_PATTERN) bits.push(b);
-                for (const byte of packet) {
-                    bits.push(0); // старт
-                    for (let i = 0; i < 8; i++) bits.push((byte >> i) & 1);
-                    bits.push(1); // стоп
-                }
-                return bits;
+    // --- ПЕРЕДАТЧИК (ТЕКСТ - FSK) ---
+    document.getElementById('sendTextBtn').addEventListener('click', () => {
+        initAudio();
+        let text = document.getElementById('smsInput').value;
+        if(!text) return;
+        
+        let binaryStr = "";
+        for(let i=0; i<text.length; i++) {
+            let bin = text.charCodeAt(i).toString(2).padStart(8, '0');
+            binaryStr += bin;
+        }
+
+        let osc = audioCtx.createOscillator();
+        osc.connect(audioCtx.destination);
+        let startTime = audioCtx.currentTime + 0.1;
+
+        // Синхронизация для текста (чередование 1010)
+        let syncBits = "1010101011110000"; 
+        let fullData = syncBits + binaryStr;
+
+        for(let i=0; i<fullData.length; i++) {
+            let freq = fullData[i] === '1' ? FSK_1 : FSK_0;
+            osc.frequency.setValueAtTime(freq, startTime + (i * BIT_DURATION));
+        }
+
+        osc.start();
+        osc.stop(startTime + (fullData.length * BIT_DURATION));
+        document.getElementById('txStatus').innerText = "Текст передан в эфир!";
+    });
+
+
+    // --- ПРИЕМНИК ---
+    let isListening = false;
+    let analyser, microphone, javascriptNode;
+    let rxCanvas = document.getElementById('rxCanvas');
+    let rxCtx = rxCanvas.getContext('2d');
+    
+    function logMsg(msg) {
+        let l = document.getElementById('rxLog');
+        l.innerHTML += `<div>${msg}</div>`;
+        l.scrollTop = l.scrollHeight;
+    }
+
+    document.getElementById('listenBtn').addEventListener('click', async () => {
+        initAudio();
+        if (isListening) return;
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
+            microphone = audioCtx.createMediaStreamSource(stream);
+            
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 2048; // Размер окна для точности определения частоты
+            analyser.smoothingTimeConstant = 0.2;
+            
+            microphone.connect(analyser);
+            
+            isListening = true;
+            document.getElementById('rxStatus').innerText = "Слушаю эфир (рацию)...";
+            document.getElementById('listenBtn').disabled = true;
+            
+            startDecoding();
+        } catch (err) {
+            alert("Ошибка доступа к микрофону: " + err);
+        }
+    });
+
+    function getDominantFrequency(dataArray, sampleRate, fftSize) {
+        let maxVal = -Infinity;
+        let maxIndex = -1;
+        // Ищем пик в спектре
+        for (let i = 0; i < dataArray.length; i++) {
+            if (dataArray[i] > maxVal) {
+                maxVal = dataArray[i];
+                maxIndex = i;
             }
+        }
+        // Если сигнал слишком слабый (шум), возвращаем 0
+        if (maxVal < -70) return 0; 
+        
+        return maxIndex * (sampleRate / fftSize);
+    }
 
-            function playBuffer(floatBuffer, sampleRate) {
-                const ctx = getAudioContext();
-                const audioBuffer = ctx.createBuffer(1, floatBuffer.length, sampleRate);
-                audioBuffer.getChannelData(0).set(floatBuffer);
-                const source = ctx.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(ctx.destination);
-                source.start();
-                statusDiv.textContent = '🔊 Воспроизведение звука...';
-                source.onended = () => {
-                    statusDiv.textContent = '✅ Звук передан. Можно начинать запись.';
-                };
-            }
+    function startDecoding() {
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Float32Array(bufferLength);
+        
+        let state = "IDLE";
+        let syncFrames = 0;
+        
+        let pixelX = 0;
+        let pixelY = 0;
+        let lastSampleTime = 0;
 
-            sendTextBtn.addEventListener('click', () => {
-                const text = textInput.value.trim();
-                if (!text) { statusDiv.textContent = '❌ Введите текст!'; return; }
-                const encoder = new TextEncoder();
-                const dataBytes = encoder.encode(text);
-                const bits = encodeToBits(dataBytes, 0x00);
-                statusDiv.textContent = `📦 Кодирование ${dataBytes.length} байт текста...`;
-                const signal = generateFskSignal(bits, sampleRate, BITRATE);
-                playBuffer(signal, sampleRate);
-            });
+        // Основной цикл анализа звука
+        function analyze() {
+            if (!isListening) return;
+            requestAnimationFrame(analyze);
 
-            imageFile.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = function(ev) {
-                    const img = new Image();
-                    img.onload = function() {
-                        const canvas = previewCanvas;
-                        const ctx = canvas.getContext('2d');
-                        let w = img.width, h = img.height;
-                        const maxDim = 32;
-                        if (w > maxDim || h > maxDim) {
-                            if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
-                            else { w = Math.round(w * maxDim / h); h = maxDim; }
-                        }
-                        canvas.width = w;
-                        canvas.height = h;
-                        ctx.drawImage(img, 0, 0, w, h);
-                        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.15);
-                        const base64 = jpegDataUrl.split(',')[1];
-                        const binaryStr = atob(base64);
-                        const bytes = new Uint8Array(binaryStr.length);
-                        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-                        pendingImageBytes = bytes;
-                        imageInfo.textContent = `Сжато до ${bytes.length} байт (${w}x${h})`;
-                        sendImageBtn.disabled = false;
-                    };
-                    img.src = ev.target.result;
-                };
-                reader.readAsDataURL(file);
-            });
+            analyser.getFloatFrequencyData(dataArray);
+            let domFreq = getDominantFrequency(dataArray, audioCtx.sampleRate, analyser.fftSize);
 
-            sendImageBtn.addEventListener('click', () => {
-                if (!pendingImageBytes) return;
-                const bits = encodeToBits(pendingImageBytes, 0x01);
-                statusDiv.textContent = `📦 Кодирование ${pendingImageBytes.length} байт изображения...`;
-                const signal = generateFskSignal(bits, sampleRate, BITRATE);
-                playBuffer(signal, sampleRate);
-            });
-
-            async function startRecording() {
-                const ctx = getAudioContext();
-                if (isRecording) return;
-                try {
-                    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
-                    const source = ctx.createMediaStreamSource(mediaStream);
-                    scriptProcessor = ctx.createScriptProcessor(256, 1, 1);
-                    source.connect(scriptProcessor);
-                    scriptProcessor.connect(ctx.destination);
-                    recordedSamples = [];
-                    scriptProcessor.onaudioprocess = (event) => {
-                        if (!isRecording) return;
-                        recordedSamples.push(...event.inputBuffer.getChannelData(0));
-                    };
-                    isRecording = true;
-                    startRecBtn.disabled = true;
-                    stopRecBtn.disabled = false;
-                    statusDiv.textContent = '🎤 Запись...';
-                } catch (err) {
-                    statusDiv.textContent = '❌ Ошибка доступа к микрофону: ' + err.message;
-                }
-            }
-
-            function stopRecording() {
-                if (!isRecording) return;
-                isRecording = false;
-                if (scriptProcessor) {
-                    scriptProcessor.disconnect();
-                    scriptProcessor = null;
-                }
-                if (mediaStream) {
-                    mediaStream.getTracks().forEach(track => track.stop());
-                    mediaStream = null;
-                }
-                startRecBtn.disabled = false;
-                stopRecBtn.disabled = true;
-                statusDiv.textContent = `📥 Записано ${recordedSamples.length} отсчётов. Идёт декодирование...`;
-                setTimeout(() => decodeRecordedSamples(), 100);
-            }
-
-            startRecBtn.addEventListener('click', startRecording);
-            stopRecBtn.addEventListener('click', stopRecording);
-
-            function decodeRecordedSamples() {
-                if (recordedSamples.length === 0) {
-                    statusDiv.textContent = '❌ Нет записанных данных.';
-                    return;
-                }
-                const samples = new Float32Array(recordedSamples);
-                const sr = sampleRate;
-                const tb = TbSamples;
-                if (tb === 0) {
-                    statusDiv.textContent = '❌ Ошибка: неизвестная частота дискретизации.';
-                    return;
-                }
-
-                // Функция Goertzel
-                function goertzelPower(signal, targetFreq, sampleRate) {
-                    const N = signal.length;
-                    const k = Math.round(N * targetFreq / sampleRate);
-                    const omega = (2 * Math.PI * k) / N;
-                    const coeff = 2 * Math.cos(omega);
-                    let s0 = 0, s1 = 0, s2 = 0;
-                    for (let i = 0; i < N; i++) {
-                        s0 = signal[i] + coeff * s1 - s2;
-                        s2 = s1;
-                        s1 = s0;
+            // 1. Ожидание синхросигнала
+            if (state === "IDLE") {
+                if (Math.abs(domFreq - AUDIO_FREQ_SYNC) < 150) { // Погрешность +-150 Гц из-за шума
+                    syncFrames++;
+                    if (syncFrames > 20) { // Если слышим стабильный писк синхронизации
+                        state = "RECEIVING_IMG";
+                        logMsg("Обнаружен сигнал фото! Начинаю декодирование...");
+                        rxCtx.fillStyle = "black";
+                        rxCtx.fillRect(0, 0, IMG_SIZE, IMG_SIZE);
+                        pixelX = 0;
+                        pixelY = 0;
+                        lastSampleTime = audioCtx.currentTime;
                     }
-                    const real = s1 - s2 * Math.cos(omega);
-                    const imag = s2 * Math.sin(omega);
-                    return real * real + imag * imag;
-                }
-
-                // Оценка энергии сигнала (среднеквадратичное)
-                function rms(windowSamples) {
-                    let sum = 0;
-                    for (let i = 0; i < windowSamples.length; i++) sum += windowSamples[i] * windowSamples[i];
-                    return Math.sqrt(sum / windowSamples.length);
-                }
-
-                const preambleLenSamples = PREAMBLE_BITS * tb;
-                if (samples.length < preambleLenSamples + tb * 2) {
-                    statusDiv.textContent = '❌ Слишком короткая запись для преамбулы.';
-                    return;
-                }
-
-                // Поиск преамбулы с нормализованной корреляцией и проверкой энергии
-                let bestScore = -Infinity;
-                let bestOffset = 0;
-                let bestAvgEnergy = 0;
-                for (let offset = 0; offset < tb; offset++) {
-                    let score = 0;
-                    let totalEnergy = 0;
-                    let valid = true;
-                    for (let i = 0; i < PREAMBLE_BITS; i++) {
-                        const start = offset + i * tb;
-                        if (start + tb > samples.length) { valid = false; break; }
-                        const windowSamples = samples.slice(start, start + tb);
-                        const energy = rms(windowSamples);
-                        totalEnergy += energy;
-                        const p1200 = goertzelPower(windowSamples, FREQ_MARK, sr);
-                        const p2200 = goertzelPower(windowSamples, FREQ_SPACE, sr);
-                        const diff = (p1200 - p2200) / (p1200 + p2200 + 1e-9); // нормализованная разница
-                        const expected = PREAMBLE_PATTERN[i] === 1 ? 1 : -1;
-                        score += diff * expected;
-                    }
-                    if (valid) {
-                        const avgEnergy = totalEnergy / PREAMBLE_BITS;
-                        // Требуем минимальную энергию (сигнал не тишина) и высокий score
-                        if (avgEnergy > 0.005 && score > bestScore) {
-                            bestScore = score;
-                            bestOffset = offset;
-                            bestAvgEnergy = avgEnergy;
-                        }
-                    }
-                }
-
-                // Порог корреляции: эмпирически, для 32 бит преамбулы score должен быть > 15
-                if (bestScore < 15 || bestAvgEnergy < 0.005) {
-                    statusDiv.textContent = `❌ Сигнал не обнаружен (score=${bestScore.toFixed(1)}, energy=${bestAvgEnergy.toFixed(4)}).`;
-                    return;
-                }
-
-                // Декодирование битов
-                const dataStart = bestOffset + PREAMBLE_BITS * tb;
-                const bits = [];
-                for (let pos = dataStart; pos + tb <= samples.length; pos += tb) {
-                    const windowSamples = samples.slice(pos, pos + tb);
-                    const p1200 = goertzelPower(windowSamples, FREQ_MARK, sr);
-                    const p2200 = goertzelPower(windowSamples, FREQ_SPACE, sr);
-                    bits.push(p1200 > p2200 ? 1 : 0);
-                }
-
-                const decodedBytes = [];
-                let idx = 0;
-                while (idx + 10 <= bits.length) {
-                    if (bits[idx] !== 0) { idx++; continue; }
-                    let byteVal = 0;
-                    for (let i = 0; i < 8; i++) {
-                        byteVal |= (bits[idx + 1 + i] << i);
-                    }
-                    if (bits[idx + 9] !== 1) { idx += 10; continue; }
-                    decodedBytes.push(byteVal);
-                    idx += 10;
-                    if (decodedBytes.length === 2) {
-                        const payloadLen = decodedBytes[0] | (decodedBytes[1] << 8);
-                        if (payloadLen > 2048) { // разумный лимит
-                            statusDiv.textContent = '❌ Некорректная длина пакета (возможно, ошибка декодирования).';
-                            return;
-                        }
-                    }
-                    if (decodedBytes.length >= 3 && decodedBytes.length >= (2 + (decodedBytes[0] | (decodedBytes[1] << 8)) + 1)) break;
-                }
-
-                if (decodedBytes.length < 4) {
-                    statusDiv.textContent = '❌ Недостаточно данных после декодирования.';
-                    return;
-                }
-
-                const payloadLen = decodedBytes[0] | (decodedBytes[1] << 8);
-                const totalExpected = 2 + payloadLen + 1;
-                if (decodedBytes.length < totalExpected) {
-                    statusDiv.textContent = `❌ Ожидалось ${totalExpected} байт, получено ${decodedBytes.length}.`;
-                    return;
-                }
-                const packet = decodedBytes.slice(0, totalExpected);
-                let checksum = 0;
-                for (let i = 0; i < packet.length - 1; i++) checksum ^= packet[i];
-                if (checksum !== packet[packet.length - 1]) {
-                    statusDiv.textContent = '❌ Ошибка контрольной суммы. Попробуйте ещё раз.';
-                    return;
-                }
-
-                const type = packet[2];
-                const payload = packet.slice(3, 3 + payloadLen - 1);
-                if (type === 0x00) {
-                    const decoder = new TextDecoder();
-                    const text = decoder.decode(new Uint8Array(payload));
-                    resultDiv.innerHTML = `<strong>📨 Принятый текст:</strong> ${text}`;
-                    resultImg.style.display = 'none';
-                    statusDiv.textContent = '✅ Текст успешно декодирован!';
-                } else if (type === 0x01) {
-                    const blob = new Blob([new Uint8Array(payload)], { type: 'image/jpeg' });
-                    const url = URL.createObjectURL(blob);
-                    resultImg.src = url;
-                    resultImg.style.display = 'block';
-                    resultDiv.innerHTML = '<strong>🖼️ Принятое фото:</strong>';
-                    statusDiv.textContent = '✅ Изображение успешно декодировано!';
                 } else {
-                    statusDiv.textContent = '❌ Неизвестный тип данных.';
+                    syncFrames = 0;
+                }
+            } 
+            // 2. Прием картинки в реальном времени (попиксельно)
+            else if (state === "RECEIVING_IMG") {
+                let now = audioCtx.currentTime;
+                // Сверяем тайминги (прошло ли время для чтения следующего пикселя)
+                if (now - lastSampleTime >= PIXEL_DURATION) {
+                    lastSampleTime += PIXEL_DURATION; // Жестко держим темп
+
+                    // Преобразуем частоту обратно в цвет
+                    let colorVal = 0;
+                    if (domFreq >= FREQ_BLACK && domFreq <= FREQ_WHITE) {
+                        colorVal = ((domFreq - FREQ_BLACK) / (FREQ_WHITE - FREQ_BLACK)) * 255;
+                    } else if (domFreq > FREQ_WHITE) {
+                        colorVal = 255;
+                    }
+
+                    // Рисуем полученный пиксель
+                    colorVal = Math.floor(colorVal);
+                    rxCtx.fillStyle = `rgb(${colorVal},${colorVal},${colorVal})`;
+                    rxCtx.fillRect(pixelX, pixelY, 1, 1);
+
+                    pixelX++;
+                    if (pixelX >= IMG_SIZE) {
+                        pixelX = 0;
+                        pixelY++;
+                    }
+
+                    if (pixelY >= IMG_SIZE) {
+                        state = "IDLE";
+                        syncFrames = 0;
+                        logMsg("Фотография принята полностью.");
+                    }
                 }
             }
-
-            document.body.addEventListener('click', () => getAudioContext(), { once: true });
-        })();
-    </script>
+        }
+        analyze();
+    }
+</script>
 </body>
 </html>
