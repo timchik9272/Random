@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Передача SMS и фото звуком (FSK 100 бит/с)</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 8px; }
+        button { margin: 5px; padding: 8px 16px; }
+        textarea { width: 100%; height: 60px; }
+        canvas { border: 1px solid #999; display: block; margin: 10px 0; }
+        #status { color: #d44; font-weight: bold; }
+        #resultImg { max-width: 100px; display: none; }
+    </style>
+</head>
+<body>
+    <h2>📻 Звуковой модем: SMS и фото через динамик/микрофон</h2>
+    <p>Скорость 100 бит/с, FSK 1200/2200 Гц. Для передачи по рации или любому аудиоканалу.</p>
+
+    <div class="section">
+        <h3>📤 Передать текст (SMS)</h3>
+        <textarea id="textInput" placeholder="Введите сообщение..."></textarea>
+        <button id="sendTextBtn">🔊 Отправить текст (проиграть звук)</button>
+    </div>
+
+    <div class="section">
+        <h3>🖼️ Передать фото (сильное сжатие JPEG)</h3>
+        <input type="file" id="imageFile" accept="image/*">
+        <button id="sendImageBtn" disabled>🔊 Отправить фото (проиграть звук)</button><br>
+        <canvas id="previewCanvas" width="32" height="32" style="image-rendering: pixelated; width: 64px; height: 64px;"></canvas>
+        <span id="imageInfo"></span>
+    </div>
+
+    <div class="section">
+        <h3>📥 Принять сообщение</h3>
+        <button id="startRecBtn">🎤 Начать запись с микрофона</button>
+        <button id="stopRecBtn" disabled>⏹️ Остановить и декодировать</button>
+        <p id="status">Ожидание...</p>
+        <div id="result"></div>
+        <img id="resultImg" alt="Принятое фото">
+    </div>
+
+    <script>
+        (function() {
+            // --- Конфигурация ---
+            const BITRATE = 100;            // бит/с
+            const FREQ_MARK = 1200;         // частота для бита 1
+            const FREQ_SPACE = 2200;        // частота для бита 0
+            const PREAMBLE_BITS = 16;       // бит в преамбуле (чередование 1010...)
+            const PREAMBLE_PATTERN = Array.from({length: PREAMBLE_BITS}, (_, i) => i % 2 === 0 ? 1 : 0); // 1,0,1,0...
+
+            // --- Глобальные переменные ---
+            let audioCtx = null;
+            let mediaStream = null;
+            let scriptProcessor = null;
+            let recordedSamples = [];        // накопленные семплы с микрофона
+            let sampleRate = 0;             // частота дискретизации (установится после AudioContext)
+            let isRecording = false;
+            let TbSamples = 0;              // число семплов на бит (вычисляется после получения sampleRate)
+
+            // --- Элементы DOM ---
+            const textInput = document.getElementById('textInput');
+            const sendTextBtn = document.getElementById('sendTextBtn');
+            const imageFile = document.getElementById('imageFile');
+            const sendImageBtn = document.getElementById('sendImageBtn');
+            const previewCanvas = document.getElementById('previewCanvas');
+            const imageInfo = document.getElementById('imageInfo');
+            const startRecBtn = document.getElementById('startRecBtn');
+            const stopRecBtn = document.getElementById('stopRecBtn');
+            const statusDiv = document.getElementById('status');
+            const resultDiv = document.getElementById('result');
+            const resultImg = document.getElementById('resultImg');
+
+            let pendingImageBytes = null;   // сжатые байты JPEG для отправки
+
+            // --- Инициализация AudioContext ---
+            function getAudioContext() {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    sampleRate = audioCtx.sampleRate;
+                    TbSamples = Math.round(sampleRate / BITRATE);
+                    console.log(`SampleRate: ${sampleRate}, TbSamples: ${TbSamples}`);
+                }
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                return audioCtx;
+            }
+
+            // --- Генерация FSK сигнала (фазовая непрерывность) ---
+            function generateFskSignal(bitSequence, sampleRate, bitRate) {
+                const totalBits = bitSequence.length;
+                const totalDuration = totalBits / bitRate;
+                const totalSamples = Math.ceil(totalDuration * sampleRate);
+                const buffer = new Float32Array(totalSamples);
+                let phase = 0;
+                const dt = 1 / sampleRate;
+                let currentFreq = FREQ_SPACE; // начальная частота (не важно)
+
+                let bitIdx = 0;
+                let nextBitTime = 0; // время начала следующего бита
+
+                for (let i = 0; i < totalSamples; i++) {
+                    const t = i * dt;
+                    if (t >= nextBitTime && bitIdx < totalBits) {
+                        currentFreq = bitSequence[bitIdx] === 1 ? FREQ_MARK : FREQ_SPACE;
+                        nextBitTime += 1 / bitRate;
+                        bitIdx++;
+                    }
+                    buffer[i] = Math.sin(phase);
+                    phase += 2 * Math.PI * currentFreq * dt;
+                    if (phase > 2 * Math.PI) phase -= 2 * Math.PI;
+                }
+                return buffer;
+            }
+
+            // --- Кодирование сообщения в битовую последовательность ---
+            function encodeToBits(dataBytes, typeByte) {
+                // Формат: [len_low len_high type payload... checksum_xor]
+                const payloadLen = 1 + dataBytes.length; // type + data
+                const totalLen = 2 + payloadLen + 1;     // 2 байта длина + payload + checksum
+                const packet = new Uint8Array(totalLen);
+                packet[0] = payloadLen & 0xFF;
+                packet[1] = (payloadLen >> 8) & 0xFF;
+                packet[2] = typeByte;
+                packet.set(dataBytes, 3);
+                // контрольная сумма XOR всех предыдущих байт
+                let checksum = 0;
+                for (let i = 0; i < totalLen - 1; i++) checksum ^= packet[i];
+                packet[totalLen - 1] = checksum;
+
+                // Преобразование в битовую последовательность: преамбула + старт/стоповые биты для каждого байта
+                const bits = [];
+                // Преамбула
+                for (const b of PREAMBLE_PATTERN) bits.push(b);
+
+                // Каждый байт: старт-бит (0), 8 бит данных (LSB first), стоп-бит (1)
+                for (const byte of packet) {
+                    bits.push(0); // старт
+                    for (let i = 0; i < 8; i++) {
+                        bits.push((byte >> i) & 1);
+                    }
+                    bits.push(1); // стоп
+                }
+                return bits;
+            }
+
+            // --- Проигрывание звука ---
+            function playBuffer(floatBuffer, sampleRate) {
+                const ctx = getAudioContext();
+                const audioBuffer = ctx.createBuffer(1, floatBuffer.length, sampleRate);
+                audioBuffer.getChannelData(0).set(floatBuffer);
+                const source = ctx.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(ctx.destination);
+                source.start();
+                statusDiv.textContent = '🔊 Воспроизведение звука...';
+                source.onended = () => {
+                    statusDiv.textContent = '✅ Звук передан.';
+                };
+            }
+
+            // --- Отправка текста ---
+            sendTextBtn.addEventListener('click', () => {
+                const text = textInput.value.trim();
+                if (!text) {
+                    statusDiv.textContent = '❌ Введите текст!';
+                    return;
+                }
+                const encoder = new TextEncoder();
+                const dataBytes = encoder.encode(text);
+                const bits = encodeToBits(dataBytes, 0x00); // type 0x00 = текст
+                statusDiv.textContent = `📦 Кодирование ${dataBytes.length} байт текста...`;
+                const signal = generateFskSignal(bits, sampleRate, BITRATE);
+                playBuffer(signal, sampleRate);
+            });
+
+            // --- Сжатие изображения ---
+            imageFile.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function(ev) {
+                    const img = new Image();
+                    img.onload = function() {
+                        // Рисуем на маленьком canvas для сильного сжатия
+                        const canvas = previewCanvas;
+                        const ctx = canvas.getContext('2d');
+                        // Очищаем и задаём размер (максимум 32x32, сохраняя пропорции)
+                        let w = img.width, h = img.height;
+                        const maxDim = 32;
+                        if (w > maxDim || h > maxDim) {
+                            if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+                            else { w = Math.round(w * maxDim / h); h = maxDim; }
+                        }
+                        canvas.width = w;
+                        canvas.height = h;
+                        ctx.drawImage(img, 0, 0, w, h);
+                        // Получаем JPEG с очень низким качеством
+                        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.15);
+                        // Преобразуем dataURL в Uint8Array
+                        const base64 = jpegDataUrl.split(',')[1];
+                        const binaryStr = atob(base64);
+                        const bytes = new Uint8Array(binaryStr.length);
+                        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+                        pendingImageBytes = bytes;
+                        imageInfo.textContent = `Сжато до ${bytes.length} байт (${w}x${h})`;
+                        sendImageBtn.disabled = false;
+                    };
+                    img.src = ev.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            sendImageBtn.addEventListener('click', () => {
+                if (!pendingImageBytes) return;
+                const bits = encodeToBits(pendingImageBytes, 0x01); // type 0x01 = JPEG
+                statusDiv.textContent = `📦 Кодирование ${pendingImageBytes.length} байт изображения...`;
+                const signal = generateFskSignal(bits, sampleRate, BITRATE);
+                playBuffer(signal, sampleRate);
+            });
+
+            // --- Приём: запись с микрофона ---
+            async function startRecording() {
+                const ctx = getAudioContext();
+                if (isRecording) return;
+                try {
+                    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
+                    const source = ctx.createMediaStreamSource(mediaStream);
+                    // ScriptProcessorNode для захвата данных
+                    scriptProcessor = ctx.createScriptProcessor(256, 1, 1);
+                    source.connect(scriptProcessor);
+                    scriptProcessor.connect(ctx.destination); // чтобы не глушить звук (можно убрать)
+                    recordedSamples = [];
+                    scriptProcessor.onaudioprocess = (event) => {
+                        if (!isRecording) return;
+                        const input = event.inputBuffer.getChannelData(0);
+                        // копируем новые семплы в массив
+                        recordedSamples.push(...input);
+                    };
+                    isRecording = true;
+                    startRecBtn.disabled = true;
+                    stopRecBtn.disabled = false;
+                    statusDiv.textContent = '🎤 Запись...';
+                } catch (err) {
+                    statusDiv.textContent = '❌ Ошибка доступа к микрофону: ' + err.message;
+                }
+            }
+
+            function stopRecording() {
+                if (!isRecording) return;
+                isRecording = false;
+                if (scriptProcessor) {
+                    scriptProcessor.disconnect();
+                    scriptProcessor = null;
+                }
+                if (mediaStream) {
+                    mediaStream.getTracks().forEach(track => track.stop());
+                    mediaStream = null;
+                }
+                startRecBtn.disabled = false;
+                stopRecBtn.disabled = true;
+                statusDiv.textContent = `📥 Записано ${recordedSamples.length} отсчётов. Идёт декодирование...`;
+                // запускаем декодирование асинхронно
+                setTimeout(() => decodeRecordedSamples(), 100);
+            }
+
+            startRecBtn.addEventListener('click', startRecording);
+            stopRecBtn.addEventListener('click', stopRecording);
+
+            // --- Декодирование записанного сигнала ---
+            function decodeRecordedSamples() {
+                if (recordedSamples.length === 0) {
+                    statusDiv.textContent = '❌ Нет записанных данных.';
+                    return;
+                }
+                const samples = new Float32Array(recordedSamples);
+                const sr = sampleRate;
+                const tb = TbSamples; // длина окна на бит в сэмплах
+
+                // Функция Goertzel для вычисления мощности на частоте
+                function goertzelPower(signal, targetFreq, sampleRate) {
+                    const N = signal.length;
+                    const k = Math.round(N * targetFreq / sampleRate);
+                    const omega = (2 * Math.PI * k) / N;
+                    const coeff = 2 * Math.cos(omega);
+                    let s0 = 0, s1 = 0, s2 = 0;
+                    for (let i = 0; i < N; i++) {
+                        s0 = signal[i] + coeff * s1 - s2;
+                        s2 = s1;
+                        s1 = s0;
+                    }
+                    const real = s1 - s2 * Math.cos(omega);
+                    const imag = s2 * Math.sin(omega);
+                    return real * real + imag * imag;
+                }
+
+                // Ищем преамбулу: перебираем возможные смещения offset от 0 до tb-1
+                let bestScore = -Infinity;
+                let bestOffset = 0;
+                const preambleLenSamples = PREAMBLE_BITS * tb;
+                if (samples.length < preambleLenSamples + tb * 2) {
+                    statusDiv.textContent = '❌ Слишком короткая запись для преамбулы.';
+                    return;
+                }
+                // Чтобы ускорить, ищем с шагом 1
+                for (let offset = 0; offset < tb; offset++) {
+                    let score = 0;
+                    let valid = true;
+                    for (let i = 0; i < PREAMBLE_BITS; i++) {
+                        const start = offset + i * tb;
+                        if (start + tb > samples.length) { valid = false; break; }
+                        const windowSamples = samples.slice(start, start + tb);
+                        const p1200 = goertzelPower(windowSamples, FREQ_MARK, sr);
+                        const p2200 = goertzelPower(windowSamples, FREQ_SPACE, sr);
+                        const diff = p1200 - p2200;
+                        const expected = PREAMBLE_PATTERN[i] === 1 ? 1 : -1;
+                        score += diff * expected;
+                    }
+                    if (valid && score > bestScore) {
+                        bestScore = score;
+                        bestOffset = offset;
+                    }
+                }
+
+                // Проверка порога (эмпирически)
+                if (bestScore < 0) {
+                    statusDiv.textContent = '❌ Преамбула не найдена (низкая корреляция).';
+                    return;
+                }
+
+                // Декодируем байты после преамбулы
+                const dataStart = bestOffset + PREAMBLE_BITS * tb;
+                const bits = [];
+                // Считываем сырые битовые решения для каждого окна tb с шагом tb
+                for (let pos = dataStart; pos + tb <= samples.length; pos += tb) {
+                    const windowSamples = samples.slice(pos, pos + tb);
+                    const p1200 = goertzelPower(windowSamples, FREQ_MARK, sr);
+                    const p2200 = goertzelPower(windowSamples, FREQ_SPACE, sr);
+                    bits.push(p1200 > p2200 ? 1 : 0);
+                }
+
+                // Декодируем байты из битового потока (ожидаем старт-бит 0, 8 бит данных, стоп-бит 1)
+                const decodedBytes = [];
+                let idx = 0;
+                while (idx + 10 <= bits.length) {
+                    if (bits[idx] !== 0) { idx++; continue; } // ждём старт-бит 0
+                    let byteVal = 0;
+                    for (let i = 0; i < 8; i++) {
+                        byteVal |= (bits[idx + 1 + i] << i);
+                    }
+                    const stopBit = bits[idx + 9];
+                    if (stopBit !== 1) { idx += 10; continue; } // ошибка стоп-бита
+                    decodedBytes.push(byteVal);
+                    idx += 10;
+                    // После получения достаточного количества байт, проверяем длину
+                    if (decodedBytes.length === 2) {
+                        const payloadLen = decodedBytes[0] | (decodedBytes[1] << 8);
+                        const totalPacketLen = 2 + payloadLen + 1;
+                        if (totalPacketLen > 512) { // реалистичное ограничение
+                            statusDiv.textContent = '❌ Слишком большая длина пакета, возможно ошибка.';
+                            return;
+                        }
+                    }
+                    if (decodedBytes.length >= 3 + (decodedBytes.length >= 3 ? (decodedBytes[0] | (decodedBytes[1] << 8)) + 2 : Infinity)) break;
+                }
+
+                if (decodedBytes.length < 4) {
+                    statusDiv.textContent = '❌ Недостаточно данных после декодирования.';
+                    return;
+                }
+
+                const payloadLen = decodedBytes[0] | (decodedBytes[1] << 8);
+                const totalExpected = 2 + payloadLen + 1;
+                if (decodedBytes.length < totalExpected) {
+                    statusDiv.textContent = `❌ Ожидалось ${totalExpected} байт, получено ${decodedBytes.length}.`;
+                    return;
+                }
+                const packet = decodedBytes.slice(0, totalExpected);
+                // Проверка контрольной суммы
+                let checksum = 0;
+                for (let i = 0; i < packet.length - 1; i++) checksum ^= packet[i];
+                if (checksum !== packet[packet.length - 1]) {
+                    statusDiv.textContent = '❌ Ошибка контрольной суммы. Попробуйте ещё раз.';
+                    return;
+                }
+
+                const type = packet[2];
+                const payload = packet.slice(3, 3 + payloadLen - 1); // -1 потому что payloadLen включает type
+
+                // Отображаем результат
+                if (type === 0x00) { // текст
+                    const decoder = new TextDecoder();
+                    const text = decoder.decode(new Uint8Array(payload));
+                    resultDiv.innerHTML = `<strong>📨 Принятый текст:</strong> ${text}`;
+                    resultImg.style.display = 'none';
+                    statusDiv.textContent = '✅ Текст успешно декодирован!';
+                } else if (type === 0x01) { // JPEG
+                    const blob = new Blob([new Uint8Array(payload)], { type: 'image/jpeg' });
+                    const url = URL.createObjectURL(blob);
+                    resultImg.src = url;
+                    resultImg.style.display = 'block';
+                    resultDiv.innerHTML = '<strong>🖼️ Принятое фото:</strong>';
+                    statusDiv.textContent = '✅ Изображение успешно декодировано!';
+                } else {
+                    statusDiv.textContent = '❌ Неизвестный тип данных.';
+                }
+            }
+
+            // Автоматически запрашиваем AudioContext при первом взаимодействии
+            document.body.addEventListener('click', () => getAudioContext(), { once: true });
+        })();
+    </script>
+</body>
+</html>
