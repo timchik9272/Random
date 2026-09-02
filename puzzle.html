@@ -2,1000 +2,1204 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>СКВОЗЬ ЭПОХИ — кооперативная головоломка</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ЭХО ЭПОХ — кооперативная головоломка времени</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/russo-one@5.0.20/index.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/rubik@5.0.20/index.css">
 <style>
-@import url('https://cdn.jsdelivr.net/npm/@fontsource/russo-one@5.0.19/index.css');
-@import url('https://cdn.jsdelivr.net/npm/@fontsource/rubik@5.0.20/400.css');
-@import url('https://cdn.jsdelivr.net/npm/@fontsource/rubik@5.0.20/700.css');
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{width:100%;height:100%;overflow:hidden;background:#0b0820;font-family:Rubik,system-ui,sans-serif;color:#eae6ff;touch-action:none;overscroll-behavior:none}
-#app{position:fixed;inset:0}
-canvas#c{position:absolute;inset:0;width:100%;height:100%;display:block}
+:root{
+  --past:#ffb454; --now:#54d1ff; --fut:#b48cff;
+  --ink:#0c1220; --panel:rgba(10,16,30,.78); --line:rgba(140,180,255,.22);
+  --gold:#ffd76a;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#070a12;font-family:'Rubik',sans-serif;color:#e8eefc}
+canvas{display:block}
+#cv{position:fixed;inset:0;z-index:0}
+h1,h2,h3,.rus{font-family:'Russo One',sans-serif;letter-spacing:.04em}
+button{font-family:'Russo One',sans-serif;cursor:pointer;border:1px solid var(--line);background:rgba(20,30,55,.7);color:#e8eefc;padding:10px 18px;border-radius:8px;font-size:14px;transition:.15s;letter-spacing:.05em}
+button:hover{background:rgba(60,90,150,.6);transform:translateY(-1px);box-shadow:0 4px 18px rgba(80,140,255,.25)}
+button:disabled{opacity:.4;cursor:default;transform:none;box-shadow:none}
+button.acc{background:linear-gradient(135deg,#2c6ee8,#7a4de8);border-color:rgba(180,200,255,.4)}
+button.acc:hover{box-shadow:0 4px 22px rgba(120,100,255,.45)}
+input{background:rgba(8,14,28,.8);border:1px solid var(--line);color:#fff;padding:10px 14px;border-radius:8px;font-size:16px;font-family:'Russo One';letter-spacing:.3em;text-transform:uppercase;text-align:center;outline:none}
+.screen{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(ellipse at 50% 120%,rgba(40,25,90,.55),rgba(4,7,14,.82) 70%);backdrop-filter:blur(3px)}
 .hidden{display:none!important}
-/* ---------- generic UI ---------- */
-.panel{background:rgba(16,12,44,.82);border:1px solid rgba(140,120,255,.35);border-radius:14px;backdrop-filter:blur(8px);box-shadow:0 10px 40px rgba(0,0,0,.5)}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:'Russo One',Rubik,sans-serif;font-size:16px;letter-spacing:.5px;color:#1a1030;background:linear-gradient(160deg,#ffd76a,#ff9d3c);border:none;border-radius:12px;padding:13px 22px;cursor:pointer;box-shadow:0 4px 0 #a35a12,0 8px 18px rgba(0,0,0,.4);transition:transform .08s,filter .15s;user-select:none}
-.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #a35a12}
-.btn.sec{background:linear-gradient(160deg,#8f7bff,#5b3fd4);color:#fff;box-shadow:0 4px 0 #2c1a78,0 8px 18px rgba(0,0,0,.4)}
-.btn.sec:active{box-shadow:0 1px 0 #2c1a78}
-.btn.ghost{background:rgba(255,255,255,.08);color:#cfc6ff;border:1px solid rgba(150,130,255,.45);box-shadow:none}
-.btn.small{font-size:13px;padding:8px 14px;border-radius:9px}
-.btn:disabled{filter:grayscale(.8) brightness(.7);cursor:not-allowed}
-input[type=text]{font-family:Rubik;font-size:16px;color:#fff;background:rgba(255,255,255,.08);border:1px solid rgba(150,130,255,.5);border-radius:10px;padding:11px 14px;outline:none;width:100%}
-input[type=text]:focus{border-color:#ffd76a}
-/* ---------- menu ---------- */
-#menuScreen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:40;background:radial-gradient(1200px 700px at 50% 18%,#2a1d63 0%,#150f3a 55%,#0b0820 100%)}
-#menuScreen .tris{position:absolute;inset:0;overflow:hidden;pointer-events:none}
-.tri{position:absolute;width:0;height:0;opacity:.16;animation:floaty 9s ease-in-out infinite}
-@keyframes floaty{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-26px) rotate(12deg)}}
-.menuCard{width:min(480px,92vw);padding:28px 26px;text-align:center;z-index:2}
-.logo{font-family:'Russo One';font-size:clamp(30px,7vw,46px);line-height:1.05;background:linear-gradient(90deg,#ffd76a,#ff7ad9 55%,#6ee7ff);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 34px rgba(255,180,80,.25)}
-.tagline{margin:8px 0 20px;color:#b9aef0;font-size:14px}
-.menuCard .btn{width:100%;margin:7px 0}
-.rowInput{display:flex;gap:8px;margin:7px 0}
-.eraIcons{display:flex;justify-content:center;gap:16px;margin:14px 0 4px;font-size:12px;color:#b9aef0}
-.eraIcons div{display:flex;flex-direction:column;align-items:center;gap:5px}
-.eraDot{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 0 18px currentColor}
-.subScreen{padding:26px;width:min(480px,92vw);text-align:center}
-.bigCode{font-family:'Russo One';font-size:44px;letter-spacing:8px;color:#ffd76a;text-shadow:0 0 26px rgba(255,215,106,.5);margin:10px 0}
-#howText{text-align:left;font-size:14px;line-height:1.55;color:#d6cdff;max-height:56vh;overflow:auto;padding-right:6px}
-#howText b{color:#ffd76a}
-/* ---------- HUD ---------- */
-#hud{position:absolute;inset:0;pointer-events:none;z-index:20}
-#hud>*{pointer-events:auto}
-#topLeft{position:absolute;top:10px;left:10px;display:flex;gap:8px;align-items:center}
-#eraBadge{font-family:'Russo One';font-size:13px;padding:8px 13px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(14,10,38,.8);display:flex;gap:7px;align-items:center}
-#roomChip{font-size:12px;padding:8px 10px;border-radius:10px;background:rgba(14,10,38,.8);border:1px solid rgba(150,130,255,.3);color:#b9aef0}
-#fragChip{font-size:12px;padding:8px 10px;border-radius:10px;background:rgba(14,10,38,.8);border:1px solid rgba(255,215,106,.35);color:#ffd76a;font-weight:700}
-#topRight{position:absolute;top:10px;right:10px;display:flex;gap:7px}
-.iconBtn{width:42px;height:42px;border-radius:11px;font-size:18px;background:rgba(14,10,38,.85);border:1px solid rgba(150,130,255,.4);color:#e8e2ff;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.iconBtn:active{transform:scale(.93)}
-#previews{position:absolute;top:62px;right:10px;display:flex;flex-direction:column;gap:8px;pointer-events:none}
-.pv{width:clamp(104px,20vw,180px);height:clamp(66px,12vw,104px);border-radius:10px;border:1px solid rgba(160,140,255,.5);position:relative;background:rgba(0,0,0,.25);overflow:hidden}
-.pv span{position:absolute;left:6px;top:4px;font-size:10px;font-family:'Russo One';letter-spacing:1px;color:#fff;text-shadow:0 1px 4px #000;z-index:2}
-.pv.p0 span{color:#ffd76a}.pv.p1 span{color:#6ee7c8}.pv.p2 span{color:#c29bff}
-#hint{position:absolute;left:50%;bottom:calc(112px + env(safe-area-inset-bottom));transform:translateX(-50%);font-size:15px;font-weight:700;padding:9px 18px;border-radius:12px;background:rgba(14,10,38,.88);border:1px solid rgba(255,215,106,.5);color:#ffe9b0;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}
-#toasts{position:absolute;top:16%;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;z-index:35;width:min(560px,94vw)}
-.toast{padding:9px 18px;border-radius:11px;background:rgba(20,14,52,.92);border:1px solid rgba(160,140,255,.55);font-size:14px;font-weight:700;color:#efe9ff;text-align:center;animation:tin .25s ease-out;box-shadow:0 6px 22px rgba(0,0,0,.45)}
-.toast.gold{border-color:#ffd76a;color:#ffe9b0}
-.toast.good{border-color:#5ee6a8;color:#c8ffde}
-@keyframes tin{from{opacity:0;transform:translateY(-10px) scale(.94)}to{opacity:1}}
-.toast.out{opacity:0;transform:translateY(-8px);transition:all .4s}
-/* tasks */
-#taskPanel{position:absolute;top:70px;left:10px;width:min(340px,86vw);max-height:60vh;overflow:auto;padding:14px;z-index:30}
-#taskPanel h3{font-family:'Russo One';color:#ffd76a;font-size:15px;margin-bottom:8px}
-.task{display:flex;gap:8px;align-items:flex-start;font-size:13px;padding:5px 0;border-bottom:1px dashed rgba(150,130,255,.18);color:#d9d1ff}
-.task .st{flex:0 0 18px;text-align:center}
-.task.done{color:#6f8f7c;text-decoration:line-through}
-.task .eraTag{flex:0 0 auto;font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;margin-left:auto;white-space:nowrap}
-.eraTag.e0{background:rgba(255,215,106,.16);color:#ffd76a}
-.eraTag.e2{background:rgba(178,120,255,.18);color:#c9a4ff}
-.eraTag.ea{background:rgba(110,231,200,.14);color:#6ee7c8}
-/* touch controls */
-#joyZone{position:absolute;left:0;bottom:0;width:46vw;height:44vh;z-index:22}
-#joyBase{position:absolute;width:112px;height:112px;border-radius:50%;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.25);display:none}
-#joyKnob{position:absolute;width:52px;height:52px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#c9b8ff,#6d4fd8);box-shadow:0 4px 12px rgba(0,0,0,.5);display:none}
-#touchBtns{position:absolute;right:14px;bottom:calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px;align-items:flex-end;z-index:22}
-.tBtn{width:70px;height:70px;border-radius:50%;font-family:'Russo One';font-size:12px;color:#1a1030;background:radial-gradient(circle at 35% 30%,#ffe6a3,#ffab3c);border:none;box-shadow:0 5px 16px rgba(0,0,0,.5);cursor:pointer}
-.tBtn.alt{background:radial-gradient(circle at 35% 30%,#c9b8ff,#7a5cf0);color:#fff;width:58px;height:58px;font-size:10px}
-.tBtn:active{transform:scale(.92)}
-/* overlays */
-.overlay{position:absolute;inset:0;z-index:45;background:rgba(6,4,20,.72);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center}
-.overlay .panel{width:min(440px,92vw);padding:26px;text-align:center}
-.overlay h2{font-family:'Russo One';font-size:26px;color:#ffd76a;margin-bottom:10px}
-.overlay p{color:#cfc5ff;font-size:14px;line-height:1.5;margin-bottom:16px}
-#lobbyList{margin:12px 0;text-align:left;font-size:14px}
-#lobbyList div{padding:6px 10px;border-radius:8px;background:rgba(255,255,255,.05);margin:4px 0}
-.spinner{width:26px;height:26px;border:3px solid rgba(255,255,255,.15);border-top-color:#ffd76a;border-radius:50%;margin:12px auto;animation:sp 1s linear infinite}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px 30px;backdrop-filter:blur(10px);box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.title{font-size:56px;background:linear-gradient(90deg,var(--past),var(--now),var(--fut));-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 40px rgba(120,120,255,.25)}
+.sub{opacity:.75;margin:6px 0 20px;font-size:15px;letter-spacing:.12em}
+.row{display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap}
+.card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:rgba(14,22,42,.7);cursor:pointer;transition:.15s;width:230px;text-align:left}
+.card:hover{border-color:var(--gold);transform:translateY(-2px)}
+.card.sel{border-color:var(--gold);box-shadow:0 0 24px rgba(255,215,106,.25)}
+.card .cn{font-family:'Russo One';font-size:16px;margin-bottom:4px}
+.card .cd{font-size:12px;opacity:.7;line-height:1.45}
+.eptag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;margin-right:4px;font-weight:600}
+.t-past{background:rgba(255,180,84,.18);color:var(--past)}
+.t-now{background:rgba(84,209,255,.18);color:var(--now)}
+.t-fut{background:rgba(180,140,255,.18);color:var(--fut)}
+/* HUD */
+#hud{position:fixed;inset:0;z-index:10;pointer-events:none;display:none}
+#hud.on{display:block}
+.hpanel{position:absolute;background:var(--panel);border:1px solid var(--line);border-radius:10px;backdrop-filter:blur(8px)}
+#objBox{top:14px;left:14px;max-width:330px;padding:12px 14px;font-size:13px}
+#lvTitle{font-family:'Russo One';color:var(--gold);font-size:15px;margin-bottom:6px}
+.stage{opacity:.45;margin:3px 0;padding-left:18px;position:relative;line-height:1.35;font-size:12.5px}
+.stage.cur{opacity:1;color:#fff}
+.stage.done{opacity:.65;color:#8fe8a8}
+.stage::before{content:'◇';position:absolute;left:0;color:var(--gold)}
+.stage.done::before{content:'✔'}
+.stage.cur::before{content:'▶';color:var(--now)}
+#chips{top:14px;right:14px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:190px}
+.chip{display:flex;align-items:center;gap:8px;font-size:13px;background:rgba(20,30,55,.55);padding:5px 9px;border-radius:8px}
+.chip .dot{width:10px;height:10px;border-radius:50%;box-shadow:0 0 8px currentColor}
+.chip .cr{margin-left:auto;font-size:14px}
+#timer{font-family:'Russo One';color:var(--gold);text-align:center;margin-bottom:4px;font-size:14px}
+#prompt{position:absolute;bottom:118px;left:50%;transform:translateX(-50%);background:rgba(8,12,24,.85);border:1px solid var(--gold);color:#fff;padding:9px 18px;border-radius:10px;font-size:14px;display:none;white-space:nowrap;box-shadow:0 0 24px rgba(255,215,106,.2)}
+#prompt b{color:var(--gold);font-family:'Russo One';margin-right:8px}
+#shiftBar{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:10px;pointer-events:auto}
+.sbtn{width:118px;padding:8px 6px 7px;border-radius:10px;position:relative;text-align:center;overflow:hidden}
+.sbtn .k{position:absolute;top:4px;left:6px;font-size:10px;opacity:.6;font-family:'Rubik'}
+.sbtn .nm{font-family:'Russo One';font-size:13px}
+.sbtn.act{outline:2px solid #fff}
+.sbtn .cd{position:absolute;inset:0;background:rgba(0,0,0,.62);transform-origin:bottom;transform:scaleY(0)}
+#hintBtn{position:absolute;bottom:16px;right:14px;pointer-events:auto;font-size:12px;padding:8px 12px}
+#ctrls{position:absolute;bottom:16px;left:14px;font-size:11px;opacity:.65;line-height:1.7}
+#toasts{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:30;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{background:rgba(10,16,30,.9);border:1px solid var(--line);border-left:3px solid var(--gold);padding:9px 18px;border-radius:8px;font-size:13.5px;max-width:560px;animation:tin .3s ease;box-shadow:0 8px 30px rgba(0,0,0,.45)}
+.toast.good{border-left-color:#6fe89a}
+.toast.warn{border-left-color:#ff8a6a}
+.toast.ep-past{border-left-color:var(--past)} .toast.ep-now{border-left-color:var(--now)} .toast.ep-fut{border-left-color:var(--fut)}
+@keyframes tin{from{opacity:0;transform:translateY(-12px)}to{opacity:1}}
+#flash{position:fixed;inset:0;z-index:25;pointer-events:none;opacity:0;background:radial-gradient(circle,rgba(255,255,255,.85),rgba(140,120,255,.4))}
+/* lobby chips */
+.prow{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--line);border-radius:10px;margin:8px 0;background:rgba(14,22,42,.6)}
+.prow .pn{font-family:'Russo One';min-width:110px}
+.epbtn{padding:6px 10px;font-size:11px;border-radius:6px}
+.epbtn.on{box-shadow:0 0 0 2px #fff inset}
+#roomCode{font-family:'Russo One';font-size:38px;letter-spacing:.4em;color:var(--gold);text-align:center;margin:8px 0;text-shadow:0 0 24px rgba(255,215,106,.4)}
+.small{font-size:12px;opacity:.65;line-height:1.5}
+#howto .panel{max-width:720px;max-height:82vh;overflow:auto;font-size:13.5px;line-height:1.6}
+#howto h3{color:var(--gold);margin:14px 0 4px}
+kbd{background:rgba(255,255,255,.12);border:1px solid var(--line);padding:1px 7px;border-radius:5px;font-family:'Russo One';font-size:11px}
+#vstats{display:flex;gap:26px;margin:16px 0;justify-content:center}
+#vstats div{text-align:center}
+#vstats .v{font-family:'Russo One';font-size:26px;color:var(--gold)}
+#vstats .l{font-size:11px;opacity:.6;letter-spacing:.1em}
+.spin{display:inline-block;animation:sp 1s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
-#levelTitle{position:absolute;inset:0;z-index:44;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;background:rgba(6,4,20,.45);transition:opacity .8s}
-#levelTitle h1{font-family:'Russo One';font-size:clamp(26px,6vw,44px);color:#ffd76a;text-shadow:0 0 40px rgba(255,180,80,.5)}
-#levelTitle p{color:#cfc5ff;margin-top:8px;font-size:15px}
-#rotateHint{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);font-size:11px;color:rgba(220,210,255,.45);pointer-events:none;z-index:21}
 </style>
 </head>
 <body>
-<div id="app">
-  <canvas id="c"></canvas>
+<div id="cv"></div>
+<div id="flash"></div>
+<div id="toasts"></div>
 
-  <!-- HUD -->
-  <div id="hud" class="hidden">
-    <div id="topLeft">
-      <div id="eraBadge">⌛ Прошлое</div>
-      <div id="fragChip">◆ 0/0</div>
-      <div id="roomChip" class="hidden"></div>
-    </div>
-    <div id="topRight">
-      <button class="iconBtn" id="btnTasks" title="Задачи">📜</button>
-      <button class="iconBtn hidden" id="btnPing" title="Готов!">✋</button>
-      <button class="iconBtn" id="btnFull" title="На весь экран">⛶</button>
-      <button class="iconBtn" id="btnLeave" title="Выйти">✕</button>
-    </div>
-    <div id="previews"></div>
-    <div id="taskPanel" class="panel hidden"></div>
-    <div id="hint" class="hidden"></div>
-    <div id="toasts"></div>
-    <div id="joyZone"><div id="joyBase"></div><div id="joyKnob"></div></div>
-    <div id="touchBtns" class="hidden">
-      <button class="tBtn" id="btnAct">ДЕЙСТВИЕ</button>
-      <button class="tBtn alt hidden" id="btnShift">⇄ ЭПОХА</button>
-      <button class="tBtn alt hidden" id="btnPingT">✋ ГОТОВ</button>
-    </div>
-    <div id="rotateHint">🔊 советы: на телефоне — джойстик слева, кнопка действия справа · лучше в ландшафте</div>
+<!-- HUD -->
+<div id="hud">
+  <div class="hpanel" id="objBox"><div id="lvTitle"></div><div id="stages"></div></div>
+  <div class="hpanel" id="chips"><div id="timer">00:00</div><div id="chipList"></div></div>
+  <div id="prompt"></div>
+  <div id="shiftBar">
+    <button class="sbtn" data-ep="past"><span class="k">[1]</span><span class="nm" style="color:var(--past)">ПРОШЛОЕ</span><div class="cd"></div></button>
+    <button class="sbtn" data-ep="present"><span class="k">[2]</span><span class="nm" style="color:var(--now)">НАСТОЯЩЕЕ</span><div class="cd"></div></button>
+    <button class="sbtn" data-ep="future"><span class="k">[3]</span><span class="nm" style="color:var(--fut)">БУДУЩЕЕ</span><div class="cd"></div></button>
   </div>
-
-  <!-- MENU -->
-  <div id="menuScreen">
-    <div class="tris" id="triBg"></div>
-    <div class="menuCard panel" id="menuMain">
-      <div class="logo">СКВОЗЬ<br>ЭПОХИ</div>
-      <div class="tagline">кооперативная головоломка о времени · лоу-поли · играйте вдвоём по сети</div>
-      <div class="eraIcons">
-        <div><div class="eraDot" style="color:#ffd76a;background:rgba(255,215,106,.14)">⌛</div>Прошлое</div>
-        <div><div class="eraDot" style="color:#6ee7c8;background:rgba(110,231,200,.12)">◈</div>Настоящее</div>
-        <div><div class="eraDot" style="color:#c29bff;background:rgba(178,120,255,.14)">🔮</div>Будущее</div>
-      </div>
-      <input type="text" id="nameInput" placeholder="Ваше имя (необязательно)" maxlength="14">
-      <button class="btn" id="btnCreate">🏰 Создать комнату</button>
-      <div class="rowInput">
-        <input type="text" id="joinCodeInput" placeholder="КОД" maxlength="5" style="text-transform:uppercase;letter-spacing:4px;text-align:center">
-        <button class="btn sec" id="btnJoin" style="flex:0 0 auto">Войти</button>
-      </div>
-      <button class="btn ghost" id="btnSolo">🕰 Одиночная игра (сдвиг времени)</button>
-      <button class="btn ghost small" id="btnHow">❓ Как играть</button>
-      <div style="margin-top:12px;font-size:11px;color:#7d71b8">Один игрок — в Прошлом, второй — в Будущем.<br>Действия в прошлом мгновенно меняют будущее!</div>
-    </div>
-
-    <div class="menuCard panel subScreen hidden" id="menuCreate">
-      <h2 style="font-family:'Russo One';color:#ffd76a">Комната создана</h2>
-      <div style="color:#b9aef0;font-size:13px">Отправьте код другу:</div>
-      <div class="bigCode" id="roomCodeBig">·····</div>
-      <button class="btn ghost small" id="btnCopyCode">📋 Скопировать код</button>
-      <div id="lobbyList"></div>
-      <div class="spinner hidden" id="lobbySpin"></div>
-      <button class="btn" id="btnStart" disabled>▶ Начать вместе</button>
-      <button class="btn ghost small" id="btnStartSoloHost">Начать без напарника (тренировка)</button>
-      <button class="btn ghost small" id="btnBack1">← Назад</button>
-    </div>
-
-    <div class="menuCard panel subScreen hidden" id="menuJoin">
-      <h2 style="font-family:'Russo One';color:#ffd76a">Подключение…</h2>
-      <div class="spinner"></div>
-      <div id="joinStatus" style="color:#b9aef0;font-size:14px">Ищем комнату <b id="joinCodeEcho"></b></div>
-      <button class="btn ghost small" id="btnBack2" style="margin-top:14px">← Отмена</button>
-    </div>
-
-    <div class="menuCard panel subScreen hidden" id="menuLobbyGuest">
-      <h2 style="font-family:'Russo One';color:#ffd76a">Вы в игре!</h2>
-      <p>Ваша эпоха: <b id="guestEraLabel" style="color:#c29bff">🔮 Будущее</b><br>Ждите, пока хозяин комнаты начнёт игру…</p>
-      <div class="spinner"></div>
-      <button class="btn ghost small" id="btnBack3">← Покинуть</button>
-    </div>
-
-    <div class="menuCard panel subScreen hidden" id="menuHow">
-      <h2 style="font-family:'Russo One';color:#ffd76a">Как играть</h2>
-      <div id="howText">
-        <p>🌍 Одна и та же локация в трёх эпохах. <b>Прошлое ⌛</b> и <b>Будущее 🔮</b> — живые игроки, <b>Настоящее ◈</b> меняется само, отражая ваши решения.</p>
-        <p>🌱 <b>Причина и следствие:</b> посадите дерево в прошлом — в настоящем оно вырастет, а в будущем упадёт и станет мостом. Ключ, брошенный в Колодец Времени, всплывёт спустя века.</p>
-        <p>🤝 Головоломки требуют <b>синхронных действий</b>: плиты и рычаги заряжаются на несколько секунд — договоритесь и действуйте одновременно. Кнопка ✋ «Готов!» подаёт сигнал напарнику.</p>
-        <p>🎮 <b>Управление:</b> WASD/стрелки — движение, E/Пробел — действие, на телефоне — джойстик и кнопка ДЕЙСТВИЕ. В одиночном режиме кнопка ⇄ переносит вас между эпохами.</p>
-        <p>🔮 Собирайте <b>осколки времени</b>, приносите их к печатям и активируйте финал вместе!</p>
-      </div>
-      <button class="btn" id="btnHowBack" style="margin-top:12px">Понятно!</button>
-    </div>
-  </div>
-
-  <!-- level intro -->
-  <div id="levelTitle" class="hidden"><h1 id="ltName"></h1><p id="ltSub"></p></div>
-
-  <!-- win / final overlays -->
-  <div class="overlay hidden" id="winOverlay"><div class="panel">
-    <h2>✨ Эпоха восстановлена!</h2>
-    <p id="winStats"></p>
-    <button class="btn" id="btnNextLevel">Следующий уровень ▶</button>
-    <div id="guestWaitNext" class="hidden" style="color:#b9aef0;font-size:13px;margin-top:8px">Хозяин комнаты запускает следующий уровень…</div>
-  </div></div>
-  <div class="overlay hidden" id="finalOverlay"><div class="panel">
-    <h2>🌟 Поток времени восстановлен!</h2>
-    <p>Оба уровня пройдены. Дерево, посаженное в прошлом, стало мостом в будущее — благодаря вам двоим.</p>
-    <p id="finalStats" style="color:#ffd76a;font-weight:700"></p>
-    <button class="btn" id="btnRestart">↺ Сыграть заново</button>
-  </div></div>
-  <div class="overlay hidden" id="errOverlay"><div class="panel">
-    <h2 id="errTitle">Соединение потеряно</h2><p id="errText"></p>
-    <button class="btn" onclick="location.reload()">В главное меню</button>
-  </div></div>
+  <button id="hintBtn">💡 Подсказка</button>
+  <div id="ctrls">WASD — движение · E — действие · 1/2/3 или Tab — эпоха · Q — вернуть предмет · M — звук</div>
 </div>
 
+<!-- MENU -->
+<div class="screen" id="scr-menu">
+  <div style="text-align:center">
+    <div class="title rus">ЭХО ЭПОХ</div>
+    <div class="sub">кооперативная головоломка · три эпохи одной долины · лоу-поли</div>
+    <div class="row" id="lvCards" style="margin-bottom:18px"></div>
+    <div class="row">
+      <button class="acc" id="btnHost">🌐 Создать комнату</button>
+      <button id="btnJoin">🔗 Присоединиться</button>
+      <button id="btnSolo">⏳ Одиночная игра</button>
+      <button id="btnHow">❔ Как играть</button>
+    </div>
+    <div class="small" style="margin-top:16px">Игра для 2–3 человек по сети. Один игрок — одна эпоха (но каждый может совершать эхо-сдвиг).<br>Соло-режим: вы играете за всех, переключая эпохи клавишами 1/2/3.</div>
+  </div>
+</div>
+
+<!-- JOIN -->
+<div class="screen hidden" id="scr-join">
+  <div class="panel" style="text-align:center;width:380px">
+    <h2 class="rus" style="color:var(--gold)">ВХОД В ПОТОК</h2>
+    <p class="small" style="margin:8px 0 14px">Введите код комнаты, который видит хост</p>
+    <input id="joinCode" maxlength="5" placeholder="КОД" style="width:200px">
+    <div style="margin:8px 0"><input id="joinName" maxlength="12" placeholder="ВАШЕ ИМЯ" style="width:200px;letter-spacing:.1em"></div>
+    <div class="row" style="margin-top:12px"><button class="acc" id="btnDoJoin">Войти</button><button id="btnJoinBack">Назад</button></div>
+    <div class="small" id="joinStat" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- LOBBY -->
+<div class="screen hidden" id="scr-lobby">
+  <div class="panel" style="width:480px;text-align:center">
+    <h2 class="rus" style="color:var(--gold)">КОМНАТА СОБРАНА</h2>
+    <div class="small">Код комнаты — передайте друзьям:</div>
+    <div id="roomCode">·····</div>
+    <div id="lobbyPlayers"></div>
+    <div class="small" style="margin:6px 0">Каждый выбирает домашнюю эпоху. Эхо-сдвиг (1/2/3) доступен всем в любой момент.</div>
+    <div class="row" id="lobbyLvRow" style="margin:10px 0"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="acc" id="btnStart">▶ НАЧАТЬ ПОГРУЖЕНИЕ</button>
+      <button id="btnLobbyLeave">Покинуть</button>
+    </div>
+    <div class="small" id="lobbyWait" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- HOWTO -->
+<div class="screen hidden" id="howto">
+  <div class="panel">
+    <h2 class="rus" style="color:var(--gold);text-align:center">КАК ИГРАТЬ</h2>
+    <h3>⌛ Суть</h3>
+    Одна и та же локация существует в трёх эпохах: <span class="eptag t-past">Прошлое</span><span class="eptag t-now">Настоящее</span><span class="eptag t-fut">Будущее</span>. Каждый игрок живёт в своей. Изменения в прошлом мгновенно прорастают в настоящем и будущем: посаженное семя станет деревом, а затем — упавшим мостом.
+    <h3>🌀 Эхо-сдвиг</h3>
+    Клавиши <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> или <kbd>Tab</kbd> перебрасывают вас в другую эпоху (перезарядка 8 секунд). Предметы переносятся с вами — ключ, зарытый в прошлом, можно выкопать в настоящем.
+    <h3>🤝 Синхронность</h3>
+    Многие механизмы требуют одновременных действий в разных эпохах: руны, маяки, рычаги. Договаривайтесь голосом: «три-два-один — жми!». Руны держат заряд 7 секунд — соло-игрок успеет сдвинуться.
+    <h3>👥 Сеть</h3>
+    Хост создаёт комнату и диктует код. Друзья вводят его в «Присоединиться». Работает через интернет (P2P). Если напарника нет — соло-режим.
+    <h3>🎮 Управление</h3>
+    <kbd>W A S D</kbd> движение · <kbd>E</kbd> действие · <kbd>1/2/3</kbd>/<kbd>Tab</kbd> эпоха · <kbd>Q</kbd> вернуть предмет времени · <kbd>M</kbd> звук · <kbd>Esc</kbd> пауза
+    <div style="text-align:center;margin-top:16px"><button class="acc" id="btnHowBack">Понятно</button></div>
+  </div>
+</div>
+
+<!-- PAUSE -->
+<div class="screen hidden" id="scr-pause">
+  <div class="panel" style="text-align:center">
+    <h2 class="rus" style="color:var(--gold)">ПАУЗА</h2>
+    <div class="row" style="margin-top:14px"><button class="acc" id="btnResume">Продолжить</button><button id="btnPauseMenu">В меню</button></div>
+  </div>
+</div>
+
+<!-- VICTORY -->
+<div class="screen hidden" id="scr-win">
+  <div class="panel" style="text-align:center;min-width:440px">
+    <h2 class="rus" style="font-size:30px;background:linear-gradient(90deg,var(--past),var(--now),var(--fut));-webkit-background-clip:text;background-clip:text;color:transparent" id="winTitle">ЭПОХА СПАСЕНА</h2>
+    <div class="small" id="winSub" style="margin-top:6px"></div>
+    <div id="vstats">
+      <div><div class="v" id="stTime">0:00</div><div class="l">ВРЕМЯ</div></div>
+      <div><div class="v" id="stShift">0</div><div class="l">СДВИГОВ</div></div>
+      <div><div class="v" id="stAct">0</div><div class="l">ДЕЙСТВИЙ</div></div>
+    </div>
+    <div class="row">
+      <button class="acc hidden" id="btnNext">▶ СЛЕДУЮЩИЙ УРОВЕНЬ</button>
+      <button id="btnReplay">↻ Заново</button>
+      <button id="btnWinMenu">В меню</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
-<script type="module">
-import * as THREE from 'three';
-/* ================= utils ================= */
-const $=id=>document.getElementById(id);
+<script>
+"use strict";
+/* ================= УТИЛИТЫ ================= */
+const $=q=>document.querySelector(q);
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const lerp=(a,b,t)=>a+(b-a)*t;
 const dist2=(ax,az,bx,bz)=>Math.hypot(ax-bx,az-bz);
-function mulberry(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
-const ERAS=[{name:'Прошлое',icon:'⌛',col:0xffd76a,css:'#ffd76a'},{name:'Настоящее',icon:'◈',col:0x6ee7c8,css:'#6ee7c8'},{name:'Будущее',icon:'🔮',col:0xc29bff,css:'#c29bff'}];
-const THEMES=[
- {sky:0xf6d9a2,fog:0xf0cf96,ground:0x8fbd68,sand:0xe6d29b,rock:0x8d8066,water:0x4fb7c9,hemi:0xfff1d6,hemiG:0x7a6b45,sun:0xffdca0,sunI:1.15,char:0xe8a33d},
- {sky:0xcfe6ec,fog:0xc4dde2,ground:0x74a86e,sand:0xd8cfac,rock:0x7e848c,water:0x4f9fc4,hemi:0xeaf6ff,hemiG:0x5f6f66,sun:0xfff4da,sunI:1.0,char:0x3fbf9f},
- {sky:0x191238,fog:0x241a4d,ground:0x4a4172,sand:0x5b4f8a,rock:0x2f2854,water:0x16304f,hemi:0x8f7bd8,hemiG:0x141026,sun:0x9fd8ff,sunI:.9,char:0x9a5cf0,neon:0x59f7ff}
-];
-/* ================= audio ================= */
-let AC=null;
-function sfx(kind){try{
- if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();
- if(AC.state==='suspended')AC.resume();
- const t=AC.currentTime;const mk=(f,d,type,g,delay=0)=>{const o=AC.createOscillator(),v=AC.createGain();o.type=type;o.frequency.value=f;v.gain.setValueAtTime(0,t+delay);v.gain.linearRampToValueAtTime(g,t+delay+.015);v.gain.exponentialRampToValueAtTime(.0001,t+delay+d);o.connect(v).connect(AC.destination);o.start(t+delay);o.stop(t+delay+d+.05)};
- if(kind==='ok'){mk(660,.15,'triangle',.16);mk(880,.2,'triangle',.14,.09)}
- else if(kind==='pick'){mk(920,.1,'square',.07)}
- else if(kind==='deny'){mk(160,.2,'sawtooth',.1)}
- else if(kind==='shift'){mk(300,.25,'sine',.12);mk(600,.25,'sine',.1,.05)}
- else if(kind==='big'){[523,659,784,1046].forEach((f,i)=>mk(f,.3,'triangle',.15,i*.12))}
- else if(kind==='win'){[392,523,659,784,1046,1318].forEach((f,i)=>mk(f,.35,'triangle',.16,i*.13))}
-}catch(e){}}
-/* ================= input ================= */
-const input={kx:0,kz:0,jx:0,jz:0};
-const keys=new Set();
-addEventListener('keydown',e=>{
- if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
- keys.add(e.code);
- if(e.code==='KeyE'||e.code==='Space')doAction();
- if(e.code==='KeyQ')doShift();
- if(e.code==='KeyR')sendPing();
-});
-addEventListener('keyup',e=>keys.delete(e.code));
-function keyVec(){let x=0,z=0;if(keys.has('KeyA')||keys.has('ArrowLeft'))x-=1;if(keys.has('KeyD')||keys.has('ArrowRight'))x+=1;if(keys.has('KeyW')||keys.has('ArrowUp'))z-=1;if(keys.has('KeyS')||keys.has('ArrowDown'))z+=1;return[x,z]}
-/* joystick */
-const isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
-let joyId=null,joyCx=0,joyCy=0;
-const jz=$('joyZone'),jb=$('joyBase'),jk=$('joyKnob');
-jz.addEventListener('pointerdown',e=>{if(joyId!==null)return;joyId=e.pointerId;joyCx=e.clientX;joyCy=e.clientY;jb.style.display=jk.style.display='block';jb.style.left=(joyCx-56)+'px';jb.style.top=(joyCy-56)+'px';jk.style.left=(joyCx-26)+'px';jk.style.top=(joyCy-26)+'px';jz.setPointerCapture(e.pointerId)});
-jz.addEventListener('pointermove',e=>{if(e.pointerId!==joyId)return;let dx=e.clientX-joyCx,dy=e.clientY-joyCy;const m=Math.hypot(dx,dy)||1,r=Math.min(m,46);dx=dx/m*r;dy=dy/m*r;jk.style.left=(joyCx-26+dx)+'px';jk.style.top=(joyCy-26+dy)+'px';input.jx=dx/46;input.jz=dy/46});
-const joyEnd=e=>{if(e.pointerId!==joyId)return;joyId=null;input.jx=input.jz=0;jb.style.display=jk.style.display='none'};
-jz.addEventListener('pointerup',joyEnd);jz.addEventListener('pointercancel',joyEnd);
-$('btnAct').addEventListener('pointerdown',e=>{e.preventDefault();doAction()});
-$('btnShift').addEventListener('pointerdown',e=>{e.preventDefault();doShift()});
-$('btnPingT').addEventListener('pointerdown',e=>{e.preventDefault();sendPing()});
-if(isTouch)$('touchBtns').classList.remove('hidden');
-function getMove(){const[kx,kz]=keyVec();let x=kx+input.jx,z=kz+input.jz;const m=Math.hypot(x,z);if(m>1){x/=m;z/=m}return{x,z}}
-/* ================= toasts / UI helpers ================= */
-function toast(txt,cls=''){const t=document.createElement('div');t.className='toast '+cls;t.textContent=txt;$('toasts').appendChild(t);setTimeout(()=>t.classList.add('out'),3200);setTimeout(()=>t.remove(),3700)}
-function showOnly(id){['menuMain','menuCreate','menuJoin','menuLobbyGuest','menuHow'].forEach(s=>$(s).classList.add('hidden'));if(id)$(id).classList.remove('hidden');$('menuScreen').classList.toggle('hidden',!id)}
-function showErr(title,text){$('errTitle').textContent=title;$('errText').textContent=text;$('errOverlay').classList.remove('hidden')}
-/* menu triangles */
-(function(){const bg=$('triBg');const cols=['#ffd76a','#6ee7c8','#c29bff','#ff7ad9'];const rnd=mulberry(7);for(let i=0;i<26;i++){const d=document.createElement('div');d.className='tri';const s=14+rnd()*46;d.style.borderLeft=s+'px solid transparent';d.style.borderRight=s+'px solid transparent';d.style.borderBottom=(s*1.6)+'px solid '+cols[i%4];d.style.left=(rnd()*100)+'%';d.style.top=(rnd()*100)+'%';d.style.animationDelay=(rnd()*8)+'s';d.style.animationDuration=(7+rnd()*8)+'s';bg.appendChild(d)}})();
-/* ================= three setup ================= */
-const canvas=$('c');
-const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,isTouch?1.7:2));
-renderer.setSize(innerWidth,innerHeight);
-const cams=[0,1,2].map(()=>new THREE.PerspectiveCamera(45,1,.5,70));
-const camPos=[{x:0,z:0},{x:0,z:0},{x:0,z:0}];
-addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight)});
-/* ================= level data: grids ================= */
-function gridMaker(w,h){const G=Array.from({length:h},()=>Array(w).fill('.'));const fill=(x0,y0,x1,y1,c)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)if(G[y]&&G[y][x]!==undefined)G[y][x]=c};const ring=()=>{fill(0,0,w-1,0,'#');fill(0,h-1,w-1,h-1,'#');fill(0,0,0,h-1,'#');fill(w-1,0,w-1,h-1,'#')};return{G,fill,ring}}
-function makeL1Grids(){
- const w=28,h=14,P=new gridMaker(w,h),M=new gridMaker(w,h),F=new gridMaker(w,h);
- for(const g of[P,M,F]){g.ring();g.fill(9,1,10,12,'X');g.fill(21,1,22,12,'X');g.fill(17,1,17,3,'#');g.fill(17,10,17,12,'#');g.fill(7,5,8,7,',');g.fill(12,2,16,10,',')}
- P.fill(2,9,4,11,'~');M.fill(3,10,4,11,'~');F.fill(2,9,4,11,',');
- const rows=g=>g.G.map(r=>r.join(''));
- return{w,h,grids:[rows(P),rows(M),rows(F)]};
+function mulberry(s){return function(){s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function makeNoise(seed){
+  const h=(x,z)=>{let n=(x*374761393+z*668265263+seed*974634)|0;n=Math.imul(n^(n>>>13),1274126177);n=(n^(n>>>16))>>>0;return n/4294967295};
+  return (x,z)=>{const xi=Math.floor(x),zi=Math.floor(z),xf=x-xi,zf=z-zi,s=t=>t*t*(3-2*t),u=s(xf),v=s(zf);
+    const a=h(xi,zi),b=h(xi+1,zi),c=h(xi,zi+1),d=h(xi+1,zi+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v};
 }
-function makeL2Grids(){
- const w=30,h=16,g=new gridMaker(w,h);g.ring();
- g.fill(19,1,28,14,'~');g.fill(24,5,27,10,'.');g.fill(24,10,24,10,',');
- g.fill(2,1,6,2,',');g.fill(2,3,3,3,'#');g.fill(5,3,7,3,'#');g.fill(7,1,7,2,'#');
- g.fill(1,11,5,11,'#');g.fill(5,12,5,14,'#');g.G[13][5]='.';
- g.fill(18,12,18,12,',');
- [[26,8],[27,8],[26,10],[27,10]].forEach(([x,y])=>g.G[y][x]='#');
- const rows=g.G.map(r=>r.join(''));
- return{w,h,grids:[rows,rows,rows]};
-}
-/* ================= LEVEL 1 SIM ================= */
-const L1={
- name:'УРОВЕНЬ 1 · «САД ТРЁХ ВЕКОВ»',
- sub:'Посадите семя в прошлом — и оно станет мостом в будущем',
- total:2,
- makeGrids:makeL1Grids,
- initF(){return{T:0,seedTaken:0,plant:null,sprouted:0,mature:0,crys:'ped',gateOpen:0,gateK:0,plateP:0,plateF:0,rift:0,riftFired:0,fP:0,fF:0,dep:0,won:0}},
- tasks:[
-  {t:'Прошлое: возьмите Семя Жизни из ларца',e:0,d:F=>F.seedTaken},
-  {t:'Прошлое: посадите семя у края пропасти',e:0,d:F=>!!F.plant},
-  {t:'Дерево выросло → в будущем появился мост-бревно',e:2,d:F=>F.mature},
-  {t:'Будущее: перейдите пропасть по бревну',e:2,d:(F,P)=>P.fut&&P.fut.x>11.4},
-  {t:'Прошлое: возьмите Солнечный кристалл с алтаря',e:0,d:F=>F.crys!=='ped'},
-  {t:'Прошлое: вставьте кристалл в Накопитель',e:0,d:F=>F.crys==='acc'},
-  {t:'Будущее: запустите древнюю консоль',e:2,d:F=>F.gateOpen},
-  {t:'Оба пройдите сквозь Врата Времён',e:3,d:(F,P)=>P.past&&P.fut&&P.past.x>17.9&&P.fut.x>17.9},
-  {t:'Встаньте на обе плиты ОДНОВРЕМЕННО',e:3,d:F=>F.riftFired},
-  {t:'Перейдите Мост Света',e:3,d:(F,P)=>P.past&&P.fut&&P.past.x>22.9&&P.fut.x>22.9},
-  {t:'Принесите осколки к печатям (2 шт.)',e:3,d:F=>F.dep>=2},
-  {t:'Встаньте на печати вместе!',e:3,d:F=>F.won}],
- seals:[{x:25.5,z:5.5,era:0},{x:25.5,z:8.5,era:2}],
- walkable(F,era,gx,gy,p){
-  const G=gridsCache[1][era];if(!G[gy]||G[gy][gx]===undefined)return false;
-  const ch=G[gy][gx];
-  if(gx===17&&gy>=4&&gy<=9&&!F.gateOpen)return false;
-  if(era===0&&gx>=9&&gx<=10&&gy===6)return true;               // старый каменный мост
-  if(era===2&&F.mature&&gx>=9&&gx<=10&&gy===6)return true;      // бревно
-  if(F.rift>F.T&&(gx===21||gx===22)&&gy===6)return true;        // мост света
-  return ch==='.'||ch===',';
- },
- tick(F,P,dt,api){
-  if(F.plant){const age=F.T-F.plant.at;
-   if(!F.sprouted&&age>0.9){F.sprouted=1;api.toast('🌱 Росток пробился в прошлом…')}
-   if(!F.mature&&age>3.6){F.mature=1;api.toast('🌳 Дерево выросло в настоящем — в будущем оно стало мостом!','good');api.sfx('big')}}
-  // plates
-  for(const p of P.all){
-   if(p.era===0&&dist2(p.x,p.z,19.5,3.5)<0.75)F.plateP=F.T+6;
-   if(p.era===2&&dist2(p.x,p.z,19.5,10.5)<0.75)F.plateF=F.T+6;
-  }
-  if(!F.riftFired&&F.plateP>F.T&&F.plateF>F.T&&F.rift<=F.T){F.rift=F.T+14;F.riftFired=1;api.toast('⚡ Плиты резонируют! Мост Света возник во всех эпохах!','gold');api.sfx('big')}
-  // deposits at own-era seal
-  for(const p of P.all){if(p.frags>0){const s=this.seals.find(s=>s.era===p.era);if(s&&dist2(p.x,p.z,s.x,s.z)<0.85){F.dep+=p.frags;if(p.era===0)F.fP=2;else F.fF=2;p.frags=0;api.toast('◆ Осколок времени впитан печатью ('+F.dep+'/2)','gold');api.sfx('ok')}}}
-  // win
-  if(!F.won&&F.dep>=2&&P.all.every(p=>this.seals.some(s=>s.era===p.era&&dist2(p.x,p.z,s.x,s.z)<0.85))){F.won=1;api.win()}
- },
- interact(F,P){
-  const L=[];
-  L.push({era:0,x:2.5,z:2.5,label:'Взять Семя Жизни',can:p=>!p.carry,do:(p,api)=>{p.carry='seed';F.seedTaken=1;api.toast('🌰 Семя Жизни у вас. Найдите место у пропасти…','pick')}});
-  const spots=[[8.5,3.5],[8.5,6.5],[8.5,10.5]];
-  spots.forEach((s,i)=>{
-   if(F.plant&&F.plant.i===i){L.push({era:0,x:s[0],z:s[1],label:'Выкопать росток (вернуть семя)',can:p=>!p.carry,do:(p,api)=>{F.plant=null;F.sprouted=0;F.mature=0;p.carry='seed';api.toast('Росток выкопан. Попробуйте другое место.','deny')}})}
-   else L.push({era:0,x:s[0],z:s[1],label:'Посадить семя',can:p=>p.carry==='seed'&&!F.plant,do:(p,api)=>{p.carry=null;F.plant={i,at:F.T};api.toast(i===1?'Семя зарыто у самой кромки пропасти…':'Семя посажено. Но будет ли здесь мост?..')}});
-  });
-  L.push({era:0,x:13.5,z:3.5,label:'Взять Солнечный кристалл',can:p=>!p.carry&&F.crys==='ped',do:(p,api)=>{p.carry='crystal';F.crys='hand';api.toast('☀️ Кристалл тёплый, как полуденное солнце.','pick')}});
-  L.push({era:0,x:13.5,z:9.5,label:'Вставить кристалл в Накопитель',can:p=>p.carry==='crystal',do:(p,api)=>{p.carry=null;F.crys='acc';api.toast('🔋 Накопитель заряжен! Спустя века энергия дойдёт до будущего.','good');api.sfx('ok')}});
-  L.push({era:2,x:13.5,z:9.5,label:'Запустить древнюю консоль',can:p=>F.crys==='acc'&&!F.gateOpen,do:(p,api)=>{F.gateOpen=1;api.toast('🚪 Консоль ожила! Врата Времён открываются во всех эпохах!','gold');api.sfx('big')}});
-  L.push({era:0,x:15.5,z:3.5,label:'Взять осколок времени',can:p=>F.fP===0,do:(p,api)=>{F.fP=1;p.frags++;api.toast('◆ Осколок времени мерцает у вас над головой.','pick')}});
-  L.push({era:2,x:12.5,z:10.5,label:'Взять осколок времени',can:p=>F.fF===0,do:(p,api)=>{F.fF=1;p.frags++;api.toast('◆ Осколок времени мерцает у вас над головой.','pick')}});
-  return L;
- }
+const fmtT=ms=>{const s=Math.max(0,Math.floor(ms/1000));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
+/* ================= ЗВУК ================= */
+let AC=null,muted=false;
+function ac(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}return AC}
+function beep(f=440,d=.12,type='sine',g=.15,slide=0){const c=ac();if(!c||muted)return;const o=c.createOscillator(),v=c.createGain();o.type=type;o.frequency.value=f;if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,f+slide),c.currentTime+d);v.gain.value=g;v.gain.exponentialRampToValueAtTime(.001,c.currentTime+d);o.connect(v).connect(c.destination);o.start();o.stop(c.currentTime+d)}
+const SFX={
+  click:()=>beep(520,.06,'square',.06),
+  act:()=>{beep(660,.09,'triangle',.12);setTimeout(()=>beep(880,.1,'triangle',.1),70)},
+  shift:()=>beep(220,.4,'sawtooth',.08,900),
+  deny:()=>beep(140,.2,'square',.1),
+  good:()=>{[523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,.18,'triangle',.12),i*90))},
+  rune:()=>beep(330,.5,'sine',.14,330),
+  bell:()=>{beep(392,1.2,'sine',.2);beep(587,1.0,'sine',.08)},
+  win:()=>{[523,659,784,1046,1318].forEach((f,i)=>setTimeout(()=>beep(f,.35,'triangle',.14),i*130))}
 };
-/* ================= LEVEL 2 SIM ================= */
-const L2={
- name:'УРОВЕНЬ 2 · «МАЯК МЕЖДУ ШТОРМАМИ»',
- sub:'Зажгите свет прошлого, чтобы найти дорогу в будущем',
- total:3,
- makeGrids:makeL2Grids,
- initF(){return{T:0,g1Open:0,crys:'ped',lamp:0,key:'altar',shrine:0,levP:0,levF:0,g2Open:0,block:[8,13],f1:0,f2:0,f3:0,dep:0,won:0}},
- tasks:[
-  {t:'Прошлое: толкните камень на плиту — откройте пещеру',e:0,d:F=>F.g1Open},
-  {t:'Прошлое: возьмите Искристый кристалл в пещере',e:0,d:F=>F.crys!=='ped'},
-  {t:'Прошлое: вставьте кристалл в горелку маяка',e:0,d:F=>F.lamp},
-  {t:'Прошлое: возьмите Ключ Приливов с алтаря порта',e:0,d:F=>F.key!=='altar'},
-  {t:'Прошлое: плывите на лодке к острову',e:0,d:(F,P)=>P.past&&(P.past.islandVisited||P.past.x>23.4)},
-  {t:'Прошлое: бросьте ключ в Колодец Времени',e:0,d:F=>F.key==='well'||F.key==='taken'||F.key==='used'},
-  {t:'Будущее: перейдите море по Дороге Света',e:2,d:(F,P)=>P.fut&&P.fut.x>23.4},
-  {t:'Будущее: достаньте ключ из колодца, откройте святилище',e:2,d:F=>F.shrine},
-  {t:'Вместе: дёрните рычаги ОДНОВРЕМЕННО',e:3,d:F=>F.g2Open},
-  {t:'Принесите 3 осколка к Маяку-Сердцу',e:3,d:F=>F.dep>=3},
-  {t:'Встаньте на печати и зажгите Маяк Эпох!',e:3,d:F=>F.won}],
- seals:[{x:3.5,z:1.5,era:'any'},{x:5.5,z:1.5,era:'any'}],
- docks:[{x:18.5,z:12.5},{x:24.5,z:10.5}],
- path:new Set(['19,7','20,7','21,7','22,7','23,7']),
- walkable(F,era,gx,gy,p){
-  const G=gridsCache[2][era];if(!G[gy]||G[gy][gx]===undefined)return false;
-  const ch=G[gy][gx];
-  if(gx===F.block[0]&&gy===F.block[1])return false;
-  if(gx===4&&gy===3&&!F.g2Open)return false;
-  if(era===0&&gx===5&&gy===13&&!F.g1Open)return false;
-  if(era===2&&gx===26&&gy===9&&!F.shrine)return false;
-  if(ch==='~'){
-   if(era===0&&p&&p.inBoat)return true;
-   if(era===2&&F.lamp&&this.path.has(gx+','+gy))return true;
-   return false;
+/* ================= КОНСТАНТЫ ================= */
+const EPS=['past','present','future'];
+const EP_RU={past:'Прошлое',present:'Настоящее',future:'Будущее'};
+const EP_COL={past:0xffb454,present:0x54d1ff,future:0xb48cff};
+const EP_CSS={past:'var(--past)',present:'var(--now)',future:'var(--fut)'};
+const CARRY_ICON={crystal:'💎',gear:'⚙️',key:'🗝️',keyOld:'🗝️',shard1:'🔶',shard2:'🔷',shard3:'🔻',note:'📜'};
+const PR=0.55; // радиус игрока
+/* ================= ГЛОБАЛЬНОЕ СОСТОЯНИЕ ================= */
+const G={screen:'menu',mode:null,my:'P1',isHost:false,lv:1,F:null,t0:0,started:false,
+  players:{},peer:null,conns:{},stats:{shifts:0,acts:0},cdReady:0,paused:false};
+let MSGQ=[],FXQ=[];
+/* ================= УРОВНИ: ДАННЫЕ ================= */
+function flags1(){return{gate:false,seedAt:0,treeT:0,treeMature:false,logT:0,crystal:'island',mirror:0,beam:false,latchPast:0,latchFut:0,_rp:false,_rf:false,templeOpen:false,done:false,_stats:null}}
+function flags2(){return{valve:0,bell:false,keyTaken:false,buried:false,dugP:false,noteGot:false,chestOpen:false,gearGot:false,gearIn:false,_pump:false,shP:false,shN:false,shF:false,pP:false,pN:false,pF:false,heart:false,latchPast:0,latchFut:0,_dryF:false,done:false,_stats:null}}
+/* --- столкновения --- */
+function B1(ep,f,x,z){
+  if(x<-29||x>29||z<-7||z>33)return true;
+  if(!f.gate&&z>3.2&&z<4.8)return true; // корневые врата
+  if(z>12&&z<17&&ep!=='past'){
+    const isl=Math.hypot(x-6,z-14.5)<2.4;
+    const log=ep==='future'&&f.treeMature&&Math.abs(x-6)<1.2;
+    const lb=ep==='present'&&f.templeOpen&&x>-9.7&&x<-6.3;
+    if(!isl&&!log&&!lb)return true;
   }
-  return ch!=='#';
- },
- tryPush(F,p,sx,sz,api){
-  if(p.era!==0)return false;
-  const bx=F.block[0],bz=F.block[1];
-  const px=Math.floor(p.x+sx*.8),pz=Math.floor(p.z+sz*.8);
-  if(px===bx&&pz===bz){
-   const nx=bx+sx,nz=bz+sz;
-   const G=gridsCache[2][0];
-   if(G[nz]&&G[nz][nx]==='.'){F.block=[nx,nz];api.sfx('pick');
-    if(nx===6&&nz===13&&!F.g1Open){F.g1Open=1;api.toast('⚙️ Противовес опустился — вход в пещеру открыт!','good');api.sfx('big')}
-    return true}
+  // храм (настоящее): стены с дверью
+  if(ep==='present'){
+    if(z>27.1&&z<28.5&&x>-6.6&&x<6.6){if(!(f.templeOpen&&x>-1.3&&x<1.3))return true}
+    if(z>27.1&&z<32&&((x>-6.8&&x<-5.9)||(x>5.9&&x<6.8)))return true;
+    if(z>31.2&&z<32.2&&x>-6.8&&x<6.8)return true;
   }
+  if(ep==='future'){
+    if(z>27.4&&z<28.4&&((x>-6.6&&x<-4)||(x>4&&x<6.6)))return true;
+  }
+  const C=[[-19,-4,1.5],[-16.4,-5.4,1.1],[-21,-.5,1.3],[12,20,1.5],[17,23,1.1],[-8,21,.9],[14,8,.9],[-14,7,.8],[20,29,1.2],[-20,29,1.2]];
+  for(const c of C)if(Math.hypot(x-c[0],z-c[1])<c[2]+PR)return true;
+  if((f.treeMature||(f.seedAt&&ep==='past'))&&Math.hypot(x-6,z-10)<(ep==='past'?.5:1)+PR)return true;
   return false;
- },
- tick(F,P,dt,api){
-  if(!F.g2Open&&F.levP>F.T&&F.levF>F.T){F.g2Open=1;api.toast('🔔 Рычаги пропели в унисон! Дверь маяка открыта во всех эпохах!','gold');api.sfx('big')}
-  for(const p of P.all){if(p.frags>0&&dist2(p.x,p.z,4.5,1.5)<0.95){F.dep+=p.frags;p.frags=0;api.toast('◆ Маяк-Сердце поглотил осколки ('+F.dep+'/3)','gold');api.sfx('ok')}}
-  if(!F.won&&F.dep>=3&&P.all.every(p=>this.seals.some(s=>dist2(p.x,p.z,s.x,s.z)<0.85))){F.won=1;api.win()}
- },
- interact(F,P){
-  const L=[];
-  L.push({era:0,x:2.5,z:13.5,label:'Взять Искристый кристалл',can:p=>!p.carry&&F.crys==='ped',do:(p,api)=>{p.carry='crystal';F.crys='hand';api.toast('✴️ Кристалл трещит от молний.','pick')}});
-  L.push({era:0,x:3.5,z:5.5,label:'Вставить кристалл в горелку маяка',can:p=>p.carry==='crystal',do:(p,api)=>{p.carry=null;F.crys='lamp';F.lamp=1;api.toast('🔥 Маяк прошлого вспыхнул! Его свет проложит дорогу по морю будущего.','gold');api.sfx('big')}});
-  L.push({era:0,x:16.5,z:12.5,label:'Взять Ключ Приливов',can:p=>!p.carry&&F.key==='altar',do:(p,api)=>{p.carry='key';F.key='hand';api.toast('🗝 Ключ тяжёлый и солёный на вкус.','pick')}});
-  // boat
-  const boatBusy=P.all.some(q=>q.inBoat);
-  if(!boatBusy)for(const d of this.docks)L.push({era:0,x:d.x,z:d.z,label:'Сесть в лодку',can:p=>!p.inBoat&&dist2(p.x,p.z,d.x,d.z)<0.9,do:(p,api)=>{p.inBoat=1;p.x=19.5;p.z=12.5;api.toast('⛵ Лодка скрипит. Вперёд, к острову!')}});
-  if(boatBusy)for(const d of this.docks)L.push({era:0,x:d.x,z:d.z,label:'Пристать к доку',can:p=>p.inBoat&&dist2(p.x,p.z,d.x,d.z)<1.7,do:(p,api)=>{p.inBoat=0;p.x=d.x;p.z=d.z;if(d.x>20)p.islandVisited=1;api.toast('Вы на берегу.')}});
-  // well
-  L.push({era:0,x:25.5,z:8.5,label:'Бросить ключ в Колодец Времени',can:p=>p.carry==='key',do:(p,api)=>{p.carry=null;F.key='well';api.toast('🕳 Ключ утонул во тьме колодца… Спустя века он всплывёт.','good');api.sfx('ok')}});
-  L.push({era:2,x:25.5,z:8.5,label:'Достать ключ из колодца',can:p=>F.key==='well'&&!p.carry,do:(p,api)=>{p.carry='key';F.key='taken';api.toast('🗝 Ключ поднялся из глубин веков — он всё ещё новый!','gold');api.sfx('big')}});
-  L.push({era:2,x:26.5,z:9.5,label:'Открыть святилище Ключом Приливов',can:p=>p.carry==='key'&&!F.shrine,do:(p,api)=>{F.shrine=1;F.f3=1;p.carry='handle';p.frags++;api.toast('🏺 Святилище открыто: резонансная рукоять и осколок — ваши!','gold');api.sfx('big')}});
-  // levers
-  L.push({era:0,x:7.5,z:5.5,label:'Дёрнуть рычаг (заряд 5 сек!)',can:()=>true,do:(p,api)=>{F.levP=F.T+5;api.toast('⚙️ Рычаг прошлого гудит! Быстрее — второй рычаг в будущем!','gold');api.sfx('ok')}});
-  L.push({era:2,x:7.5,z:5.5,label:'Дёрнуть рычаг (нужна рукоять)',can:p=>p.carry==='handle',do:(p,api)=>{p.carry=null;F.levF=F.T+5;api.toast('⚙️ Рукоять встала на место! Резонанс…!','gold');api.sfx('ok')}});
-  // fragments
-  L.push({era:0,x:1.5,z:12.5,label:'Взять осколок времени',can:()=>F.f1===0,do:(p,api)=>{F.f1=1;p.frags++;api.toast('◆ Осколок мерцает над головой.','pick')}});
-  L.push({era:2,x:26.5,z:6.5,label:'Взять осколок времени',can:()=>F.f2===0,do:(p,api)=>{F.f2=1;p.frags++;api.toast('◆ Осколок мерцает над головой.','pick')}});
-  return L;
- }
+}
+function B2(ep,f,x,z){
+  if(x<-30||x>30||z<-8.5||z>33)return true;
+  const dryN=ep==='present'?f.gearIn:ep==='future'?(f.valve>=3&&f.gearIn):false;
+  const isl=Math.hypot(x-22,z-20)<4.3;
+  const bar=z>17.5&&z<22.5;
+  if(ep==='past'){
+    if(z>11.8&&z<13.6&&!((x>-5&&x<-3)||(x>7&&x<9)))return true; // канал
+    if(x>16&&!isl)return true; // бухта
+  }else{
+    if(!dryN){ if(z>12||(x>10&&z>3))return true; }
+    else{ if(x>20&&!isl&&!bar)return true; }
+    if(ep==='present'&&!f.bell&&z>12.5&&z<13.7&&x>-3.2&&x<3.2)return true; // лозы
+  }
+  const C=[[-20,6,2.3],[-10,8,1.7],[-25,9.5,2.1],[-26,-3,2.1],[22,20,2.3],[20.6,18.2,.9],[9,12.3,1.1],[10,.6,1.0],[7,19,1.7],[-2,16,.9],[16,15.5,.9],[-15,10,1.0],[4,1.5,.8],[-8,1,.8]];
+  for(const c of C)if(Math.hypot(x-c[0],z-c[1])<c[2]+PR)return true;
+  return false;
+}
+/* --- интеракции --- */
+const D1=[
+ {id:'lever',ep:'past',x:-18,z:-2,r:2.6,show:f=>true,lab:f=>f.gate?null:'Опустить Рычаг Корней',
+  act(f){if(f.gate)return'Рычаг уже опущен.';f.gate=true;fx('past',-18,-2,'ring',0xffb454);say('Корневые врата растворились во всех трёх эпохах.','ep-past');say('Будущее скринуло: врата давно истлели, путь свободен.','ep-fut');return null}},
+ {id:'mound',ep:'past',x:6,z:10,r:2.4,show:f=>!f.seedAt,lab:()=>'Посадить семя Древа Времени',
+  act(f){f.seedAt=Date.now();fx('past',6,10,'ring',0x8fe89a);say('Семечко легло в землю. Настоящее и будущее дрогнули...','good');return null}},
+ {id:'branches',ep:'present',x:6,z:12,r:4.6,show:(f,pl)=>f.treeMature&&(Math.hypot(pl.x-6,pl.z-11.2)<3||Math.hypot(pl.x-6,pl.z-14.5)<3),
+  lab(f,pl){return Math.hypot(pl.x-6,pl.z-14.5)<3?'Спуститься по ветвям':'Пройти по ветвям к острову'},
+  act(f,pl,now){const onI=Math.hypot(pl.x-6,pl.z-14.5)<3;startTween(pl,onI?[6,11.4]:[6,14.5],1400);return onI?'Вы спустились по ветвям.':'Ветви перенесли вас к острову.'}},
+ {id:'crystal',ep:['present','future'],x:6,z:14.5,r:2.3,show:f=>f.crystal==='island',lab:()=>'Взять Солнечный хрусталь',
+  act(f,pl){if(pl.carry)return'Руки заняты.';pl.carry='crystal';f.crystal='carry';SFX.good();return'Хрусталь тёплый, как утреннее солнце. Он помнит прошлое.'}},
+ {id:'altar',ep:'past',x:12,z:20,r:2.6,show:()=>true,lab:(f,pl)=>pl.carry==='crystal'?'Возложить хрусталь на Алтарь':'Алтарь Времени — ждёт подношения',
+  act(f,pl){if(pl.carry!=='crystal')return'Алтарю нужен Солнечный хрусталь. Говорят, он зреет в кроне великого древа.';pl.carry=null;f.crystal='altar';fx('past',12,20,'ring',0xffd76a);say('Алтарь вспыхнул! В будущем древний излучатель получил энергию сквозь века.','good');return null}},
+ {id:'mirror',ep:'future',x:17,z:23,r:2.4,show:()=>true,lab:()=>'Повернуть зеркало',
+  act(f){f.mirror=(f.mirror+1)%4;fx('future',17,23,'ring',0xb48cff);
+    if(f.crystal!=='altar')return'Зеркало щёлкнуло. Но луча нет — излучатель мёртв. Его питает что-то в прошлом...';
+    if(f.mirror===2){return'Луч ударил точно в катушку храма!'}
+    return'Луч ушёл в небо. Попробуйте другой угол. ('+(f.mirror+1)+'/4)' }},
+ {id:'runePast',ep:'past',x:-8,z:21,r:2.3,show:()=>true,lab:f=>f.beam?'Активировать Руну Прошлого':'Руны темны — нет энергии',
+  act(f,pl,now){if(!f.beam)return'Руны темны. Их должен запитать луч из будущего.';f.latchPast=now+7000;fx('past',-8,21,'ring',0xffb454);SFX.rune();say('Руна ПРОШЛОГО горит! 7 секунд. Вторая руна — в будущем, на том же месте.','warn');return null}},
+ {id:'runeFut',ep:'future',x:-8,z:21,r:2.3,show:()=>true,lab:f=>f.beam?'Активировать Руну Будущего':'Руны темны — нет энергии',
+  act(f,pl,now){if(!f.beam)return'Руны темны. Их должен запитать луч из будущего.';f.latchFut=now+7000;fx('future',-8,21,'ring',0xb48cff);SFX.rune();say('Руна БУДУЩЕГО горит! 7 секунд. Первая руна — в прошлом, на том же месте.','warn');return null}},
+ {id:'core',ep:'present',x:0,z:29.6,r:2.6,show:f=>f.templeOpen,lab:()=>'Коснуться Сердца Времени',
+  act(f){completeLevel('Сердце Времени забилось вновь. Долина помнит вас во всех эпохах.');return null}}
+];
+const D2=[
+ {id:'valve',ep:'past',x:10,z:.6,r:2.5,show:()=>true,lab:f=>f.valve>=3?'Шлюз открыт':'Крутить вентиль шлюза ('+f.valve+'/3)',
+  act(f){if(f.valve>=3)return'Шлюз уже открыт.';f.valve++;fx('past',10,.6,'ring',0xffb454);SFX.act();
+    if(f.valve>=3){say('Старый шлюз открыт! В будущем море отступит — но только если заработает насос.','good')}return'Вентиль повернулся со скрипом. ('+f.valve+'/3)'}},
+ {id:'bell',ep:'past',x:-10,z:8,r:2.6,show:()=>true,lab:f=>f.bell?'Колокол ещё гудит':'Ударить в соборный колокол',
+  act(f){if(f.bell)return'Звон ещё плывёт над городом.';f.bell=true;fx('past',-10,8,'ring',0xffd76a);SFX.bell();say('Звон прокатился сквозь века. В настоящем лозы, душившие площадь, рассыпались прахом.','good');return null}},
+ {id:'key',ep:'past',x:-20,z:6,r:2.6,show:f=>!f.keyTaken,lab:()=>'Взять латунный ключ со стола',
+  act(f,pl){if(pl.carry)return'Руки заняты.';f.keyTaken=true;pl.carry='key';return'Ключ смотрителя маяка. Медь ещё тёплая. Может, его стоит... оставить для кого-то в будущем?'}},
+ {id:'capsule',ep:'past',x:4,z:7.5,r:2.3,show:()=>true,lab:(f,pl)=>pl.carry==='key'?'Спрятать ключ в тайник времени':'Тайник времени — плиты шевелятся',
+  act(f,pl){if(pl.carry==='key'){pl.carry=null;f.buried=true;fx('past',4,7.5,'ring',0xffb454);return'Ключ зарыт. Теперь он будет ждать — сколько потребуется. Выкопайте его в другой эпохе.'}
+    return f.buried?'Здесь что-то было спрятано... но вы уже забрали это в другой эпохе.':'Под плитами — пустая полость. Сюда можно что-то положить (нужен предмет в руках).'}},
+ {id:'digNow',ep:'present',x:4,z:7.5,r:2.3,show:f=>f.buried&&!f.dugP,lab:()=>'Раскопать тайник времени',
+  act(f,pl){if(pl.carry)return'Руки заняты.';f.dugP=true;pl.carry='keyOld';fx('present',4,7.5,'ring',0x54d1ff);return'Тайник найден! Внутри — потемневший от времени латунный ключ. Он пролежал здесь века.'}},
+ {id:'digFut',ep:'future',x:4,z:7.5,r:2.3,show:()=>true,lab:f=>f.noteGot?'Старая записка':'Заглянуть в разрытый тайник',
+  act(f,pl){if(!f.noteGot){f.noteGot=true;pl.carry?0:pl.carry='note';return'Записка: «Если маяк погас — собери три осколка его сердца. Кузница. Фонтан. Коралл. И не забудь открыть шлюз ДО того, как сломаешь насос. — Смотритель»'}
+    return pl.carry?'Место занято вашей ношей.':'Пусто. Только пыль веков.'}},
+ {id:'chest',ep:'present',x:.5,z:3.5,r:2.4,show:()=>true,lab:f=>f.chestOpen?'Пустой сундук':'Открыть сундук лодочника',
+  act(f,pl){if(f.chestOpen)return'Сундук пуст.';if(pl.carry!=='keyOld')return'Замок проржавел, но держит. Нужен старый ключ — может, кто-то спрятал его для вас в прошлом?';
+    pl.carry='gear';f.chestOpen=true;f.gearGot=true;SFX.good();return'Сундук открыт! Внутри — латунная шестерня, завёрнутая в просмоленную ткань. Она подойдёт к мельнице.'}},
+ {id:'chestFut',ep:'future',x:.5,z:3.5,r:2.4,show:()=>true,lab:()=>'Осмотреть трухлявый сундук',
+  act:()=>'Сундук раздавлен веками и пуст. Кто-то забрал содержимое очень давно... или очень скоро.'},
+ {id:'mill',ep:'past',x:-26,z:-3,r:3,show:()=>true,lab:f=>f.gearIn?'Мельница работает':'Встроить шестерню в мельницу',
+  act(f,pl){if(f.gearIn)return'Крылья крутятся, насос внизу гудит.';if(pl.carry!=='gear')return'На оси не хватает большой шестерни. Поищите её — например, в сундуке у лодочника (если он вообще будет существовать).';
+    pl.carry=null;f.gearIn=true;fx('past',-26,-3,'ring',0xffb454);SFX.good();say('Мельница прошлого закрутилась! Насос в настоящем ожил — вода уходит с площади.','good');say('Если шлюз открыт — будущее высохнет полностью.','ep-fut');return null}},
+ {id:'shardPast',ep:'past',x:-25,z:10.8,r:2.4,show:f=>!f.shP&&!f.pP,lab:()=>'Взять осколок Сердца из горна',
+  act(f,pl){if(pl.carry)return'Руки заняты.';f.shP=true;pl.carry='shard1';return'Осколок №1 — горячий, как сердце кузнеца. Несите его к маяку, в настоящее.'}},
+ {id:'shardNow',ep:'present',x:8.6,z:19,r:2.4,show:f=>f.gearIn&&!f.shN&&!f.pN,lab:()=>'Достать осколок со дна фонтана',
+  act(f,pl){if(pl.carry)return'Руки заняты.';f.shN=true;pl.carry='shard2';return'Осколок №2 — со дна осушенного фонтана. Он покрыт водорослями, но светится.'}},
+ {id:'shardFut',ep:'future',x:8.6,z:19,r:2.4,show:f=>f.valve>=3&&f.gearIn&&!f.shF&&!f.pF,lab:()=>'Сорвать коралловую розу с осколком',
+  act(f,pl){if(pl.carry)return'Руки заняты.';f.shF=true;pl.carry='shard3';return'Осколок №3 — коралл вырос вокруг него за столетия и отдал ему свой цвет.'}},
+ {id:'pedestal',ep:'present',x:20.6,z:18.2,r:2.5,show:()=>true,lab:f=>'Сердце Маяка — вложить осколок ('+( (f.pP?1:0)+(f.pN?1:0)+(f.pF?1:0) )+'/3)',
+  act(f,pl){const m={shard1:'pP',shard2:'pN',shard3:'pF'};const k=m[pl.carry];
+    if(!k)return'Пьедестал ждёт три осколка Сердца: из кузницы, фонтана и коралловой розы.';
+    pl.carry=null;f[k]=true;fx('present',20.6,18.2,'ring',0xffd76a);SFX.good();
+    const n=(f.pP?1:0)+(f.pN?1:0)+(f.pF?1:0);
+    if(n===3){f.heart=true;say('СЕРДЦЕ МАЯКА СОБРАНО! Осталось зажечь оба маяка — в прошлом и будущем — одновременно.','good')}
+    return'Осколок встал на место. ('+n+'/3)'}},
+ {id:'beaconPast',ep:'past',x:23.6,z:21.6,r:2.4,show:()=>true,lab:f=>'Зажечь маяк ПРОШЛОГО',
+  act(f,pl,now){f.latchPast=now+8000;fx('past',23.6,21.6,'ring',0xffb454);SFX.rune();
+    if(!f.heart)return'Огонь вспыхнул, но Сердце маяка не собрано — лучу не через что светить.';
+    say('Маяк ПРОШЛОГО горит! 8 секунд. Теперь маяк БУДУЩЕГО — вместе!','warn');return null}},
+ {id:'beaconFut',ep:'future',x:23.6,z:21.6,r:2.4,show:()=>true,lab:f=>'Зажечь маяк БУДУЩЕГО',
+  act(f,pl,now){f.latchFut=now+8000;fx('future',23.6,21.6,'ring',0xb48cff);SFX.rune();
+    if(!f.heart)return'Огонь вспыхнул, но Сердце маяка не собрано — лучу не через что светить.';
+    say('Маяк БУДУЩЕГО горит! 8 секунд. Теперь маяк ПРОШЛОГО — вместе!','warn');return null}},
+ {id:'boat',ep:'past',x:3,z:1.6,r:2.6,show:()=>true,lab:()=>'Плыть на лодке к маяку',
+  act(f,pl){startTween(pl,[19.8,19],1600);return'Лодка скользнула через бухту.'}},
+ {id:'boat2',ep:'past',x:19.8,z:19,r:2.6,show:()=>true,lab:()=>'Вернуться на пристань',
+  act(f,pl){startTween(pl,[3,1.6],1600);return'Лодка вернула вас на пристань.'}}
+];
+/* --- этапы/цели --- */
+const STAGES1=[
+ {t:'Опустите Рычаг Корней в прошлом (за валунами, запад)',c:f=>f.gate,h:'Прошлое — самый запад луга, за тремя валунами. Рычаг открывает врата сразу во всех эпохах.'},
+ {t:'Посадите семя у Разлома (прошлое)',c:f=>!!f.seedAt,h:'Курган земли стоит у южного края Разлома. В прошлом это всего лишь ручей.'},
+ {t:'Дождитесь, пока Древо вырастет (настоящее)',c:f=>f.treeMature,h:'Смена эпох не ускоряет время. Просто подождите несколько секунд — или займитесь пока делами.'},
+ {t:'Доберитесь до острова и возьмите Солнечный хрусталь',c:f=>f.crystal!=='island',h:'В настоящем — по ветвям древа. В будущем — по упавшему стволу-мосту.'},
+ {t:'Отнесите хрусталь в ПРОШЛОЕ и возложите на Алтарь',c:f=>f.crystal==='altar',h:'Предметы путешествуют вместе с вами при эхо-сдвиге. Алтарь — на востоке за Разломом; в прошлом его можно перейти вброд.'},
+ {t:'В БУДУЩЕМ направьте луч зеркалом в катушку храма',c:f=>f.beam,h:'Зеркало стоит к востоку от руин алтаря. Крутите его (4 положения), пока луч не упрётся в катушку на фасаде храма.'},
+ {t:'Зажгите ОБЕ руны одновременно: прошлое + будущее',c:f=>f.templeOpen,h:'Руны светятся, когда заряжены. Нажатая руна горит 7 секунд. Одна — в прошлом, другая — в будущем, на одном и том же месте к западу от храма.'},
+ {t:'Войдите в храм (настоящее) и коснитесь Сердца Времени',c:f=>f.done,h:'Мост света лёг через Разлом в настоящем. Дверь храма открыта.'}
+];
+const STAGES2=[
+ {t:'Откройте старый шлюз: вентиль на пристани, 3 оборота (прошлое)',c:f=>f.valve>=3,h:'Вентиль торчит из камня у кромки пристани, на востоке. Три нажатия.'},
+ {t:'Ударьте в колокол — звон иссушит лозы (настоящее)',c:f=>f.bell,h:'Колокольня в прошлом цела. Звон резонирует сквозь время и разрушает преграду в настоящем.'},
+ {t:'Возьмите латунный ключ в доме смотрителя (прошлое)',c:f=>f.keyTaken,h:'Дом с красной крышей на западе. Ключ лежит на столе.'},
+ {t:'Спрячьте ключ в тайник (прошлое), затем выкопайте в настоящем',c:f=>f.dugP,h:'Тайник — плиты с трещиной времени возле колокольни. Зарытый предмет ждёт века.'},
+ {t:'Откройте сундук лодочника и возьмите шестерню (настоящее)',c:f=>f.gearGot,h:'Сундук стоит на сваях у края пристани. Замок откроет старый ключ.'},
+ {t:'Встройте шестерню в мельницу прошлого — насос осушит площадь',c:f=>f.gearIn,h:'Мельница — на южном холме в прошлом. Насос работает только в настоящем, но крутит его прошлое.'},
+ {t:'Соберите 3 осколка Сердца: горн (прошлое), фонтан (настоящее), коралл (будущее)',c:f=>f.shP&&f.shN&&f.shF,h:'Фонтан доступен, когда площадь осушена. Коралловая роза расцветает только в высохшем будущем (шлюз + шестерня).'},
+ {t:'Вложите осколки в Сердце Маяка (настоящее, остров)',c:f=>f.heart,h:'В настоящем к острову ведёт отмель (после осушения). В прошлом — лодка. Пьедестал у подножия маяка.'},
+ {t:'Зажгите маяки ПРОШЛОГО и БУДУЩЕГО одновременно',c:f=>f.done,h:'По рычагу у лампы на вершине острова. Заряд держится 8 секунд. Договоритесь и жмите вместе!'}
+];
+const LEVELS={
+ 1:{name:'ДОЛИНА ЭХО',sub:'уровень 1 · причинность',flags:flags1,B:B1,D:D1,ST:STAGES1,spawn:[-2,-3],
+    win:'Сердце Времени забилось вновь. Долина помнит вас во всех эпохах.'},
+ 2:{name:'ЗАТОНУВШИЙ МАЯК',sub:'уровень 2 · память моря',flags:flags2,B:B2,D:D2,ST:STAGES2,spawn:[-14,-1],
+    win:'Три эпохи вспыхнули одним лучом. Маяк снова ведёт корабли — сквозь время.'}
 };
-const LEVELS={1:L1,2:L2};
-let gridsCache={};
-/* ================= game state ================= */
-const game={mode:'menu',role:'solo',levelIdx:1,F:null,players:new Map(),T:0,tasksMask:0,started:false,localId:'H',startTime:0};
-let net={peer:null,conns:new Map(),hostConn:null,code:''};
-/* ================= three view builders ================= */
-let currentView=null;
-function std(c,opts={}){return new THREE.MeshStandardMaterial(Object.assign({color:c,flatShading:true,roughness:.9,metalness:.05},opts))}
-function buildTerrain(scene,gstr,th,era,seed){
- const w=gstr[0].length,h=gstr.length;
- const rnd=mulberry(seed*97+era*13+5);
- const ground=[],water=[],chasms=[];
- for(let y=0;y<h;y++)for(let x=0;x<w;x++){const ch=gstr[y][x];
-  if(ch==='.'){ground.push([x,y,th.ground,rnd])}
-  else if(ch===','){ground.push([x,y,th.sand,rnd])}
-  else if(ch==='~')water.push([x,y]);
-  else if(ch==='X')chasms.push([x,y]);
- }
- const boxG=new THREE.BoxGeometry(1,.3,1);
- const gm=new THREE.InstancedMesh(boxG,new THREE.MeshLambertMaterial({color:0xffffff}),ground.length);
- const M=new THREE.Matrix4(),C=new THREE.Color();
- ground.forEach(([x,y,c,r],i)=>{M.makeTranslation(x+.5,-.15+(r()-.5)*.06,y===0?0:0);M.setPosition(x+.5,-.15+(r()-.5)*.06,y+.5);gm.setMatrixAt(i,M);C.setHex(c);C.offsetHSL(0,(r()-.5)*.03,(r()-.5)*.06);gm.setColorAt(i,C)});
- gm.instanceColor.needsUpdate=true;scene.add(gm);
- if(water.length){const wm=new THREE.InstancedMesh(new THREE.BoxGeometry(1,.12,1),new THREE.MeshLambertMaterial({color:th.water,transparent:true,opacity:.86}),water.length);
-  water.forEach(([x,y],i)=>{M.makeTranslation(x+.5,-.1,y+.5);wm.setMatrixAt(i,M)});scene.add(wm)}
- // dark pit floor
- const pit=new THREE.Mesh(new THREE.PlaneGeometry(w+4,h+4),new THREE.MeshBasicMaterial({color:era===2?0x0a0618:0x171310}));
- pit.rotation.x=-Math.PI/2;pit.position.set(w/2,-1.4,h/2);scene.add(pit);
- // rocks
- const rocks=[];for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(gstr[y][x]==='#')rocks.push([x,y]);
- const rm=new THREE.InstancedMesh(new THREE.DodecahedronGeometry(.58,0),new THREE.MeshLambertMaterial({color:th.rock}),rocks.length);
- const E=new THREE.Euler(),Q=new THREE.Quaternion(),S=new THREE.Vector3(),Pp=new THREE.Vector3();
- rocks.forEach(([x,y],i)=>{const r=rnd();E.set(r()*6,r()*6,r()*6);Q.setFromEuler(E);const s=.7+r()*.7;S.set(s,s*.75+.25,s);Pp.set(x+.5+(r()-.5)*.2,.18,y+.5+(r()-.5)*.2);M.compose(Pp,Q,S);rm.setMatrixAt(i,M)});scene.add(rm);
- // scatter
- const spots=[];for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++)if((gstr[y][x]==='.'||gstr[y][x]===',')&&rnd()<.06)spots.push([x,y]);
- const sm=new THREE.InstancedMesh(era===2?new THREE.ConeGeometry(.12,.34,5):new THREE.ConeGeometry(.14,.4,5),new THREE.MeshLambertMaterial({color:era===2?0x7df9ff:(era===0?0xff9dc8:0x5d8f5a),emissive:era===2?0x1a5f66:0}),spots.length||1);
- spots.forEach(([x,y],i)=>{const r=rnd();M.makeScale(.7+r(),.7+r()*.8,.7+r());M.setPosition(x+.2+r()*.6,.15,y+.2+r()*.6);sm.setMatrixAt(i,M)});sm.count=spots.length;scene.add(sm);
- return{w,h};
+/* ================= THREE: БАЗА ================= */
+let renderer,scene,camera,clock=new THREE.Clock();
+const V={group:null,ups:[],av:{}};
+function initThree(){
+  renderer=new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  $('#cv').appendChild(renderer.domElement);
+  camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,500);
+  camera.position.set(0,20,20);
+  addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 }
-function addLights(scene,th){
- scene.add(new THREE.HemisphereLight(th.hemi,th.hemiG,1));
- const d=new THREE.DirectionalLight(th.sun,th.sunI);d.position.set(9,14,5);scene.add(d);
+function mat(c,o){return new THREE.MeshStandardMaterial(Object.assign({color:c,flatShading:true,roughness:.92,metalness:.05},o||{}))}
+function mesh(g,m,x,y,z){const s=new THREE.Mesh(g,m);s.position.set(x,y,z);return s}
+const boxG=new THREE.BoxGeometry(1,1,1);
+function bx(c,w,h,d,x,y,z,ry){const s=new THREE.Mesh(boxG,mat(c));s.scale.set(w,h,d);s.position.set(x,y,z);if(ry)s.rotation.y=ry;s.castShadow=true;s.receiveShadow=true;return s}
+function cyl(c,rt,rb,h,seg,x,y,z){const s=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg),mat(c));s.position.set(x,y,z);s.castShadow=true;s.receiveShadow=true;return s}
+function cone(c,r,h,seg,x,y,z){const s=new THREE.Mesh(new THREE.ConeGeometry(r,h,seg),mat(c));s.position.set(x,y,z);s.castShadow=true;return s}
+function ico(c,r,x,y,z,d){const s=new THREE.Mesh(new THREE.IcosahedronGeometry(r,d||0),mat(c));s.position.set(x,y,z);s.castShadow=true;return s}
+function tree(x,z,s,pal){const g=new THREE.Group();g.add(cyl(0x6b4a2f,.16*s,.24*s,1.4*s,6,0,.7*s,0));
+  const f=()=>mat(pal[ (Math.random()*pal.length)|0 ]);
+  g.add(ico(f(),.95*s,0,1.9*s,0));g.add(ico(f(),.65*s,.5*s,2.6*s,.2*s));g.add(ico(f(),.55*s,-.45*s,2.45*s,-.15*s));g.position.set(x,0,z);return g}
+function pine(x,z,s){const g=new THREE.Group();g.add(cyl(0x5c4030,.14*s,.2*s,1*s,6,0,.5*s,0));
+  g.add(cone(0x3f7d4f,.95*s,1.4*s,7,0,1.5*s,0));g.add(cone(0x4c8f5a,.7*s,1.1*s,7,0,2.3*s,0));g.add(cone(0x5aa065,.45*s,.85*s,7,0,3*s,0));g.position.set(x,0,z);return g}
+function deadTree(x,z,s){const g=new THREE.Group();g.add(cyl(0x4a4048,.14*s,.22*s,2.4*s,5,0,1.2*s,0));
+  const b=cyl(0x4a4048,.07*s,.09*s,1.1*s,5,.4*s,2.1*s,0);b.rotation.z=-.9;g.add(b);
+  const b2=cyl(0x4a4048,.06*s,.08*s,.9*s,5,-.3*s,2.4*s,0);b2.rotation.z=.8;g.add(b2);g.position.set(x,0,z);return g}
+function rock(x,z,s,c){const r=ico(c||0x8a8f9c,s,x,s*.4,z,0);r.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);return r}
+function house(x,z,ry,wall,roof,w=3.4,h=2.4,d=3){const g=new THREE.Group();
+  g.add(bx(wall,w,h,d,0,h/2,0));
+  const rf=new THREE.Mesh(new THREE.ConeGeometry(Math.max(w,d)*.78,1.6,4),mat(roof));rf.position.y=h+.8;rf.rotation.y=Math.PI/4;rf.castShadow=true;g.add(rf);
+  g.add(bx(0x4a3524,.7,1.2,.1,0,.6,d/2+.02));
+  g.position.set(x,0,z);g.rotation.y=ry||0;return g}
+function column(x,z,h,c,r=.42){const g=new THREE.Group();g.add(bx(c,r*2.6,.35,r*2.6,x,.17,z));g.add(cyl(c,r*.82,r,h-0.7,8,x,h/2,z));g.add(bx(c,r*2.4,.32,r*2.4,x,h-.16,z));return g}
+function glow(c,r,x,y,z){const l=new THREE.PointLight(c,.9,r);l.position.set(x,y,z);return l}
+function sun(color,scale){const cv=document.createElement('canvas');cv.width=cv.height=64;const g=cv.getContext('2d');const gr=g.createRadialGradient(32,32,4,32,32,32);gr.addColorStop(0,'#ffffff');gr.addColorStop(.35,color);gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.fillRect(0,0,64,64);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthWrite:false}));sp.scale.setScalar(scale);return sp}
+function nameSprite(txt,col){const cv=document.createElement('canvas');cv.width=256;cv.height=70;const g=cv.getContext('2d');g.font='28px "Russo One"';g.textAlign='center';g.fillStyle=col;g.strokeStyle='rgba(0,0,0,.7)';g.lineWidth=5;g.strokeText(txt,128,42);g.fillText(txt,128,42);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthWrite:false}));sp.scale.set(3,.82,1);return sp}
+/* ================= ЗЕМЛЯ ================= */
+const NZ1=makeNoise(11),NZ2=makeNoise(77);
+function H1(x,z){
+  let y=(NZ1(x*.13,z*.13)-.5)*1.3;
+  const d=Math.hypot(x,z-13);y*= .35+.65*clamp((d-16)/14,0,1);
+  if(z>11.6&&z<17.4){y=-2.6+(NZ1(x*.4,z*.4)-.5)*.3}
+  if(Math.hypot(x-6,z-14.5)<2.6)y=.15;
+  if(z>26)y+=(z-26)*.12;
+  return y;
 }
-function box(w,h,d,c,o){return new THREE.Mesh(new THREE.BoxGeometry(w,h,d),std(c,o))}
-function put(scene,mesh,x,z,y=0){mesh.position.set(x,y,z);scene.add(mesh);return mesh}
-/* ---------- Level 1 view ---------- */
-function buildL1View(){
- const lvl=LEVELS[1];const grids=gridsCache[1];
- const scenes=[0,1,2].map(e=>{const s=new THREE.Scene();s.fog=new THREE.Fog(THEMES[e].fog,16,42);addLights(s,THEMES[e]);buildTerrain(s,grids[e],THEMES[e],e,1);return s});
- const dyn={trees:[],logs:[]};
- for(let e=0;e<3;e++){
-  const th=THEMES[e],sc=scenes[e];
-  // temple pillars
-  [[12.5,2.5],[16.5,2.5],[12.5,10.5],[16.5,10.5]].forEach(([x,z])=>{
-   const p=new THREE.Mesh(new THREE.CylinderGeometry(.28,.34,e===2?1.1:2.3,6),std(e===0?0xd8c49a:(e===1?0xb0aca0:0x5d5488)));
-   if(e===2)p.rotation.z=.14;put(sc,p,x,z,1.15*(e===2?.55:1))});
-  // stone bridge (past) / rubble (present)
-  if(e===0){const b=box(2.6,.3,1.3,0xb9a988);put(sc,b,10,6.5,.12);put(sc,box(.4,.8,1.3,0xa5967a),9.2,6.5,-.25);put(sc,box(.4,.8,1.3,0xa5967a),10.8,6.5,-.25)}
-  if(e===1){put(sc,new THREE.Mesh(new THREE.DodecahedronGeometry(.4,0),std(0x93897a)),9.6,6.5,0);put(sc,new THREE.Mesh(new THREE.DodecahedronGeometry(.34,0),std(0x877d6e)),10.4,6.7,0)}
-  // chest
-  const chest=box(.7,.5,.5,e===0?0x8a5a33:0x4a3a30);chest.rotation.y=e?0.4:0;if(e!==0)chest.rotation.z=.3;put(sc,chest,2.5,2.5,.25);
-  // dig mounds + trees
-  dyn.trees.push([]);
-  [[8.5,3.5],[8.5,6.5],[8.5,10.5]].forEach(([x,z],i)=>{
-   const mound=new THREE.Mesh(new THREE.ConeGeometry(.42,.22,7),std(e===2?0x3a3358:0x6d4b30));put(sc,mound,x,z,.11);
-   const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.14,.2,1.4,6),std(0x7a5230));
-   const crown=new THREE.Mesh(new THREE.IcosahedronGeometry(.85,0),std(e===2?0x5a4d88:0x4f9e4c,{emissive:e===2?0x1a1040:0x0a2a0c}));
-   crown.position.y=1.5;const tr=new THREE.Group();tr.add(trunk);tr.add(crown);tr.visible=false;put(sc,tr,x,z,.1);
-   dyn.trees[e].push({mound,trunk,crown,grp:tr});
+function H2(x,z){
+  let y=(NZ2(x*.12,z*.12)-.5)*.7;
+  y+=2.3*Math.exp(-((x+26)**2+(z+3)**2)/22); // холм мельницы
+  y+=1.2*Math.exp(-((x+20)**2+(z-6)**2)/30);
+  if(z>13)y-=.55;
+  if(z>11.6&&z<13.8&&x<16)y=-.9; // канал
+  if(x>16)y-=1.6*clamp((x-16)/4,0,1);
+  if(Math.hypot(x-22,z-20)<5)y=.4;
+  if(z>17.5&&z<22.5&&x>4&&x<22)y=Math.max(y,.3); // отмель
+  if(z<-6)y+=(-6-z)*.1;
+  return y;
+}
+function buildGround(lv,ep){
+  const b=lv===1?{x:[-31,31],z:[-9,35]}:{x:[-32,32],z:[-10,35]};
+  const W=b.x[1]-b.x[0],Hh=b.z[1]-b.z[0];
+  const geo=new THREE.PlaneGeometry(W,Hh,60,44);geo.rotateX(-Math.PI/2);
+  const p=geo.attributes.position;
+  for(let i=0;i<p.count;i++){const x=p.getX(i)+ (b.x[0]+W/2),z=p.getZ(i)+(b.z[0]+Hh/2);p.setY(i,lv===1?H1(x,z):H2(x,z))}
+  geo.translate(b.x[0]+W/2,0,b.z[0]+Hh/2);geo.computeVertexNormals();
+  const col={1:{past:0x8fc86a,present:0x74bd7a,future:0x5f8f7e},2:{past:0xb9a98c,present:0x8b98a3,future:0x9aa7b4}}[lv][ep];
+  const m=new THREE.Mesh(geo,mat(col,{roughness:1}));m.receiveShadow=true;return m;
+}
+const SKY={
+ 1:{past:{bg:0xffd9a3,fog:0xf5c98c,sun:0xffcf8a,si:1.15,hemi:[0xfff1cf,0x6a7a4a]},
+    present:{bg:0xbfe3ff,fog:0xbcd9ee,sun:0xffffff,si:1.2,hemi:[0xe8f4ff,0x5a7a5a]},
+    future:{bg:0x332a52,fog:0x3a2f58,sun:0x9f8cff,si:.7,hemi:[0x6a5aa0,0x232036]}},
+ 2:{past:{bg:0xffe3b3,fog:0xf2cf9e,sun:0xffd9a0,si:1.15,hemi:[0xfff1d5,0x7a6f52]},
+    present:{bg:0x9fc9e8,fog:0x9dbfd8,sun:0xf2f8ff,si:1.1,hemi:[0xdcefff,0x54656e]},
+    future:{bg:0x14283a,fog:0x1a3145,sun:0x7fd8ff,si:.65,hemi:[0x2f5a70,0x0e1a22]}}
+};
+/* ================= ПОСТРОЕНИЕ УРОВНЕЙ ================= */
+function lights(sc,ep,lv){
+  const s=SKY[lv][ep];
+  sc.background=new THREE.Color(s.bg);sc.fog=new THREE.Fog(s.fog,55,150);
+  sc.add(new THREE.HemisphereLight(s.hemi[0],s.hemi[1],.85));
+  const d=new THREE.DirectionalLight(s.sun,s.si);d.position.set(ep==='past'?-30:20,42,ep==='future'?-18:24);
+  d.castShadow=true;d.shadow.mapSize.set(2048,2048);
+  const sz=lv===1?42:44;d.shadow.camera.left=-sz;d.shadow.camera.right=sz;d.shadow.camera.top=sz;d.shadow.camera.bottom=-sz;d.shadow.camera.far=160;
+  sc.add(d);sc.add(d.target);d.target.position.set(0,0,12);
+  const su=sun(ep==='past'?'#ffb454':ep==='present'?'#fff6d8':'#cdb8ff',ep==='future'?14:20);
+  su.position.set(ep==='past'?-90:60,ep==='past'?26:64,ep==='future'?-70:ep==='past'?-30:-80);sc.add(su);
+  if(ep==='future'){const su2=sun('#8ff0ff',9);su2.position.set(-55,52,-64);sc.add(su2);
+    const st=new THREE.BufferGeometry();const arr=[];const rnd=mulberry(9);for(let i=0;i<350;i++){const th=rnd()*Math.PI*2,ph=rnd()*Math.PI*.45;const r=170;arr.push(Math.cos(th)*Math.sin(ph)*r, Math.cos(ph)*r+10, Math.sin(th)*Math.sin(ph)*r)}
+    st.setAttribute('position',new THREE.Float32BufferAttribute(arr,3));
+    sc.add(new THREE.Points(st,new THREE.PointsMaterial({color:0xcfd8ff,size:.8,transparent:true,opacity:.8})));}
+  return s;
+}
+function particles(sc,ep,col){
+  const n=140,arr=[];const rnd=mulberry(ep==='past'?3:ep==='present'?5:8);
+  for(let i=0;i<n;i++)arr.push((rnd()-.5)*70,rnd()*10+1,(rnd()-.5)*70+12);
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(arr,3));
+  const p=new THREE.Points(g,new THREE.PointsMaterial({color:col,size:.32,transparent:true,opacity:.85,depthWrite:false}));
+  sc.add(p);
+  return t=>{const a=g.attributes.position;for(let i=0;i<n;i++){let y=a.getY(i)+.012;if(y>11)y=1;a.setY(i,y);a.setX(i,a.getX(i)+Math.sin(t+i)*.003)}a.needsUpdate=true};
+}
+function water(sc,x1,z1,x2,z2,y,c,op=.7){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(x2-x1,z2-z1),new THREE.MeshStandardMaterial({color:c,transparent:true,opacity:op,flatShading:true,roughness:.35,metalness:.15}));
+  m.rotation.x=-Math.PI/2;m.position.set((x1+x2)/2,y,(z1+z2)/2);sc.add(m);return m;
+}
+/* --- домики/декор для городов --- */
+function buildLevelScene(lv,ep){
+  const sc=new THREE.Group();const ups=[];const f=G.F;
+  lights(sc,ep,lv);
+  sc.add(buildGround(lv,ep));
+  ups.push(particles(sc,ep,ep==='past'?0xffe9a0:ep==='present'?0xffffff:0x9fffe0));
+  const rnd=mulberry(lv*100+(ep==='past'?1:ep==='present'?2:3));
+  if(lv===1)buildValley(sc,ep,ups,rnd);else buildCity(sc,ep,ups,rnd);
+  return{sc,ups};
+}
+/* ======= УРОВЕНЬ 1: ДОЛИНА ======= */
+function buildValley(sc,ep,ups,rnd){
+  const past=ep==='past',now=ep==='present',fut=ep==='future';
+  const palF=past?[0x5da24a,0x6fb552,0x87c25e]:now?[0x4f9e5c,0x5faf68,0x77bd74]:[0x4c6e63,0x5a7d70,0x3f5e58];
+  // деревья/камни
+  const spots=[];const tr=mulberry(ep==='past'?21:ep==='present'?22:23);
+  for(let i=0;i<46;i++){const x=(tr()-.5)*56,z=-6+tr()*38;
+    if(z>11&&z<18)continue;if(z>25&&Math.abs(x)<9)continue;if(Math.abs(x-6)<4&&z>7&&z<20)continue;if(Math.hypot(x+18,z+2)<5)continue;
+    spots.push([x,z,tr()*.7+.6,tr()])}
+  for(const[x,z,s,t]of spots){
+    if(fut&&t>.6)sc.add(deadTree(x,z,s*.9));
+    else if(t>.75)sc.add(pine(x,z,s));
+    else sc.add(tree(x,z,s,palF));
+  }
+  for(let i=0;i<16;i++){const x=(rnd()-.5)*56,z=-6+rnd()*38;if(z>11&&z<18)continue;sc.add(rock(x,z,.4+rnd()*.7,fut?0x6a6280:0x8a8f9c))}
+  if(!fut)for(let i=0;i<40;i++){const x=(rnd()-.5)*54,z=-5+rnd()*34;if(z>11&&z<18)continue;sc.add(cone(past?0xffb7c9:0xf2e28a,.14,.4,5,x,.2,z))}
+  if(fut)for(let i=0;i<24;i++){const x=(rnd()-.5)*54,z=-5+rnd()*34;if(z>11&&z<18)continue;
+    const m=ico(0x7fe8d8,.18+rnd()*.2,x,.25,z);m.material.emissive=new THREE.Color(0x1d6a60);sc.add(m)}
+  // тропа
+  for(let z=-6;z<32;z+=2.2){sc.add(bx(fut?0x6c6a80:0xb9a27c,1.9,.12,2.1,-2,H1(-2,z)+.05,z))}
+  /* --- РАЗЛОМ --- */
+  sc.add(bx(0x241d30,62,2.4,6,0,-2.3,14.5)); // дно
+  if(past)water(sc,-30,12,30,17,-1.1,0x57b7d8,.65);
+  if(now&&f.templeOpen){ // мост света
+    const bm=new THREE.Mesh(new THREE.BoxGeometry(3,.3,5.6),new THREE.MeshStandardMaterial({color:0x9fe8ff,emissive:0x54d1ff,emissiveIntensity:1,transparent:true,opacity:.8}));
+    bm.position.set(-8,.35,14.5);sc.add(bm);ups.push(t=>{bm.material.opacity=.55+.3*Math.sin(t*3);bm.position.y=.35+Math.sin(t*2)*.08})}
+  /* --- ВРАТА КОРНЕЙ --- */
+  const gate=new THREE.Group();
+  gate.add(bx(0x5c4430,1.4,4,1.2,-3.4,2,4));gate.add(bx(0x5c4430,1.4,4,1.2,3.4,2,4));
+  for(let i=0;i<5;i++){const r=cyl(0x6b4a2f,.16,.22,4.6,6,-3+ i*1.6,2.3,4);r.rotation.z=Math.PI/2;gate.add(r)}
+  gate.add(bx(0x4a7a3a,8.4,.8,1.4,0,4.4,4));
+  sc.add(gate);let gT=f.gate?1:0;
+  ups.push(t=>{gT=lerp(gT,f.gate?1:0,.06);gate.position.y=-gT*4.6;gate.rotation.x=gT*.25});
+  /* --- ДРЕВО --- */
+  if(past){
+    const mound=ico(0x7a5b3c,.7,6,.25,10);sc.add(mound);mound.material.flatShading=true;
+    const sprout=new THREE.Group();sprout.add(cone(0x7ed87a,.28,.7,5,0,.5,0));sprout.position.set(6,.4,10);sc.add(sprout);
+    ups.push(()=>{mound.visible=!f.seedAt;sprout.visible=!!f.seedAt&&!f.treeMature;sprout.scale.setScalar(.4+f.treeT*.8)});
+  }
+  if(now){
+    const tr1=new THREE.Group();
+    tr1.add(cyl(0x6b4a2f,.5,.85,4.4,7,0,2.2,0));
+    const cr1=ico(0x4f9e5c,2.6,0,5.2,0),cr2=ico(0x63b169,1.8,1.6,6.3,.6),cr3=ico(0x77bd74,1.6,-1.7,6,-.5);
+    tr1.add(cr1);tr1.add(cr2);tr1.add(cr3);
+    const gold=ico(0xffd76a,.3,1,6.9,1.4);gold.material.emissive=new THREE.Color(0x664a00);tr1.add(gold);
+    tr1.position.set(6,0,10);sc.add(tr1);
+    const branch=bx(0x6b4a2f,.5,.24,4.6,6,3.1,12.6);branch.rotation.x=.12;sc.add(branch);
+    ups.push(()=>{const s=.15+f.treeT*.85;tr1.visible=!!f.seedAt;tr1.scale.setScalar(s);branch.visible=f.treeMature;
+      gold.position.y=6.9+Math.sin(tGlobal*2)*.15});
+  }
+  if(fut){
+    sc.add(cyl(0x54465a,.7,.85,1.1,7,6,.55,10)); // пень
+    const log=new THREE.Group();
+    const lg=cyl(0x5c4c46,.55,.7,7.4,7,0,0,0);lg.rotation.x=Math.PI/2;log.add(lg);
+    log.add(ico(0x4c6e63,.5,0,.2,3.6));log.add(cone(0x7fe8d8,.2,.5,5,.3,.5,-3));
+    log.position.set(6,.55,14.5);sc.add(log);let lT=f.treeMature?1:0;
+    ups.push(t=>{log.visible=f.treeMature||f.logT>0;lT=lerp(lT,f.treeMature?1:0,.05);
+      log.rotation.x=(1-lT)*1.2;log.position.y=.55+(1-lT)*3});
+  }
+  /* --- ОСТРОВ + КРИСТАЛЛ --- */
+  const islG=new THREE.Group();islG.add(ico(0x8f93a8,2.3,0,-.6,0));islG.add(ico(0x77808f,1,.9,-.2,1));sc.add(islG);islG.position.set(6,.3,14.5);
+  if(!fut)islG.add(column(0,0,1.1,0xd9d2c0,.35)).position.set(6,0,0);
+  const ped=bx(fut?0x77708c:0xd9d2c0,1,.9,1,6, fut? .55:1.6,14.5);sc.add(ped);
+  const cry=new THREE.Mesh(new THREE.OctahedronGeometry(.55),new THREE.MeshStandardMaterial({color:0xffd76a,emissive:0xcc8800,emissiveIntensity:.9,flatShading:true}));
+  cry.position.set(6,fut?1.6:2.7,14.5);sc.add(cry);sc.add(glow(0xffc85a,6,6,2.6,14.5));
+  ups.push(t=>{cry.visible=f.crystal==='island';cry.rotation.y=t*1.2;cry.position.y=(fut?1.6:2.7)+Math.sin(t*2.2)*.14});
+  /* --- АЛТАРЬ (прошлое) / ИЗЛУЧАТЕЛЬ (будущее) --- */
+  if(past||fut){
+    const g2=new THREE.Group();g2.position.set(12,0,20);
+    for(let i=0;i<6;i++){const a=i/6*Math.PI*2;g2.add(bx(fut?0x6d6880:0xcfc6ae,.7,.9,.7,Math.cos(a)*2.2,.45,Math.sin(a)*2.2))}
+    g2.add(cyl(fut?0x77708c:0xddd3b8,1.2,1.5,1.1,fut?6:7,0,.55,0));
+    const bowl=cyl(fut?0x8a84a0:0xe8dfc6,1.05,.6,.6,8,0,1.3,0);g2.add(bowl);
+    if(past){const ac1=new THREE.Mesh(new THREE.OctahedronGeometry(.5),new THREE.MeshStandardMaterial({color:0xffd76a,emissive:0xcc8800,emissiveIntensity:1,flatShading:true}));ac1.position.y=1.9;g2.add(ac1);
+      ups.push(t=>{ac1.visible=f.crystal==='altar';ac1.rotation.y=t;ac1.position.y=1.9+Math.sin(t*2)*.1})}
+    if(fut){const lens=new THREE.Mesh(new THREE.SphereGeometry(.5,8,6),new THREE.MeshStandardMaterial({color:0xb48cff,emissive:0x7a4de8,emissiveIntensity:.2,flatShading:true}));lens.position.y=1.8;g2.add(lens);
+      const pl1=glow(0x9a6cff,7,0,2.2,0);g2.add(pl1);
+      ups.push(()=>{const pw=f.crystal==='altar';lens.material.emissiveIntensity=pw?1.2:.1;pl1.intensity=pw?1.2:.05})}
+    sc.add(g2);
+  }
+  /* --- ЗЕРКАЛО + ЛУЧ + КАТУШКА (будущее) --- */
+  if(fut){
+    const mg=new THREE.Group();mg.position.set(17,0,23);
+    mg.add(cyl(0x555068,.2,.4,1,6,0,.5,0));
+    const disc=new THREE.Mesh(new THREE.CircleGeometry(1.05,8),new THREE.MeshStandardMaterial({color:0xcfd8ff,metalness:.9,roughness:.2,side:THREE.DoubleSide,flatShading:true}));
+    disc.position.y=1.9;mg.add(disc);sc.add(mg);
+    const mkBeam=(a,b,w,c,o)=>{const d=new THREE.Vector3().fromArray(b).sub(new THREE.Vector3().fromArray(a));const l=d.length();
+      const m2=new THREE.Mesh(new THREE.CylinderGeometry(w,w,l,6),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:o}));
+      m2.position.copy(new THREE.Vector3().fromArray(a).add(d.multiplyScalar(.5)));m2.lookAt(new THREE.Vector3().fromArray(b));m2.rotateX(Math.PI/2);sc.add(m2);return m2};
+    const E=[12,2.4,20],M=[17,2.2,23],C=[3,4.2,27.6];
+    const b1=mkBeam(E,M,.14,0xb48cff,.9),b2=mkBeam(M,C,.14,0xb48cff,.9);
+    const coil=new THREE.Group();coil.position.set(3,4.2,27.6);
+    for(let i=0;i<3;i++){const tt=new THREE.Mesh(new THREE.TorusGeometry(.65-i*.12,.12,6,10),mat(0x8a84a0));tt.rotation.x=Math.PI/2;tt.position.y=i*.3;coil.add(tt)}
+    const cg=glow(0x9a6cff,9,0,0,0);coil.add(cg);sc.add(coil);
+    ups.push(()=>{const pw=f.crystal==='altar';b1.visible=pw;b2.visible=!!f.beam;cg.intensity=f.beam?2:.1;
+      mg.rotation.y=f.mirror*Math.PI/4+Math.PI/8});
+  }
+  if(now){ // катушка на храме в настоящем - тёмная/заряженная
+    const coil=ico(0x555a70,.55,3,4.4,27.3);sc.add(coil);
+    ups.push(()=>{coil.material.emissive=new THREE.Color(f.beam?0x7a4de8:0x000000);coil.material.emissiveIntensity=f.beam?1:0});
+  }
+  /* --- РУНЫ --- */
+  const mkRune=(flag,key)=>{const g3=new THREE.Group();g3.position.set(-8,H1(-8,21),21);
+    const base=new THREE.Mesh(new THREE.CylinderGeometry(1.3,1.5,.35,6),mat(past?0xc9b98a:0x6d6880));base.position.y=.18;g3.add(base);
+    const inner=new THREE.Mesh(new THREE.CylinderGeometry(.8,.8,.4,6),new THREE.MeshStandardMaterial({color:0x333,emissive:ep==='past'?0xff8c1a:0x8c5cff,emissiveIntensity:.1,flatShading:true}));inner.position.y=.2;g3.add(inner);
+    const beamC=new THREE.Mesh(new THREE.CylinderGeometry(.5,.7,7,6,1,true),new THREE.MeshBasicMaterial({color:ep==='past'?0xffb454:0xb48cff,transparent:true,opacity:0,side:THREE.DoubleSide}));beamC.position.y=3.8;g3.add(beamC);
+    sc.add(g3);
+    ups.push(t=>{const charged=f.beam,on=f[key];inner.material.emissiveIntensity=charged?(on?2.2:.7+Math.sin(t*4)*.3):.06;beamC.material.opacity=on?.5:0});};
+  mkRune(f,'_rp');
+  /* --- ХРАМ --- */
+  if(now){
+    const T=new THREE.Group();T.position.set(0,0,29);
+    for(const sx of[-5,-3,3,5])T.add(column(sx,-.6,4.6,0xe8e2d0));
+    T.add(bx(0xefe8d6,13,.7,4,0,4.9,-.6));
+    const pd=new THREE.Mesh(new THREE.ConeGeometry(6.6,2,4),mat(0xe2dac6));pd.position.set(0,6.2,-.6);pd.rotation.y=Math.PI/4;pd.scale.z=.55;T.add(pd);
+    T.add(bx(0xcfc6ae,13,.5,5,0,.25,0));
+    const door=bx(0x6b5b4a,2.4,4,.5,0,2,-2.4);T.add(door);
+    sc.add(T);let dT=f.templeOpen?1:0;
+    ups.push(()=>{dT=lerp(dT,f.templeOpen?1:0,.05);door.position.y=2-dT*4.4});
+    const core=new THREE.Mesh(new THREE.IcosahedronGeometry(.8,0),new THREE.MeshStandardMaterial({color:0xffd76a,emissive:0xffaa22,emissiveIntensity:1.2,flatShading:true}));
+    core.position.set(0,2.4,29.6);sc.add(core);sc.add(glow(0xffc85a,10,0,2.6,29.6));
+    ups.push(t=>{core.rotation.y=t;core.rotation.x=t*.6;core.position.y=2.4+Math.sin(t*1.8)*.25;core.visible=f.templeOpen});
+  }
+  if(past){ // стройка
+    for(const sx of[-5,5])sc.add(column(sx,28.4,2.4,0xd8cbb0,.4));
+    sc.add(bx(0xb09a6c,.2,3.4,.2,-3.4,1.7,28));sc.add(bx(0xb09a6c,.2,3.4,.2,-1.4,1.7,28));sc.add(bx(0xb09a6c,2.6,.16,.16,-2.4,3.3,28));
+    sc.add(bx(0xd8cbb0,3,.8,3,0,.4,29.5));
+  }
+  if(fut){ // руины
+    sc.add(column(-5,28.4,3.4,0x8a84a0,.42));
+    const fc=column(3.4,28.4,2,0x8a84a0,.42);fc.rotation.z=.5;sc.add(fc);
+    sc.add(bx(0x77708c,2.6,.8,2.6,0,.4,29.5));sc.add(ico(0x6d6880,1.1,1.6,.5,28));
+  }
+}
+/* ======= УРОВЕНЬ 2: ГОРОД ======= */
+function buildCity(sc,ep,ups,rnd){
+  const past=ep==='past',now=ep==='present',fut=ep==='future';
+  const wallC=past?0xd8c8a4:now?0xa8b0ba:0x7d8598, roofC=past?0xc4574a:now?0x7d6a5c:0x5c6470;
+  const wall=(x,z,ry,w=3.4,h=2.4,d=3)=>{const hh=house(x,z,ry,fut?0x6c7488:wallC,fut?0x4c5566:roofC,w,h,d);if(fut){hh.rotation.z=(rnd()-.5)*.16;hh.position.y-=.25}sc.add(hh);return hh};
+  // дома
+  wall(-16,4.6,.2);wall(-6,5,-.15);wall(6,1,.3,3,2.2,2.8);wall(-24,3,-.3);wall(-12,11,.1);wall(14,14,-.5,3.6,2.6,3.2);wall(16,17,.4);
+  // площадь и собор
+  sc.add(bx(fut?0x6c7488:0xcfc4a8,16,.3,12,7,.15,19));
+  const cat=new THREE.Group();cat.position.set(7,0,26);
+  cat.add(bx(fut?0x77808c:0xd9d0b8,10,7,4,0,3.5,0));
+  cat.add(bx(fut?0x77808c:0xd9d0b8,3,9,3,-3.4,4.5,0));cat.add(bx(fut?0x77808c:0xd9d0b8,3,9,3,3.4,4.5,0));
+  cat.add(cone(fut?0x5c6470:0xa8564a,2.2,3,4,-3.4,10,0));cat.add(cone(fut?0x5c6470:0xa8564a,2.2,3,4,3.4,10,0));
+  cat.add(new THREE.Mesh(new THREE.CircleGeometry(1.6,10),new THREE.MeshStandardMaterial({color:0x54d1ff,emissive:0x1a4a66,emissiveIntensity:.6,flatShading:true}))).children;
+  const rose=new THREE.Mesh(new THREE.CircleGeometry(1.5,10),new THREE.MeshStandardMaterial({color:0xffd76a,emissive:0x775500,emissiveIntensity:.5,flatShading:true,side:THREE.DoubleSide}));rose.position.set(0,5.4,-2.05);cat.add(rose);
+  if(fut)cat.rotation.z=.04;
+  sc.add(cat);
+  // фонтан
+  const ft=new THREE.Group();ft.position.set(7,0,19);
+  ft.add(cyl(0xb8b0a0,2,2.3,.6,9,0,.3,0));ft.add(cyl(0xb8b0a0,.5,.6,1.6,8,0,1.2,0));ft.add(cyl(0xb8b0a0,1,.4,.3,8,0,2.1,0));sc.add(ft);
+  const jet=cyl(0x9fdcff,.14,.2,2.4,6,0,3.2,0);jet.material=new THREE.MeshStandardMaterial({color:0x9fdcff,transparent:true,opacity:.75,flatShading:true});ft.add(jet);
+  const shN=ico(0x54d1ff,.35,1.6,.7,0);shN.material.emissive=new THREE.Color(0x1a5a7a);ft.add(shN);
+  const coralR=new THREE.Group();coralR.add(cone(0xff7ab8,.5,1.4,6,0,.7,0));coralR.add(cone(0x7fe8d8,.3,.9,6,.4,.45,.2));coralR.add(cone(0xffb454,.26,.8,6,-.35,.4,-.15));
+  const shF=ico(0xb48cff,.35,0,1.6,0);shF.material.emissive=new THREE.Color(0x4a2a7a);coralR.add(shF);coralR.position.set(0,2.2,0);ft.add(coralR);
+  ups.push(()=>{jet.visible=(past)||(now&&!f.gearIn);shN.visible=now&&f.gearIn&&!f.shN&&!f.pN;coralR.visible=fut;shF.visible=fut&&!f.shF&&!f.pF&&f.valve>=3&&f.gearIn});
+  // колокольня + лозы
+  const bt=new THREE.Group();bt.position.set(-10,0,8);
+  bt.add(bx(fut?0x6c7488:0xcfc0a0,2.6,6,2.6,0,3,0));bt.add(bx(fut?0x5c6470:0xa8564a,3.2,.5,3.2,0,6.2,0));
+  const bell=new THREE.Mesh(new THREE.ConeGeometry(.6,.8,8),mat(0xd8a832));bell.position.y=5.4;bell.rotation.x=Math.PI;bt.add(bell);
+  if(fut){bt.rotation.z=.18;bell.position.set(.8,-4.8,.5);bell.rotation.z=1.2}
+  sc.add(bt);
+  if(now){const vines=new THREE.Group();vines.position.set(0,0,13.1);
+    for(let i=0;i<7;i++)vines.add(cone(0x3f7d3a,.3,2.4+rnd()*1.4,5,-3+i,.9,rnd()*.4-.2));
+    vines.add(bx(0x3f7d3a,6.4,.4,.4,0,2.3,0));sc.add(vines);
+    let vT=f.bell?1:0;ups.push(()=>{vT=lerp(vT,f.bell?1:0,.04);vines.scale.setScalar(Math.max(.01,1-vT));vines.visible=vT<.99})}
+  // дом смотрителя + ключ
+  const kh=wall(-20,6,.25,3.8,2.6,3.4);
+  if(past){const tb=bx(0x8a6a48,1.4,.12,.9,-19.2,1.05,4.3);sc.add(tb);
+    const ky=new THREE.Group();ky.add(new THREE.Mesh(new THREE.TorusGeometry(.14,.05,6,10),mat(0xd8a832)));ky.add(bx(0xd8a832,.3,.07,.07,.2,0,0));ky.position.set(-19.2,1.2,4.3);sc.add(ky);
+    ups.push(()=>{ky.visible=!f.keyTaken;ky.rotation.y+=.02})}
+  // кузница
+  const fg=new THREE.Group();fg.position.set(-25,0,9.5);
+  fg.add(bx(0x7d6a5c,3.6,2.6,3.4,0,1.3,0));fg.add(bx(0x5c5248,.7,2.6,.7,1.2,3.6,1));
+  const ember=glow(0xff7a3a,6,0,1.2,.8);fg.add(ember);
+  const forgeM=new THREE.Mesh(new THREE.OctahedronGeometry(.4),new THREE.MeshStandardMaterial({color:0xff8c3a,emissive:0xff5500,emissiveIntensity:1.2,flatShading:true}));forgeM.position.set(0,1.4,1.9);fg.add(forgeM);
+  sc.add(fg);ups.push(t=>{forgeM.visible=!f.shP&&!f.pP;forgeM.rotation.y=t*1.5;ember.intensity=past?1+Math.sin(t*7)*.3:.0});
+  // тайник
+  const cp=new THREE.Group();cp.position.set(4,0,7.5);
+  cp.add(bx(0x9a927e,1.9,.3,1.9,0,.15,0));
+  const crack=bx(past?0x6a6252:fut?0x3a3f4c:0x5a6270,.1,.32,1.7,.3,.16,0);cp.add(crack);
+  const glowC=glow(0xffd76a,3,0,.6,0);cp.add(glowC);sc.add(cp);
+  ups.push(()=>{glowC.intensity=(past&&G.players[G.my]&&G.players[G.my].carry==='key')||(now&&f.buried&&!f.dugP)?1.1:0});
+  // сундук
+  const ch=new THREE.Group();ch.position.set(.5,0,3.5);
+  ch.add(bx(0x7d5a3a,1.5,.9,1,0,.45,0));
+  const lid=bx(0x8a6a48,1.5,.22,1,0,.95,-.5);ch.add(lid);ch.add(bx(0xd8a832,.2,.5,.06,0,.55,.52));
+  sc.add(ch);
+  if(fut){ch.rotation.z=.3;ch.position.y-=.15}
+  if(now){let oT=f.chestOpen?1:0;ups.push(()=>{oT=lerp(oT,f.chestOpen?1:0,.08);lid.rotation.x=-oT*1.8})}
+  // вентиль
+  if(past){const vg=new THREE.Group();vg.position.set(10,0,.6);
+    vg.add(bx(0x8a8f9c,1.4,1.6,1.2,0,.8,0));
+    const wh=new THREE.Group();for(let i=0;i<6;i++){const sp2=bx(0xd8a832,.12,1.1,.12,0,0,0);sp2.rotation.z=i*Math.PI/3;wh.add(sp2)}
+    wh.add(new THREE.Mesh(new THREE.TorusGeometry(.55,.07,6,12),mat(0xd8a832)));wh.position.set(0,1.6,.7);vg.add(wh);sc.add(vg);
+    let wa=f.valve*Math.PI*2/3;ups.push(()=>{wa=lerp(wa,f.valve*Math.PI*2/3,.1);wh.rotation.z=wa})}
+  else{const rv=cyl(0x5c6470,.5,.6,.8,7,10,.4,.6);sc.add(rv)}
+  // мельница
+  const ml=new THREE.Group();ml.position.set(-26,0,-3);
+  ml.add(new THREE.Mesh(new THREE.ConeGeometry(2.2,5,7),mat(fut?0x6c7488:0xd8c8a4)));ml.children[0].position.y=2.5;
+  ml.add(bx(fut?0x5c6470:0x8a6a48,.8,1.6,.2,0,1,2));
+  const hub=new THREE.Group();hub.position.set(0,4.4,2.1);
+  for(let i=0;i<4;i++){const bl=bx(fut?0x555d6e:0xcfc0a0,.34,3.4,.1,0,0,0);bl.position.y=1.7;const wr=new THREE.Group();wr.add(bl);wr.rotation.z=i*Math.PI/2;hub.add(wr)}
+  if(!now)ml.add(hub);else{ml.add(cyl(0x7d6a5c,.2,.25,1.4,6,0,4.4,2.1));sc.add(bx(0xcfc0a0,.3,3,.1,-3.4,1.4,1.4,.6))}
+  if(fut){ml.rotation.z=.22;ml.position.y-=.3}
+  sc.add(ml);
+  if(past){let ang=0;ups.push((t,dt)=>{if(f.gearIn)ang+=dt*1.6;hub.rotation.z=ang})}
+  // насос
+  if(now){const pm=new THREE.Group();pm.position.set(9,0,12.3);
+    pm.add(bx(0x6a7480,1.6,1.4,1.4,0,.7,0));const pist=cyl(0xd8a832,.18,.18,1,6,0,1.6,0);pm.add(pist);
+    pm.add(cyl(0x545e6a,.3,.3,2.4,6,1.6,.5,0)).children;sc.add(pm);
+    ups.push(t=>{pist.position.y=f.gearIn?1.6+Math.sin(t*8)*.25:1.4})}
+  // лодка
+  if(past){const bo=new THREE.Group();
+    bo.add(bx(0x8a6a48,1.4,.5,3,0,.25,0));bo.add(bx(0x8a6a48,.2,.5,.6,.6,.45,1.2));bo.add(bx(0x8a6a48,.2,.5,.6,-.6,.45,-1.2));
+    bo.position.set(3,0,1.6);sc.add(bo);
+    const bo2=bo.clone();bo2.position.set(19.8,.3,19);bo2.rotation.y=.8;sc.add(bo2);
+    ups.push(t=>{bo.position.y=.1+Math.sin(t*1.6)*.08;bo2.position.y=.4+Math.sin(t*1.4)*.08})}
+  // маяк + остров
+  const isl=ico(0x8a92a8,5,22,-1.4,20,1);sc.add(isl);
+  const lh=new THREE.Group();lh.position.set(22,0,20);
+  for(let i=0;i<4;i++)lh.add(cyl(i%2?0xd85a4a:0xe8e2d0,1.5-i*.22,1.7-i*.22,1.6,9,0,.8+i*1.6,0));
+  lh.add(bx(0x3a4048,2,.3,2,0,7.3,0));
+  const glass=new THREE.Mesh(new THREE.CylinderGeometry(.8,.8,1.2,8),new THREE.MeshStandardMaterial({color:0xffe9a0,emissive:0xffaa22,emissiveIntensity:.15,flatShading:true,transparent:true,opacity:.9}));glass.position.y=8;lh.add(glass);
+  lh.add(new THREE.Mesh(new THREE.ConeGeometry(1.1,.9,8),mat(0x3a4048))).children[0];lh.children[lh.children.length-1].position.y=9;
+  const lampG=glow(0xffc85a,14,0,8,0);lh.add(lampG);sc.add(lh);
+  const beamUp=new THREE.Mesh(new THREE.CylinderGeometry(.4,2.2,40,8,1,true),new THREE.MeshBasicMaterial({color:0xffe9a0,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false}));beamUp.position.set(22,26,20);sc.add(beamUp);
+  // пьедестал
+  const pd2=new THREE.Group();pd2.position.set(20.6,0,18.2);
+  pd2.add(cyl(0x9aa2b8,.9,1.1,1,7,0,.5,0));
+  const heart=new THREE.Mesh(new THREE.IcosahedronGeometry(.6,0),new THREE.MeshStandardMaterial({color:0xffd76a,emissive:0xffaa22,emissiveIntensity:1,flatShading:true}));heart.position.y=1.9;pd2.add(heart);
+  const sgs=[0xff8c3a,0x54d1ff,0xb48cff].map((c,i)=>{const s=ico(c,.22,Math.cos(i*2.1)*.7,1.15,Math.sin(i*2.1)*.7);s.material.emissive=new THREE.Color(c);s.material.emissiveIntensity=.6;pd2.add(s);return s});
+  sc.add(pd2);
+  ups.push(t=>{const n=(f.pP?1:0)+(f.pN?1:0)+(f.pF?1:0);sgs[0].visible=f.pP;sgs[1].visible=f.pN;sgs[2].visible=f.pF;
+    heart.scale.setScalar(.3+n*.3);heart.rotation.y=t;heart.position.y=1.9+Math.sin(t*2)*.12;
+    lampG.intensity=f.done?3:(f.latchPast>Date.now()||f.latchFut>Date.now()?2:.4);glass.material.emissiveIntensity=f.done?2:((f.latchPast>Date.now()||f.latchFut>Date.now())?1.2:.15);
+    beamUp.material.opacity=f.done?.5:((f.latchPast>Date.now()||f.latchFut>Date.now())?.22:0);beamUp.rotation.y=t*.5});
+  // рычаги маяков
+  for(const ep2 of['past','future'])if(ep===ep2){const lv2=new THREE.Group();lv2.position.set(23.6,0,21.6);
+    lv2.add(bx(0x545e6a,.7,1,.7,0,.5,0));const stk=bx(0xd8a832,.12,.9,.12,0,1.2,0);lv2.add(stk);sc.add(lv2);
+    const key2=ep==='past'?'latchPast':'latchFut';
+    ups.push(()=>{stk.rotation.x=f[key2]>Date.now()?-.7:0})}
+  // вода
+  if(past){water(sc,-31,11.8,16,13.8,-.15,0x57b7d8,.6);water(sc,16,-9,33,34,-.2,0x3f9fd8,.75)}
+  if(now){const flood=water(sc,-9,12,32,34,.85,0x4f9fd0,.72);const sea=water(sc,14,-9,33,34,.5,0x3f8fc4,.8);
+    ups.push(()=>{flood.visible=!f.gearIn;flood.position.y=.85+Math.sin(tGlobal*1.2)*.06})}
+  if(fut){const flood=water(sc,-9,12,33,34,.85,0x2f6f8f,.78);
+    ups.push(()=>{const dry=f.valve>=3&&f.gearIn;flood.visible=!dry;flood.position.y=.85+Math.sin(tGlobal)*.06})}
+  // кораллы будущего
+  if(fut){const cr=mulberry(44);for(let i=0;i<40;i++){const x=-28+cr()*56,z=-6+cr()*36;if(z>17&&z<23&&x>3)continue;
+    const c=[0xff7ab8,0x7fe8d8,0xffb454,0xb48cff][(cr()*4)|0];const m=cone(c,.25+cr()*.4,.6+cr()*.9,5,x,H2(x,z)+.3,z);sc.add(m)}}
+  if(past){const cr=mulberry(12);for(let i=0;i<8;i++){const x=-14+cr()*20,z=-4+cr()*4;sc.add(bx(0x8a6a48,.8,.8,.8,x,.4,z,cr()*3))}
+    for(let i=0;i<7;i++){const p2=new THREE.Group();const x=-12+cr()*18,z=-2+cr()*5;
+      p2.add(new THREE.Mesh(new THREE.ConeGeometry(.3,.9,6),mat([0xc4574a,0x4a7ab5,0xd8a832][i%3])));p2.children[0].position.y=.45;
+      p2.add(ico(0xe8c8a0,.16,0,.95,0));p2.position.set(x,0,z);sc.add(p2)}}
+}
+/* ================= АВАТАРЫ ================= */
+function buildAvatar(pl,echo){
+  const g=new THREE.Group();const col=pl.id==='P1'?0xff9a3c:pl.id==='P2'?0x3cd6ff:0x8fe89a;
+  const m0=new THREE.MeshStandardMaterial({color:col,flatShading:true,roughness:.7,transparent:!!echo,opacity:echo?.3:1});
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.34,.42,.95,7),m0);body.position.y=.75;body.castShadow=!echo;g.add(body);
+  const head=new THREE.Mesh(new THREE.IcosahedronGeometry(.3,0),m0.clone());head.material.color=new THREE.Color(col).lerp(new THREE.Color(0xffffff),.35);head.position.y=1.5;head.castShadow=!echo;g.add(head);
+  const visor=new THREE.Mesh(new THREE.BoxGeometry(.4,.12,.1),new THREE.MeshStandardMaterial({color:0x101828,flatShading:true,transparent:!!echo,opacity:echo?.3:1}));visor.position.set(0,1.55,.26);g.add(visor);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(.55,.06,6,16),new THREE.MeshBasicMaterial({color:EP_COL[pl.epoch],transparent:true,opacity:echo?.25:.85}));
+  ring.rotation.x=Math.PI/2;ring.position.y=.08;g.add(ring);g.userData.ring=ring;
+  if(!echo){const ns=nameSprite(pl.name,'#'+col.toString(16).padStart(6,'0'));ns.position.y=2.5;g.add(ns);
+    const carry=new THREE.Group();carry.position.y=2.05;g.add(carry);g.userData.carry=carry;}
+  if(echo){const et=nameSprite('⟡ '+EP_RU[pl.epoch],'#9aa8cc');et.position.y=2.3;et.scale.set(2.6,.7,1);g.add(et)}
+  return g;
+}
+function carryMesh(item){
+  const g=new THREE.Group();
+  const mk=(geo,c,e)=>{const m2=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:c,emissive:e||0x000000,emissiveIntensity:.8,flatShading:true}));g.add(m2)};
+  if(item==='crystal')mk(new THREE.OctahedronGeometry(.3),0xffd76a,0xcc8800);
+  else if(item==='gear'){mk(new THREE.TorusGeometry(.24,.09,6,10),0xd8a832);mk(new THREE.BoxGeometry(.1,.5,.1),0xd8a832)}
+  else if(item==='key'||item==='keyOld'){mk(new THREE.TorusGeometry(.14,.05,6,10),item==='key'?0xd8a832:0x8a7a4a);mk(new THREE.BoxGeometry(.32,.08,.08),item==='key'?0xd8a832:0x8a7a4a)}
+  else if(item&&item.startsWith('shard'))mk(new THREE.TetrahedronGeometry(.3),{shard1:0xff8c3a,shard2:0x54d1ff,shard3:0xb48cff}[item],0x442200);
+  else if(item==='note')mk(new THREE.BoxGeometry(.3,.05,.4),0xe8e0c8);
+  return g;
+}
+/* ================= СЦЕНА/ВИД ================= */
+let tGlobal=0,camTarget=new THREE.Vector3();
+function disposeScene(){if(!V.group)return;V.group.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{if(m.map)m.map.dispose();m.dispose()})}});scene&&scene.remove(V.group);V.group=null;V.ups=[];V.av={}}
+function setView(){
+  disposeScene();if(!scene)scene=new THREE.Scene();
+  const{sc,ups}=buildLevelScene(G.lv,myPl().epoch);
+  V.group=sc;V.ups=ups;scene.add(sc);
+  // аватары
+  for(const id in G.players){const pl=G.players[id];const echo=pl.epoch!==myPl().epoch;
+    const av=buildAvatar(pl,echo);av.position.set(pl.x,0,pl.z);sc.add(av);V.av[id]={g:av,echo,px:pl.x,pz:pl.z,lastCarry:undefined}}
+  flashScreen();
+}
+function flashScreen(){const fl=$('#flash');fl.style.transition='none';fl.style.opacity=.8;requestAnimationFrame(()=>{fl.style.transition='opacity .6s';fl.style.opacity=0})}
+/* ================= ИГРОКИ ================= */
+function myPl(){return G.players[G.my]||{id:G.my,name:'—',epoch:'past',x:0,z:0,face:0,carry:null}}
+function addPlayer(id,name,epoch){G.players[id]={id,name,epoch,home:epoch,x:LEVELS[G.lv].spawn[0],z:LEVELS[G.lv].spawn[1],face:0,carry:null,tw:null,twLock:0}}
+/* ================= СЕТЬ ================= */
+function genCode(){const A='ABCEHKMPTX23456789';let s='';for(let i=0;i<4;i++)s+=A[(Math.random()*A.length)|0];return s}
+function send(conn,o){try{conn.send(JSON.stringify(o))}catch(e){}}
+function netSend(o){ // от гостя хосту
+  if(G.mode==='host'||G.mode==='solo'){hostRecv(G.my,o);return}
+  if(G.hostConn)send(G.hostConn,o);
+}
+function broadcast(o){const s=JSON.stringify(o);for(const id in G.conns)try{G.conns[id].send(s)}catch(e){}}
+function startHost(){
+  G.mode='host';G.isHost=true;const code=genCode();
+  $('#roomCode').textContent=code;
+  try{G.peer=new Peer('hronos-'+code)}catch(e){hostFail(e);return}
+  G.peer.on('error',e=>hostFail(e));
+  G.peer.on('open',()=>{$('#lobbyWait').textContent='Комната готова. Друзья вводят код '+code+' в меню «Присоединиться».'});
+  G.peer.on('connection',conn=>{
+    conn.on('open',()=>{
+      if(G.started){send(conn,{t:'deny',m:'Игра уже идёт'});setTimeout(()=>conn.close(),300);return}
+      G.conns[conn.peer]=conn;
+    });
+    conn.on('data',d=>{try{hostRecv(conn.peer,JSON.parse(d))}catch(e){}});
+    conn.on('close',()=>{delete G.conns[conn.peer];const nm=G.players[conn.peer]?G.players[conn.peer].name:'Гость';delete G.players[conn.peer];
+      if(G.started){say(nm+' растворился(ась) в потоке времени.','warn');hostSendState()}renderLobby()});
   });
-  // fallen logs (future)
-  dyn.logs.push({});
-  if(e===2){
-   const bridge=new THREE.Mesh(new THREE.CylinderGeometry(.3,.34,3.6,7),std(0x6e5a44));bridge.rotation.z=Math.PI/2;bridge.visible=false;put(sc,bridge,10,6.5,.28);dyn.logs[e].bridge=bridge;
-   [[8.5,3.5],[8.5,10.5]].forEach(([x,z])=>{const l=new THREE.Mesh(new THREE.CylinderGeometry(.24,.28,1.8,6),std(0x5d4c3c));l.rotation.z=Math.PI/2;l.rotation.y=.5;l.visible=false;put(sc,l,x+.8,z,.2);dyn.logs[e]['x'+x+z]=l});
-  }
-  // crystal pedestal
-  put(sc,new THREE.Mesh(new THREE.CylinderGeometry(.45,.55,.8,6),std(e===2?0x4a4170:0xcbb894)),13.5,3.5,.4);
-  const cry=new THREE.Mesh(new THREE.OctahedronGeometry(.32,0),std(0xffc94d,{emissive:0xff9d2c,emissiveIntensity:.8}));put(sc,cry,13.5,3.5,1.15);dyn['cry'+e]=cry;
-  // accumulator / console
-  if(e===0){put(sc,box(.9,.9,.9,0xd8b46a),13.5,9.5,.45);const sock=new THREE.Mesh(new THREE.OctahedronGeometry(.26,0),std(0x444,.0));sock.visible=false;put(sc,sock,13.5,9.5,1.1);dyn.sock0=sock}
-  if(e===1){put(sc,box(.9,.7,.9,0x9aa08f),13.5,9.5,.35)}
-  if(e===2){put(sc,box(1,.8,1,0x39315e),13.5,9.5,.4);const scr=new THREE.Mesh(new THREE.PlaneGeometry(.7,.4),new THREE.MeshBasicMaterial({color:0x0c2c33}));scr.position.set(13.5,1.05,9.0);scr.rotation.x=-.3;put(sc,scr,13.5,9.05,0);dyn.scr2=scr}
-  // gate
-  const gateM=std(e===0?0xc99a4a:(e===1?0xa09a8a:0x4e4578),{emissive:e===2?0x241a66:0});
-  const gate=box(1,2.2,6.2,0xffffff);gate.material=gateM;put(sc,gate,17.5,7,1.1);dyn['gate'+e]=gate;
-  // plates
-  const mkPlate=(x,z,c)=>{const g=new THREE.Group();const base=new THREE.Mesh(new THREE.CylinderGeometry(.62,.7,.16,12),std(0x554f78));const top=new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,.12,12),std(c,{emissive:c,emissiveIntensity:.25}));top.position.y=.13;g.add(base);g.add(top);put(sc,g,x,z,.05);return{g,top}};
-  if(e===0)dyn.pl0=mkPlate(19.5,3.5,0xffd76a);
-  if(e===2)dyn.pl2=mkPlate(19.5,10.5,0xc29bff);
-  // light bridge over rift
-  const lb=[];[[21.5],[22.5]].forEach(([x])=>{const m=new THREE.Mesh(new THREE.BoxGeometry(.95,.1,.95),new THREE.MeshBasicMaterial({color:e===2?0x9ffcff:0xfff3b8,transparent:true,opacity:.9}));m.visible=false;put(sc,m,x,6.5,.06);lb.push(m)});
-  dyn['lb'+e]=lb;
-  // seals
-  const mkSeal=(x,z,c)=>{const ring=new THREE.Mesh(new THREE.TorusGeometry(.62,.08,8,24),std(c,{emissive:c,emissiveIntensity:.5}));ring.rotation.x=Math.PI/2;put(sc,ring,x,z,.08);const cr=new THREE.Mesh(new THREE.OctahedronGeometry(.22,0),std(c,{emissive:c,emissiveIntensity:.6}));put(sc,cr,x,z,.9);return{ring,cr}};
-  if(e===0)dyn.seal0=mkSeal(25.5,5.5,0xffd76a);
-  if(e===2)dyn.seal2=mkSeal(25.5,8.5,0xc29bff);
-  // fragments
-  const mkFrag=(x,z)=>{const f=new THREE.Mesh(new THREE.TetrahedronGeometry(.26,0),std(0x8ff4ff,{emissive:0x3fd9ff,emissiveIntensity:.9}));put(sc,f,x,z,.8);return f};
-  if(e===0)dyn.frag0=mkFrag(15.5,3.5);
-  if(e===2)dyn.frag2=mkFrag(12.5,10.5);
- }
- function update(F,dt,rt){
-  for(let e=0;e<3;e++){
-   const spots=[[8.5,3.5],[8.5,6.5],[8.5,10.5]];
-   spots.forEach((s,i)=>{const t=dyn.trees[e][i];const planted=F.plant&&F.plant.i===i;
-    t.mound.visible=planted?(F.T-F.plant.at<1.2):true;
-    t.grp.visible=planted;
-    if(planted){const age=F.T-F.plant.at;const k=clamp(age/3.6,0,1);const sc2=.15+k*.95;t.grp.scale.set(sc2,e===2?sc2:sc2,sc2);if(e===2&&F.mature)t.grp.visible=false}});
-   if(e===2){const b=dyn.logs[2].bridge;if(b){b.visible=!!F.mature;b.position.y=F.mature?.28+Math.sin(rt*1.4)*.01:.28}
-    for(const key of['x8.53.5','x8.510.5']){const l=dyn.logs[2][key];if(l)l.visible=!!F.mature}}
-   dyn['cry'+e].visible=(e===0)?(F.crys==='ped'):false;
-   if(e===0){dyn.sock0.visible=F.crys==='acc'}
-   if(e===2){dyn.scr2.material.color.setHex(F.crys==='acc'?(Math.sin(rt*9)>0?0x59f7ff:0x2fa8c0):0x0c2c33)}
-   const gate=dyn['gate'+e];F.gateK=lerp(F.gateK||0,F.gateOpen?1:0,dt*2.5);gate.position.y=lerp(1.1,-1.5,F.gateK);
-   if(e===0){const on=F.plateP>F.T;dyn.pl0.top.material.emissiveIntensity=on?.9+Math.sin(rt*10)*.4:.2;dyn.pl0.g.position.y=on?.01:.05}
-   if(e===2){const on=F.plateF>F.T;dyn.pl2.top.material.emissiveIntensity=on?.9+Math.sin(rt*10)*.4:.2;dyn.pl2.g.position.y=on?.01:.05}
-   const lbOn=F.rift>F.T;dyn['lb'+e].forEach((m,i)=>{m.visible=lbOn;if(lbOn)m.position.y=.06+Math.sin(rt*5+i*2)*.06});
-   const s0=dyn.seal0,s2=dyn.seal2;
-   if(s0){s0.cr.rotation.y=rt*2;s0.ring.material.emissiveIntensity=.4+(F.dep>0?.4:0)+Math.sin(rt*3)*.15}
-   if(s2){s2.cr.rotation.y=rt*2;s2.ring.material.emissiveIntensity=.4+(F.dep>1?.4:0)+Math.sin(rt*3)*.15}
-   dyn.frag0.visible=F.fP===0;dyn.frag0.rotation.y=rt*3;dyn.frag0.position.y=.8+Math.sin(rt*2.4)*.12;
-   dyn.frag2.visible=F.fF===0;dyn.frag2.rotation.y=rt*3;dyn.frag2.position.y=.8+Math.sin(rt*2.4)*.12;
-  }
- }
- return{scenes,update};
+  G.players={};addPlayer('P1',hostName(),pickFreeEp());
+  showScreen('lobby');renderLobby();
 }
-/* ---------- Level 2 view ---------- */
-function buildL2View(){
- const lvl=LEVELS[2];const grids=gridsCache[2];
- const scenes=[0,1,2].map(e=>{const s=new THREE.Scene();s.fog=new THREE.Fog(THEMES[e].fog,16,46);addLights(s,THEMES[e]);buildTerrain(s,grids[e],THEMES[e],e,2);return s});
- const dyn={};
- for(let e=0;e<3;e++){
-  const sc=scenes[e],fut=e===2,past=e===0;
-  // lighthouse tower
-  const tw=new THREE.Group();
-  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.75,.95,fut?1.8:3.2,8),std(past?0xe8d9b0:(e===1?0xb8b2a2:0x4e4478)));shaft.position.y=fut?.9:1.6;tw.add(shaft);
-  if(!fut){const top=new THREE.Mesh(new THREE.CylinderGeometry(.5,.6,.7,8),std(0xd8b46a));top.position.y=3.35;tw.add(top);
-   const lampG=new THREE.Mesh(new THREE.SphereGeometry(.34,8,6),new THREE.MeshBasicMaterial({color:0xffe08a}));lampG.position.y=3.7;tw.add(lampG);dyn['lampG'+e]=lampG;
-   const beam=new THREE.Mesh(new THREE.ConeGeometry(2.6,9,8,1,true),new THREE.MeshBasicMaterial({color:0xffe9a8,transparent:true,opacity:.14,side:THREE.DoubleSide,depthWrite:false}));beam.rotation.z=Math.PI/2;beam.position.set(4.5,3.7,0);beam.visible=false;tw.add(beam);dyn['beam'+e]=beam}
-  put(sc,tw,2.5,4.5,0);
-  // burner pedestal
-  put(sc,new THREE.Mesh(new THREE.CylinderGeometry(.4,.5,.7,6),std(past?0xd8b46a:0x4a4170)),3.5,5.5,.35);
-  const bc=new THREE.Mesh(new THREE.OctahedronGeometry(.28,0),std(0xffb347,{emissive:0xff7b1c,emissiveIntensity:.9}));bc.visible=false;put(sc,bc,3.5,5.5,1);dyn['burn'+e]=bc;
-  // cave gate G1
-  if(past){const g=box(.9,1.6,1,0x8a5a33);put(sc,g,5.5,13,.8);dyn.g1=g}
-  else{put(sc,new THREE.Mesh(new THREE.DodecahedronGeometry(.4,0),std(e===1?0x8a8478:0x3a3358)),5.2,13.6,0);put(sc,new THREE.Mesh(new THREE.DodecahedronGeometry(.3,0),std(e===1?0x8a8478:0x3a3358)),5.8,12.5,0)}
-  // block + plate
-  const bl=box(.85,.85,.85,past?0xd9c08a:(e===1?0xa8a08c:0x55497e));put(sc,bl,8.5,13.5,.45);dyn['block'+e]=bl;
-  if(past){const pl=new THREE.Mesh(new THREE.CylinderGeometry(.55,.6,.12,12),std(0xc99a4a,{emissive:0xffd76a,emissiveIntensity:.2}));put(sc,pl,6.5,13.5,.06);dyn.plate0=pl}
-  // altar + key
-  put(sc,box(.9,fut?.4:.8,.9,fut?0x39315e:0xcbb894),16.5,12.5,fut?.2:.4);
-  const key=new THREE.Group();const kr=new THREE.Mesh(new THREE.TorusGeometry(.14,.05,6,12),std(0xffd76a,{emissive:0xaa7711}));const ks=box(.06,.34,.06,0xffd76a);ks.position.y=-.22;key.add(kr);key.add(ks);key.visible=past;put(sc,key,16.5,12.5,1.1);dyn.key0=key;
-  // boat
-  if(past){const boat=new THREE.Group();const hull=box(1.3,.35,.6,0x8a5a33);hull.position.y=.1;boat.add(hull);const mast=box(.06,.8,.06,0x6d4426);mast.position.y=.5;boat.add(mast);put(sc,boat,19.5,12.5,0);dyn.boat=boat}
-  if(fut){const wreck=box(1.2,.25,.55,0x2e2850);wreck.rotation.z=.4;put(sc,wreck,19.5,12.5,-.1)}
-  // light path
-  if(fut){const tiles=[];for(let x=19;x<=23;x++){const m=new THREE.Mesh(new THREE.BoxGeometry(.96,.08,.96),new THREE.MeshBasicMaterial({color:0x8ffcff,transparent:true,opacity:.85}));m.visible=false;put(sc,m,x+.5,7.5,.03);tiles.push(m)}dyn.pathTiles=tiles}
-  // well
-  const wr=new THREE.Mesh(new THREE.TorusGeometry(.5,.16,7,14),std(past?0xb9a988:0x4a4170));wr.rotation.x=Math.PI/2;put(sc,wr,25.5,8.5,.18);
-  const wg=new THREE.Mesh(new THREE.CircleGeometry(.42,12),new THREE.MeshBasicMaterial({color:0x0a2c33}));wg.rotation.x=-Math.PI/2;put(sc,wg,25.5,8.5,.2);dyn['well'+e]={glow:wg};
-  // shrine gate + contents
-  if(fut){const g=box(.7,1.4,.7,0x59499c,{emissive:0x2a1a66});put(sc,g,26.5,9.5,.7);dyn.shrineGate=g;
-   const hd=box(.12,.5,.12,0x9ffcff,{emissive:0x2fb8c9});hd.visible=false;put(sc,hd,27.5,9.5,.5);dyn.handle=hd}
-  // lever
-  const lb=new THREE.Group();put(sc,new THREE.Mesh(new THREE.CylinderGeometry(.3,.36,.3,8),std(past?0xd8b46a:0x4a4170)),0,0,.15);lb.add(new THREE.Mesh(new THREE.CylinderGeometry(.3,.36,.3,8),std(0)).geometry?new THREE.Object3D():new THREE.Object3D());
-  const handle=new THREE.Group();const rod=box(.09,.8,.09,past?0xc99a4a:0x9ffcff,{emissive:past?0x553a10:0x2fb8c9});rod.position.y=.4;const knob=new THREE.Mesh(new THREE.SphereGeometry(.12,6,5),std(0xffd76a));knob.position.y=.85;handle.add(rod);handle.add(knob);handle.position.y=.25;lb.add(handle);put(sc,lb,7.5,5.5,0);dyn['lever'+e]={grp:lb,handle};
-  // door G2
-  const g2=box(1,1.9,1.1,past?0xd8b46a:(e===1?0xa09a8a:0x59499c),{emissive:fut?0x241a66:0});put(sc,g2,4.5,3.5,.95);dyn['g2'+e]=g2;
-  // beacon heart + seals
-  const bh=new THREE.Mesh(new THREE.OctahedronGeometry(.42,0),std(0x8ff4ff,{emissive:0x3fd9ff,emissiveIntensity:.3}));put(sc,bh,4.5,1.5,1);dyn['heart'+e]=bh;
-  [[3.5,1.5],[5.5,1.5]].forEach(([x,z],i)=>{const ring=new THREE.Mesh(new THREE.TorusGeometry(.55,.07,8,24),std(0x8ff4ff,{emissive:0x3fd9ff,emissiveIntensity:.4}));ring.rotation.x=Math.PI/2;put(sc,ring,x,z,.07);dyn['seal'+e+i]=ring});
-  if(fut){const winBeam=new THREE.Mesh(new THREE.CylinderGeometry(.5,1.6,14,10,1,true),new THREE.MeshBasicMaterial({color:0xbffcff,transparent:true,opacity:.22,side:THREE.DoubleSide,depthWrite:false}));winBeam.visible=false;put(sc,winBeam,4,1.5,7);dyn.winBeam=winBeam}
-  // fragments
-  const mkFrag=(x,z)=>{const f=new THREE.Mesh(new THREE.TetrahedronGeometry(.24,0),std(0x8ff4ff,{emissive:0x3fd9ff,emissiveIntensity:.9}));put(sc,f,x,z,.8);return f};
-  if(past)dyn.frag1=mkFrag(1.5,12.5);
-  if(fut){dyn.frag2=mkFrag(26.5,6.5);dyn.frag3=mkFrag(27.5,9.1)}
-  // port crates
-  [[14.5,13.3],[15.3,13.6]].forEach(([x,z])=>{const c=box(.7,.7,.7,fut?0x39315e:0x9a6b3f);c.rotation.y=x;put(sc,c,x,z,.35)});
- }
- function update(F,dt,rt){
-  for(let e=0;e<3;e++){
-   const past=e===0,fut=e===2;
-   if(dyn['lampG'+e]){const on=!!F.lamp;dyn['lampG'+e].material.color.setHex(on?0xffe08a:0x443c30);
-    const bm=dyn['beam'+e];bm.visible=on;if(on)bm.rotation.y=rt*1.1}
-   dyn['burn'+e].visible=F.lamp===1||F.crys==='lamp';
-   if(past){F.g1K=lerp(F.g1K||0,F.g1Open?1:0,dt*2.5);dyn.g1.position.y=lerp(.8,-1.2,F.g1K);
-    dyn.plate0.material.emissiveIntensity=F.g1Open?.8:.2}
-   const bl=dyn['block'+e];bl.position.set(F.block[0]+.5,.45,F.block[1]+.5);
-   dyn.key0.visible=F.key==='altar';
-   if(past){const bp=game.players&&[...game.players.values()].find(p=>p.inBoat);
-    if(bp){dyn.boat.position.set(bp.tx??bp.x,0,bp.tz??bp.z);dyn.boat.position.y=Math.sin(rt*2)*.04}
-    else dyn.boat.position.set(19.5,Math.sin(rt*2)*.04,12.5)}
-   if(fut&&dyn.pathTiles)dyn.pathTiles.forEach((m,i)=>{m.visible=!!F.lamp;if(F.lamp)m.position.y=.03+Math.sin(rt*4+i)*.05});
-   dyn['well'+e].glow.material.color.setHex(F.key==='well'?0x59f7ff:0x0a2c33);
-   if(fut){if(dyn.shrineGate)dyn.shrineGate.visible=!F.shrine;if(dyn.handle)dyn.handle.visible=F.shrine===0?false:false}
-   const lv=dyn['lever'+e];const pulled=(past?F.levP:F.levF)>F.T;lv.grp.rotation.x=lerp(lv.grp.rotation.x,pulled?-.6:(F.g2Open?-.6:0),dt*6);
-   if(fut)lv.handle.visible=true;
-   const g2=dyn['g2'+e];F.g2K=lerp(F.g2K||0,F.g2Open?1:0,dt*2.5);g2.position.y=lerp(.95,-1.3,F.g2K);
-   dyn['heart'+e].rotation.y=rt*1.5;dyn['heart'+e].position.y=1+Math.sin(rt*2)*.1;
-   dyn['heart'+e].material.emissiveIntensity=.3+F.dep*.35+(F.won?1.5:0);
-   for(let i=0;i<2;i++){const s=dyn['seal'+e+i];s.material.emissiveIntensity=.4+F.dep*.2+Math.sin(rt*3+i)*.15+(F.won?1:0)}
-   if(fut&&dyn.winBeam)dyn.winBeam.visible=!!F.won;
-   if(past)dyn.frag1.visible=F.f1===0,dyn.frag1.rotation.y=rt*3,dyn.frag1.position.y=.8+Math.sin(rt*2.4)*.12;
-   if(fut){dyn.frag2.visible=F.f2===0;dyn.frag2.rotation.y=rt*3;dyn.frag3.visible=false}
-  }
- }
- return{scenes,update};
-}
-/* ================= characters ================= */
-const chars={};
-function clearChars(){for(const id in chars){try{currentView.scenes[chars[id].era].remove(chars[id].grp)}catch(e){}};for(const id in chars)delete chars[id]}
-function makeCharMesh(era){
- const g=new THREE.Group();
- const c=ERAS[era].col;
- const body=new THREE.Mesh(new THREE.ConeGeometry(.34,.95,6),std(c,{emissive:c,emissiveIntensity:.12}));body.position.y=.5;g.add(body);
- const head=new THREE.Mesh(new THREE.IcosahedronGeometry(.19,0),std(0xf2e6d0));head.position.y=1.12;g.add(head);
- const ring=new THREE.Mesh(new THREE.TorusGeometry(.44,.05,6,20),std(c,{emissive:c,emissiveIntensity:.6}));ring.rotation.x=Math.PI/2;ring.position.y=.06;g.add(ring);
- const carryG=new THREE.Group();carryG.position.y=1.65;g.add(carryG);
- const items={
-  seed:put(carryG,new THREE.Mesh(new THREE.SphereGeometry(.14,6,5),std(0x8a5a33)),0,0,0),
-  crystal:put(carryG,new THREE.Mesh(new THREE.OctahedronGeometry(.2,0),std(0xffc94d,{emissive:0xff9d2c,emissiveIntensity:.9})),0,0,0),
-  key:put(carryG,new THREE.Mesh(new THREE.TorusGeometry(.13,.05,6,10),std(0xffd76a,{emissive:0xaa7711})),0,0,0),
-  handle:put(carryG,new THREE.Mesh(new THREE.ConeGeometry(.12,.4,5),std(0x9ffcff,{emissive:0x2fb8c9})),0,0,0)
- };
- const fragOrbs=[];for(let i=0;i<3;i++){const o=new THREE.Mesh(new THREE.TetrahedronGeometry(.12,0),std(0x8ff4ff,{emissive:0x3fd9ff,emissiveIntensity:1}));o.visible=false;g.add(o);fragOrbs.push(o)}
- // ping sprite
- const cv=document.createElement('canvas');cv.width=256;cv.height=96;const cx=cv.getContext('2d');
- cx.fillStyle='rgba(255,215,106,.95)';cx.beginPath();cx.roundRect(8,10,240,76,22);cx.fill();
- cx.fillStyle='#3a2404';cx.font='bold 44px Rubik,sans-serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText('✋ Готов!',128,50);
- const tex=new THREE.CanvasTexture(cv);const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false}));spr.scale.set(2.1,.8,1);spr.position.y=2.3;spr.visible=false;g.add(spr);
- return{g,body,ring,items,fragOrbs,spr};
-}
-function ensureChar(id,era){
- let c=chars[id];
- if(c&&c.era===era)return c;
- if(c){currentView.scenes[c.era].remove(c.grp)}
- const m=makeCharMesh(era);currentView.scenes[era].add(m.g);
- chars[id]={era,grp:m.g,mesh:m,x:null,z:null,tx:0,tz:0,ping:0};
- return chars[id];
-}
-/* ================= networking ================= */
-const PREFIX='skvoz-epokh-';
-let myName='Странник';
-function randCode(){const A='ABCEHKMNPRTUVXY23456789';let s='';const r=mulberry(Date.now()&0x7fffffff);for(let i=0;i<5;i++)s+=A[Math.floor(Math.random()*A.length)];return s}
-function createRoom(){
- net.code=randCode();
- showOnly('menuCreate');$('roomCodeBig').textContent=net.code;$('lobbySpin').classList.remove('hidden');$('lobbyList').innerHTML='';
- game.role='host';
- net.peer=new Peer(PREFIX+net.code);
- net.peer.on('open',()=>{});
- net.peer.on('error',err=>{
-  if(err.type==='unavailable-id'){net.peer.destroy();createRoom()}
-  else showErr('Ошибка сети',String(err.type));
- });
- net.peer.on('connection',conn=>{
-  conn.on('open',()=>{
-   if(game.started||net.conns.size>=1){conn.send({t:'full'});setTimeout(()=>conn.close(),300);return}
-   const id=conn.peer;net.conns.set(id,conn);
-   const era=2;
-   conn.send({t:'hello',id,era});
-   toast('🔮 Напарник подключился!','good');sfx('ok');updateLobby();
-   conn.on('data',d=>hostOnData(id,d));
-   conn.on('close',()=>{net.conns.delete(id);game.players.delete(id);toast('Напарник покинул игру','');updateLobby()});
+function hostFail(e){$('#lobbyWait').innerHTML='⚠ Ошибка сети: '+(e&&e.type||e)+'. Попробуйте ещё раз или сыграйте соло.';}
+function hostName(){return localStorage.getItem('hron_name')||'Хранитель'}
+function pickFreeEp(){for(const e of EPS)if(!Object.values(G.players).some(p=>p.home===e))return e;return'past'}
+function joinGame(){
+  const code=$('#joinCode').value.trim().toUpperCase();const name=$('#joinName').value.trim()||'Странник';
+  localStorage.setItem('hron_name',name);
+  if(code.length<4){$('#joinStat').textContent='Введите код из 4 символов';return}
+  $('#joinStat').innerHTML='<span class="spin">◌</span> Подключение...';
+  G.mode='guest';G.my='guest';
+  try{G.peer=new Peer()}catch(e){$('#joinStat').textContent='Не удалось создать Peer: '+e;return}
+  G.peer.on('error',e=>{$('#joinStat').textContent='⚠ Ошибка: '+(e&&e.type||e)+'. Проверьте код или сыграйте соло.'});
+  G.peer.on('open',()=>{
+    G.hostConn=G.peer.connect('hronos-'+code,{reliable:true});
+    G.hostConn.on('open',()=>{send(G.hostConn,{t:'hello',name});$('#joinStat').innerHTML='<span class="spin">◌</span> Соединение установлено, ждём хоста...'});
+    G.hostConn.on('data',d=>{try{guestRecv(JSON.parse(d))}catch(e){}});
+    G.hostConn.on('close',()=>{if(G.screen!=='menu'){toast('Хост покинул игру','warn');toMenu()}});
   });
- });
 }
-function updateLobby(){
- const list=$('lobbyList');list.innerHTML='';
- const add=(n,e)=>{const d=document.createElement('div');d.innerHTML=`${ERAS[e].icon} <b>${n}</b> — эпоха: ${ERAS[e].name}`;list.appendChild(d)};
- add(myName||'Вы',0);
- net.conns.forEach((c,id)=>add(c._name||'Напарник',2));
- $('lobbySpin').classList.toggle('hidden',net.conns.size>0);
- $('btnStart').disabled=net.conns.size===0;
+/* --- логика хоста: приём --- */
+function hostRecv(pid,o){
+  const pl=G.players[pid];
+  switch(o.t){
+    case 'hello':{addPlayer(pid,(o.name||'Гость').slice(0,12),pickFreeEp());renderLobby();broadcastLobby();break}
+    case 'pick':{if(pl&&!G.started){pl.epoch=pl.home=o.ep;broadcastLobby()}break}
+    case 'start':break;
+    case 'mv':{if(pl){pl.x=o.x;pl.z=o.z;pl.face=o.f}break}
+    case 'act':hostAct(pid,o.id);break;
+    case 'shift':hostShift(pid,o.ep);break;
+    case 'drop':hostDrop(pid);break;
+    case 'next':if(pid===G.my||true)nextLevel();break;
+    case 'replay':resetWorld(G.lv);break;
+  }
 }
-function joinRoom(code){
- game.role='guest';showOnly('menuJoin');$('joinCodeEcho').textContent=code;
- net.peer=new Peer();
- net.peer.on('open',()=>{
-  net.hostConn=net.peer.connect(PREFIX+code,{reliable:true});
-  net.hostConn.on('open',()=>{net.hostConn.send({t:'join',name:myName})});
-  net.hostConn.on('data',d=>guestOnData(d));
-  net.hostConn.on('close',()=>{if(game.mode==='game'||game.started)showErr('Соединение потеряно','Хозяин комнаты отключился.')});
- });
- net.peer.on('error',err=>{
-  if(err.type==='peer-unavailable')showErr('Комната не найдена','Проверьте код. Обе комнаты должны быть онлайн.');
-  else showErr('Ошибка сети',String(err.type));
- });
+function broadcastLobby(){broadcast({t:'lobby',lv:G.lv,pl:Object.values(G.players).map(p=>({id:p.id,name:p.name,ep:p.home,host:p.id==='P1'}))})}
+function startTween(pl,to,dur){pl.tw={x0:pl.x,z0:pl.z,x1:to[0],z1:to[1],t0:Date.now(),d:dur};
+  if(pl.id===G.my)G.myTween=pl.tw;broadcast({t:'tw',id:pl.id,x1:to[0],z1:to[1],d:dur,x0:pl.x,z0:pl.z})}
+function hostAct(pid,id){
+  const pl=G.players[pid];if(!pl||G.F.done)return;
+  const def=LEVELS[G.lv].D.find(d=>d.id===id);if(!def)return;
+  const eps=Array.isArray(def.ep)?def.ep:[def.ep];
+  if(!eps.includes(pl.epoch))return;
+  if(Math.hypot(pl.x-def.x,pl.z-def.z)>def.r+.9)return;
+  if(!def.show(G.F,pl))return;
+  const r=def.act(G.F,pl,Date.now());
+  G.stats.acts++;
+  if(r)say(r,'info');
+  hostSendState();
 }
-function hostOnData(id,d){
- const p=game.players.get(id);
- if(!p)return;
- if(d.t==='in'){p.inX=d.x;p.inZ=d.z;p.inT=performance.now()}
- else if(d.t==='act')tryAct(p);
- else if(d.t==='ping')broadcastPing(id,p.name);
+function hostShift(pid,ep){
+  const pl=G.players[pid];if(!pl||G.F.done)return;
+  const now=Date.now();const cd=(G.mode==='solo')?2500:8000;
+  if(now<pl.cdReady){if(pid===G.my)SFX.deny();return}
+  if(pl.epoch===ep)return;
+  const old=pl.epoch;pl.epoch=ep;pl.cdReady=now+cd;G.stats.shifts++;
+  fx(ep,pl.x,pl.z,'ring',EP_COL[ep]);SFX.shift();
+  hostSendState();
 }
-function broadcastPing(id,name){
- game.players.forEach(p=>p.ping=performance.now());
- const pl=game.players.get(id);if(pl)pl.ping=performance.now();
- toast('✋ '+(name||'Напарник')+': Готов!','gold');sfx('pick');
- sendAll({t:'ping',id});
+function hostDrop(pid){
+  const pl=G.players[pid];if(!pl||!pl.carry)return;const f=G.F,c=pl.carry;pl.carry=null;
+  if(G.lv===1){if(c==='crystal')f.crystal='island'}
+  else{if(c==='key')f.keyTaken=false;else if(c==='keyOld')f.dugP=false;else if(c==='gear')f.gearGot=false;
+    else if(c==='shard1')f.shP=false;else if(c==='shard2')f.shN=false;else if(c==='shard3')f.shF=false;}
+  say('Предмет возвращён потоком времени.','info');hostSendState();
 }
-function sendAll(o){net.conns.forEach(c=>{try{c.send(o)}catch(e){}})}
-function guestOnData(d){
- if(d.t==='hello'){game.localId=d.id;game.myEra=d.era;showOnly('menuLobbyGuest');$('guestEraLabel').textContent=ERAS[d.era].icon+' '+ERAS[d.era].name}
- else if(d.t==='full'){showErr('Комната занята','В этой комнате уже два игрока.')}
- else if(d.t==='start'){startLevel(d.idx||1,d.players)}
- else if(d.t==='s'){applySnapshot(d)}
- else if(d.t==='toast'){toast(d.txt,d.cls);if(d.sfx)sfx(d.sfx)}
- else if(d.t==='ping'){const c=chars[d.id];if(c)c.ping=performance.now();if(d.name)toast('✋ '+d.name+': Готов!','gold')}
- else if(d.t==='win'){showWin(d.time)}
- else if(d.t==='level'){startLevel(d.idx,game.rosterGuest)}
- else if(d.t==='final'){showFinal(d.time)}
- else if(d.t==='restart'){location.reload()}
+function hostSendState(){
+  const s={t:'S',lv:G.lv,f:G.F,started:G.started,t0:G.t0,pl:Object.values(G.players).map(p=>({id:p.id,name:p.name,ep:p.epoch,home:p.home,carry:p.carry,x:p.x,z:p.z,cd:p.cdReady||0}))};
+  if(G.mode==='guest')return;
+  broadcast(s);
+  if(MSGQ.length||FXQ.length){broadcast({t:'M',m:MSGQ,f:FXQ});MSGQ=[];FXQ=[]}
 }
-/* ================= level start / lifecycle ================= */
-function startLevel(idx,roster){
- game.levelIdx=idx;game.started=true;game.mode='game';
- gridsCache[idx]=LEVELS[idx].makeGrids().grids;
- const L=LEVELS[idx];
- game.F=L.initF();game.T=0;game.tasksMask=0;game.startTime=performance.now();
- // players
- game.players.clear();clearChars&&currentView&&clearChars();
- if(game.role==='guest'){game.rosterGuest=roster;roster.forEach(r=>{game.players.set(r.id,{id:r.id,era:r.era,name:r.name,x:r.x||2,z:r.z||2,inX:0,inZ:0,inT:0,frags:0,carry:null,ping:0})});game.myEra=roster.find(r=>r.id===game.localId)?.era??2}
- else{
-  roster.forEach(r=>{game.players.set(r.id,{id:r.id,era:r.era,name:r.name,x:idx===1?3.5:4.5,z:idx===1?6.5:8.5,inX:0,inZ:0,inT:0,frags:0,carry:null,inp:game.role==='solo'?null:undefined,ping:0})});
-  game.myEra=game.players.get('H').era;
- }
- currentView=idx===1?buildL1View():buildL2View();
- buildPreviews();
- $('menuScreen').classList.add('hidden');$('hud').classList.remove('hidden');
- updateEraBadge();renderTasks();updateFragChip();
- $('btnShift').classList.toggle('hidden',game.role!=='solo');
- $('btnPing').classList.toggle('hidden',game.role==='solo');
- $('btnPingT').classList.toggle('hidden',game.role==='solo');
- // title splash
- $('ltName').textContent=L.name;$('ltSub').textContent=L.sub;
- const lt=$('levelTitle');lt.classList.remove('hidden');lt.style.opacity=1;
- setTimeout(()=>{lt.style.opacity=0;setTimeout(()=>lt.classList.add('hidden'),800)},2600);
- sfx('big');
+function hostSendFrame(){
+  const p={};for(const id in G.players){const pl=G.players[id];p[id]=[Math.round(pl.x*100)/100,Math.round(pl.z*100)/100,Math.round(pl.face*100)/100,pl.epoch,pl.carry]}
+  broadcast({t:'F',n:Date.now(),p});
 }
-function hostStart(idx){
- const roster=[{id:'H',era:0,name:myName||'Хранитель прошлого'}];
- net.conns.forEach((c,id)=>roster.push({id,era:2,name:c._name||'Хранитель будущего'}));
- game.rosterGuest=roster;
- sendAll({t:'start',idx,players:roster});
- startLevel(idx,roster);
+let lastHostState='';
+function hostTick(){
+  if(!G.started||G.mode==='solo'&&G.paused)return;
+  const now=Date.now(),f=G.F;let dirty=false;
+  if(G.lv===1){
+    if(f.seedAt&&!f.treeMature){const t=clamp((now-f.seedAt)/6000,0,1),q=Math.round(t*40)/40;if(q!==f.treeT){f.treeT=q;dirty=true}
+      if(t>=1){f.treeMature=true;f.treeT=1;dirty=true;SFX.good();
+        say('НАСТОЯЩЕЕ: Древо Времени выросло! По его ветвям можно добраться до острова.','ep-now');
+        say('БУДУЩЕЕ: ствол рухнул через Разлом — получился мост.','ep-fut');fx('future',6,14.5,'ring',0x8fe89a)}}
+    if(f.treeMature&&f.logT<1){f.logT=Math.min(1,f.logT+.04);dirty=true}
+    const beam=f.crystal==='altar'&&f.mirror===2;
+    if(beam!==f.beam){f.beam=beam;dirty=true;if(beam){SFX.good();say('Луч попал в катушку храма! Руны прошлого и будущего заряжены.','good')}}
+    const rp=f.latchPast>now,rf=f.latchFut>now;
+    if(rp!==f._rp){f._rp=rp;dirty=true}if(rf!==f._rf){f._rf=rf;dirty=true}
+    if(rp&&rf&&!f.templeOpen){f.templeOpen=true;dirty=true;SFX.win();
+      say('ОБЕ РУНЫ ГОРЯТ! Храм открыт, а через Разлом в настоящем лёг мост света.','good');fx('present',-8,14.5,'ring',0x54d1ff)}
+  }else{
+    if(f.gearIn&&!f._pump){f._pump=true;dirty=true}
+    const dryF=f.valve>=3&&f.gearIn;
+    if(dryF&&!f._dryF){f._dryF=true;dirty=true;SFX.good();say('БУДУЩЕЕ высохло: море ушло, обнажив дно и коралловые сады.','ep-fut')}
+    const n=(f.pP?1:0)+(f.pN?1:0)+(f.pF?1:0);
+    if(n===3&&!f.heart){f.heart=true;dirty=true}
+    const rp=f.latchPast>now,rf=f.latchFut>now;
+    if(rp!==f._rp){f._rp=rp;dirty=true}if(rf!==f._rf){f._rf=rf;dirty=true}
+    if(rp&&rf&&f.heart&&!f.done){completeLevel(LEVELS[2].win);return}
+  }
+  for(const id in G.players){const pl=G.players[id];
+    if(pl.tw){const k=(now-pl.tw.t0)/pl.tw.d;if(k>=1){pl.x=pl.tw.x1;pl.z=pl.tw.z1;pl.tw=null;if(id===G.my)G.myTween=null}
+      else{pl.x=lerp(pl.tw.x0,pl.tw.x1,k);pl.z=lerp(pl.tw.z0,pl.tw.z1,k);}}}
+  if(dirty)hostSendState();
+  if(MSGQ.length||FXQ.length){broadcast({t:'M',m:MSGQ,f:FXQ});
+    MSGQ.forEach(m=>toast(m.m,m.k));MSGQ=[];
+    FXQ.forEach(x=>spawnFX(x));FXQ=[];}
+  frameAcc+=50;if(frameAcc>=66){frameAcc=0;hostSendFrame()}
 }
-function buildPreviews(){
- const pv=$('previews');pv.innerHTML='';
- game.pvEls=[];
- [0,1,2].forEach(e=>{if(e===game.myEra)return;
-  const d=document.createElement('div');d.className='pv p'+e;
-  d.innerHTML=`<span>${ERAS[e].icon} ${ERAS[e].name.toUpperCase()}${e===1?' · авто':''}</span>`;
-  pv.appendChild(d);game.pvEls.push({el:d,era:e})});
+let frameAcc=0;
+function completeLevel(msg){
+  const f=G.F;if(f.done)return;f.done=true;f._stats={time:Date.now()-G.t0,shifts:G.stats.shifts,acts:G.stats.acts};
+  SFX.win();say(msg,'good');
+  fx(myPl().epoch,myPl().x,myPl().z,'ring',0xffd76a);
+  hostSendState();
+  setTimeout(showVictory,1600);
 }
-function updateEraBadge(){const e=game.myEra;$('eraBadge').innerHTML=`${ERAS[e].icon} <b style="color:${ERAS[e].css}">${ERAS[e].name}</b>`;$('eraBadge').style.borderColor=ERAS[e].css}
-function renderTasks(){
- const L=LEVELS[game.levelIdx];const p=$('taskPanel');
- p.innerHTML='<h3>📜 Задачи эпох</h3>';
- L.tasks.forEach((t,i)=>{
-  const d=document.createElement('div');const done=game.tasksMask&(1<<i);
-  d.className='task'+(done?' done':'');
-  const tag=t.e===0?'<span class="eraTag e0">прошлое</span>':t.e===2?'<span class="eraTag e2">будущее</span>':'<span class="eraTag ea">вместе</span>';
-  d.innerHTML=`<span class="st">${done?'✅':'◻'}</span><span>${t.t}</span>${tag}`;
-  p.appendChild(d)});
+/* --- приём у гостя --- */
+function guestRecv(o){
+  switch(o.t){
+    case 'deny':$('#joinStat').textContent='⚠ '+o.m;G.hostConn&&G.hostConn.close();break;
+    case 'lobby':{G.lv=o.lv;G.players={};for(const p of o.pl){addPlayer(p.id,p.name,p.ep);G.players[p.id].home=p.ep;if(p.id!=='guest')G.players[p.id].x=9999}
+      if(!G.players['guest']){/*ещё не добавлены хостом*/}
+      showScreen('lobby');renderLobby(true);break}
+    case 'S':{const lvChanged=o.lv!==G.lv||!G.F;G.lv=o.lv;G.F=o.f;G.t0=o.t0;
+      for(const p of o.pl){if(!G.players[p.id])addPlayer(p.id,p.name,p.ep);const pl=G.players[p.id];
+        pl.name=p.name;pl.epoch=p.ep;pl.home=p.home;pl.carry=p.carry;if(p.id!==G.my){pl.x=p.x;pl.z=p.z}pl.cdReady=p.cd}
+      const wasStarted=G.started;G.started=o.started;
+      if(o.started&&(!wasStarted||lvChanged)){enterGame()}
+      else if(o.started&&G.screen==='game'){if(G.screen==='game'&&V.group)applyFlagsOnly()}
+      if(o.f.done&&!$('#scr-win').classList.contains('on')===false){}
+      if(o.f.done&&G.screen==='game')setTimeout(showVictory,1200);
+      updateHUD(true);break}
+    case 'F':{for(const id in o.p){const pl=G.players[id];if(!pl||id===G.my)continue;const a=o.p[id];pl.tx=a[0];pl.tz=a[1];pl.face=a[2];pl.epoch=a[3];pl.carry=a[4]}break}
+    case 'M':{o.m.forEach(m=>toast(m.m,m.k));o.f.forEach(x=>{if(x.ep===myPl().epoch)spawnFX(x)});break}
+    case 'T':toast(o.m,o.k);break;
+    case 'tw':{if(o.id===G.my){G.myTween={x0:myPl().x,z0:myPl().z,x1:o.x1,z1:o.z1,t0:Date.now(),d:o.d}}
+      const pl=G.players[o.id];if(pl&&o.id!==G.my){pl.tw={x0:o.x0,z0:o.z0,x1:o.x1,z1:o.z1,t0:Date.now(),d:o.d}}break}
+    case 'win':showVictory();break;
+  }
 }
-function updateFragChip(){if(!game.F)return;$('fragChip').textContent=`◆ осколки: ${game.F.dep}/${LEVELS[game.levelIdx].total}`}
-$('btnTasks').onclick=()=>{const p=$('taskPanel');p.classList.toggle('hidden');renderTasks()};
-$('btnFull').onclick=()=>{const el=document.documentElement;
- if(!document.fullscreenElement){(el.requestFullscreen||el.webkitRequestFullscreen||function(){}).call(el).catch?.(()=>toast('Полный экран недоступен в этом браузере'))}
- else{(document.exitFullscreen||document.webkitExitFullscreen||function(){}).call(document)}};
-$('btnLeave').onclick=()=>location.reload();
-function sendPing(){if(game.role==='solo')return;
- if(game.role==='host')broadcastPing('H',myName||'Вы');
- else if(net.hostConn){net.hostConn.send({t:'ping'});const c=chars[game.localId];if(c)c.ping=performance.now()}}
-$('btnPing').onclick=sendPing;
-function doAction(){if(game.mode!=='game')return;
- if(game.role==='guest'){net.hostConn&&net.hostConn.send({t:'act'})}
- else{const p=game.players.get('H');if(p)tryAct(p)}}
-function doShift(){if(game.mode!=='game'||game.role!=='solo')return;
- const p=game.players.get('H');p.era=p.era===0?2:0;game.myEra=p.era;
- clearCharsForShift();updateEraBadge();buildPreviews();sfx('shift');toast('⇄ Сдвиг времени: '+(p.era===0?'Прошлое':'Будущее'))}
-function clearCharsForShift(){for(const id in chars){const c=chars[id];currentView.scenes[c.era].remove(c.grp);delete chars[id]}}
-/* ================= host sim ================= */
-const api={
- toast(txt,cls,s){toast(txt,cls);sendAll({t:'toast',txt,cls,sfx:s});if(s)sfx(s)},
- sfx(k){sfx(k)},
- win(){const time=(performance.now()-game.startTime)/1000;sendAll({t:'win',time});showWin(time);sfx('win')}
-};
-function showWin(time){
- $('winStats').innerHTML=`Уровень ${game.levelIdx} пройден за <b>${Math.floor(time/60)}:${String(Math.floor(time%60)).padStart(2,'0')}</b><br>Осколков собрано: ${game.F.dep}/${LEVELS[game.levelIdx].total}`;
- $('winOverlay').classList.remove('hidden');
- const isHost=game.role!=='guest';
- $('btnNextLevel').classList.toggle('hidden',!isHost);
- $('guestWaitNext').classList.toggle('hidden',isHost);
- $('btnNextLevel').textContent=game.levelIdx===1?'Уровень 2: Маяк Меж Штормами ▶':'Финал ✨';
+function applyFlagsOnly(){/* апдейтеры читают G.F каждый кадр — ничего делать не надо; структурные смены делаем перестройкой */
+  // перестраиваем вид, если появились/исчезли крупные объекты: дешёвый способ — перестроить
+  const sig=JSON.stringify({lv:G.lv,ep:myPl().epoch,g:G.F.gate||false,m:G.F.treeMature||false,o:G.F.templeOpen||false,d:G.F.gearIn||false,b:G.F.bell||false,dry:G.F._dryF||false});
+  if(sig!==applyFlagsOnly._sig){applyFlagsOnly._sig=sig;setView()}}
+function say(m,k){MSGQ.push({m,k});if(G.mode!=='guest')toast(m,k)}
+function fx(ep,x,z,kind,col){const o={ep,x,z,kind,c:col};FXQ.push(o);if(myPl().epoch===ep)spawnFX(o)}
+/* ================= FX в 3D ================= */
+const FXL=[];
+function spawnFX(o){
+  if(!scene||!V.group)return;
+  const g=new THREE.Mesh(new THREE.RingGeometry(.4,.7,24),new THREE.MeshBasicMaterial({color:o.c||0xffffff,transparent:true,opacity:.9,side:THREE.DoubleSide}));
+  g.rotation.x=-Math.PI/2;g.position.set(o.x,(G.lv===1?H1(o.x,o.z):H2(o.x,o.z))+.3,o.z);V.group.add(g);
+  FXL.push({m:g,t:0});beep(700,.2,'sine',.06,-300);
 }
-$('btnNextLevel').onclick=()=>{
- if(game.levelIdx===1){sendAll({t:'level',idx:2});startLevel(2,game.rosterGuest||[{id:'H',era:0,name:myName}]);$('winOverlay').classList.add('hidden')}
- else{const time=(performance.now()-game.startTime)/1000;sendAll({t:'final',time});showFinal(time)}
-};
-function showFinal(time){$('winOverlay').classList.add('hidden');$('finalStats').textContent=`Финальный уровень: ${Math.floor(time/60)}:${String(Math.floor(time%60)).padStart(2,'0')}`;$('finalOverlay').classList.remove('hidden');$('btnRestart').classList.toggle('hidden',game.role==='guest')}
-$('btnRestart').onclick=()=>{sendAll({t:'restart'});location.reload()};
-function canStand(p,x,z){
- const L=LEVELS[game.levelIdx];const r=.28;
- for(const ox of[-r,r])for(const oz of[-r,r]){
-  const gx=Math.floor(x+ox),gz=Math.floor(z+oz);
-  if(!L.walkable(game.F,p.era,gx,gz,p))return false}
- return true;
+function updFX(dt){for(let i=FXL.length-1;i>=0;i--){const f=FXL[i];f.t+=dt*1.6;f.m.scale.setScalar(1+f.t*7);f.m.material.opacity=Math.max(0,.9-f.t);if(f.t>=1){V.group&&V.group.remove(f.m);f.m.geometry.dispose();f.m.material.dispose();FXL.splice(i,1)}}}
+/* ================= ВВОД ================= */
+const keys={};
+addEventListener('keydown',e=>{
+  if(e.code==='Tab')e.preventDefault();
+  if(document.activeElement&&document.activeElement.tagName==='INPUT')return;
+  keys[e.code]=true;
+  if(G.screen!=='game'||G.paused)return;
+  if(e.code==='KeyE'||e.code==='Enter')tryInteract();
+  if(e.code==='Digit1')reqShift('past');if(e.code==='Digit2')reqShift('present');if(e.code==='Digit3')reqShift('future');
+  if(e.code==='Tab')reqShift(EPS[(EPS.indexOf(myPl().epoch)+1)%3]);
+  if(e.code==='KeyQ')netSend({t:'drop'});
+  if(e.code==='KeyM'){muted=!muted;toast(muted?'Звук выключен':'Звук включён','info')}
+  if(e.code==='Escape')togglePause();
+});
+addEventListener('keyup',e=>{keys[e.code]=false});
+addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
+document.querySelectorAll('.sbtn').forEach(b=>b.addEventListener('click',()=>reqShift(b.dataset.ep)));
+$('#hintBtn').addEventListener('click',()=>{const st=curStage();toast(st?('💡 '+st.h):'Все цели выполнены!','good')});
+function reqShift(ep){if(!G.F||G.F.done)return;netSend({t:'shift',ep})}
+function tryInteract(){
+  const d=bestInteract();if(!d){return}
+  SFX.act();netSend({t:'act',id:d.id});
 }
-function movePlayer(p,dt){
- let{x,z}=p.era===undefined?{x:0,z:0}:getInputFor(p);
- const L=LEVELS[game.levelIdx];
- const sp=p.inBoat?2.3:3.6;
- let nx=p.x+x*sp*dt;
- if(canStand(p,nx,p.z))p.x=nx;else if(x!==0&&L.tryPush)L.tryPush(game.F,p,Math.sign(x),0,api);
- let nz=p.z+z*sp*dt;
- if(canStand(p,p.x,nz))p.z=nz;else if(z!==0&&L.tryPush)L.tryPush(game.F,p,0,Math.sign(z),api);
+function bestInteract(){
+  const me=myPl();if(!G.F)return null;
+  let best=null,bd=1e9;
+  for(const d of LEVELS[G.lv].D){
+    const eps=Array.isArray(d.ep)?d.ep:[d.ep];
+    if(!eps.includes(me.epoch))continue;
+    if(!d.show(G.F,me))continue;
+    const dd=Math.hypot(me.x-d.x,me.z-d.z);
+    if(dd<d.r&&dd<bd){bd=dd;best=d}
+  }
+  return best;
 }
-function getInputFor(p){
- if(p.id==='H'){return getMove()}
- const stale=performance.now()-(p.inT||0)>600;
- if(stale)return{x:0,z:0};
- let x=p.inX||0,z=p.inZ||0;const m=Math.hypot(x,z);if(m>1){x/=m;z/=m}
- return{x,z};
+/* ================= ДВИЖЕНИЕ ================= */
+function blockedFn(){return LEVELS[G.lv].B}
+function movePlayer(pl,dx,dz){
+  const B=blockedFn(),f=G.F;
+  let nx=pl.x+dx;if(!B(pl.epoch,f,nx,pl.z))pl.x=nx;
+  let nz=pl.z+dz;if(!B(pl.epoch,f,pl.x,nz))pl.z=nz;
 }
-function tryAct(p){
- const L=LEVELS[game.levelIdx];let best=null,bd=1.6;
- for(const it of L.interact(game.F,null)){
-  if(it.era!==p.era)continue;
-  const d=dist2(p.x,p.z,it.x,it.z);
-  if(d<bd&&it.can(p)){best=it;bd=d}}
- if(best){best.do(p,api);sendSnapshot(true)}
- else sfx('deny');
+function updMy(dt){
+  const me=myPl();if(!me)return;
+  if(G.myTween){const k=(Date.now()-G.myTween.t0)/G.myTween.d;
+    if(k>=1){me.x=G.myTween.x1;me.z=G.myTween.z1;G.myTween=null}else{me.x=lerp(G.myTween.x0,G.myTween.x1,k);me.z=lerp(G.myTween.z0,G.myTween.z1,k)}
+    return}
+  if(!G.F||G.F.done||G.paused)return;
+  let dx=0,dz=0;
+  if(keys.KeyW||keys.ArrowUp)dz-=1;if(keys.KeyS||keys.ArrowDown)dz+=1;
+  if(keys.KeyA||keys.ArrowLeft)dx-=1;if(keys.KeyD||keys.ArrowRight)dx+=1;
+  if(dx||dz){const l=Math.hypot(dx,dz);dx/=l;dz/=l;const sp=6.4*dt;movePlayer(me,dx*sp,dz*sp);me.face=Math.atan2(dx,-dz)}
 }
-function findHint(p){
- const L=LEVELS[game.levelIdx];let best=null,bd=1.6;
- for(const it of L.interact(game.F,null)){if(it.era!==p.era)continue;const d=dist2(p.x,p.z,it.x,it.z);if(d<bd&&it.can(p)){best=it;bd=d}}
- return best?best.label:'';
+/* ================= HUD ================= */
+function curStage(){if(!G.F)return null;for(const s of LEVELS[G.lv].ST)if(!s.c(G.F))return s;return null}
+function updateHUD(force){
+  if(G.screen!=='game'||!G.F)return;
+  $('#lvTitle').textContent=LEVELS[G.lv].name+' · '+LEVELS[G.lv].sub;
+  let h='';LEVELS[G.lv].ST.forEach((s,i)=>{const done=s.c(G.F);const cur=!done&&!LEVELS[G.lv].ST.slice(0,i).some(x=>!x.c(G.F));
+    h+='<div class="stage'+(done?' done':'')+(cur&&done===false&&LEVELS[G.lv].ST.findIndex(x=>!x.c(G.F))===i?' cur':'')+'">'+s.t+'</div>'});
+  $('#stages').innerHTML=h;
+  $('#timer').textContent=fmtT(Date.now()-G.t0);
+  let ch='';for(const id in G.players){const p=G.players[id];
+    ch+='<div class="chip"><span class="dot" style="background:'+EP_CSS[p.epoch]+';color:'+EP_CSS[p.epoch]+'"></span>'+
+    (p.id===G.my?'<b>'+p.name+'</b>':p.name)+'<span style="opacity:.6;font-size:11px">'+EP_RU[p.epoch].slice(0,4)+'.</span>'+
+    '<span class="cr">'+(p.carry?CARRY_ICON[p.carry]||'◈':'')+'</span></div>'}
+  $('#chipList').innerHTML=ch;
+  // кнопки эпох
+  const me=myPl(),now=Date.now();
+  document.querySelectorAll('.sbtn').forEach(b=>{
+    b.classList.toggle('act',b.dataset.ep===me.epoch);
+    const cd=b.querySelector('.cd');
+    const k=clamp((me.cdReady-now)/((G.mode==='solo')?2500:8000),0,1);
+    cd.style.transform='scaleY('+(b.dataset.ep===me.epoch?0:k)+')';
+  });
+  // подсказка действия
+  const d=bestInteract(),pr=$('#prompt');
+  if(d){const l=d.lab(G.F,me);if(l){pr.style.display='block';pr.innerHTML='<b>[E]</b>'+l}else pr.style.display='none'}
+  else pr.style.display='none';
 }
-function hostTick(dt){
- game.T+=dt;game.F.T=game.T;
- game.players.forEach(p=>movePlayer(p,dt));
- const P={all:[...game.players.values()]};P.past=P.all.find(p=>p.era===0)||(game.role==='solo'?P.all[0]:null);P.fut=P.all.find(p=>p.era===2)||(game.role==='solo'?P.all[0]:null);
- LEVELS[game.levelIdx].tick(game.F,P,dt,api);
- // tasks
- const L=LEVELS[game.levelIdx];let mask=0;
- L.tasks.forEach((t,i)=>{let ok=false;try{ok=t.d(game.F,P)}catch(e){}if(ok)mask|=1<<i});
- if(mask!==game.tasksMask){
-  for(let i=0;i<L.tasks.length;i++){const nb=mask&(1<<i),ob=game.tasksMask&(1<<i);
-   if(nb&&!ob&&i<L.tasks.length-1){toast('✅ '+L.tasks[i],'good');sendAll({t:'toast',txt:'✅ '+L.tasks[i],cls:'good',sfx:'ok'})}}
-  game.tasksMask=mask;if(!$('taskPanel').classList.contains('hidden'))renderTasks()}
- updateFragChip();
+function toast(m,k){const t=document.createElement('div');t.className='toast '+(k||'');t.textContent=m;$('#toasts').appendChild(t);
+  setTimeout(()=>{t.style.transition='opacity .5s';t.style.opacity=0;setTimeout(()=>t.remove(),500)},4200)}
+function togglePause(){if(G.screen!=='game')return;G.paused=!G.paused;$('#scr-pause').classList.toggle('hidden',!G.paused)}
+$('#btnResume').onclick=()=>togglePause();
+$('#btnPauseMenu').onclick=()=>{G.paused=false;toMenu()};
+/* ================= ЭКРАНЫ ================= */
+function showScreen(n){G.screen=n;['menu','join','lobby','howto','pause','win'].forEach(s=>$('#scr-'+s).classList.add('hidden'));
+  $('#howto').classList.add('hidden');
+  if(n==='howto')$('#howto').classList.remove('hidden');else if(n!=='game')$('#scr-'+n).classList.remove('hidden');
+  $('#hud').classList.toggle('on',n==='game');
 }
-let snapN=0;
-function snapshotPlayers(){
- return[...game.players.values()].map(p=>[p.id,p.era,+p.x.toFixed(2),+p.z.toFixed(2),p.carry||0,p.frags||0,p.inBoat||0,findHint(p)]);
+function buildLvCards(contain,cb){
+  contain.innerHTML='';
+  [1,2].forEach(i=>{const L=LEVELS[i];const d=document.createElement('div');d.className='card'+(G.lv===i?' sel':'');
+    d.innerHTML='<div class="cn">'+(i===1?'🌳 ':'🌊 ')+L.name+'</div><div class="cd">'+L.sub+'<br>'+(i===1?'Древо, хрусталь и руны. Учит правилам причинности.':'Маяк, капсулы времени и три осколка. Большое приключение.')+'</div>';
+    d.onclick=()=>{G.lv=i;SFX.click();buildLvCards(contain,cb);cb&&cb()};contain.appendChild(d)});
 }
-function sendSnapshot(force){
- if(game.role==='guest')return;
- snapN++;if(!force&&snapN%2)return;
- sendAll({t:'s',T:+game.T.toFixed(2),F:game.F,m:game.tasksMask,pl:snapshotPlayers()});
+buildLvCards($('#lvCards'));
+$('#btnHow').onclick=()=>{SFX.click();showScreen('howto')};
+$('#btnHowBack').onclick=()=>{SFX.click();showScreen('menu')};
+$('#btnSolo').onclick=()=>{SFX.click();G.mode='solo';G.isHost=true;G.my='P1';G.players={};addPlayer('P1','Странник','past');resetWorld(G.lv);};
+$('#btnHost').onclick=()=>{SFX.click();startHost()};
+$('#btnJoin').onclick=()=>{SFX.click();showScreen('join');$('#joinName').value=localStorage.getItem('hron_name')||''};
+$('#btnJoinBack').onclick=()=>showScreen('menu');
+$('#btnDoJoin').onclick=()=>{SFX.click();joinGame()};
+$('#btnLobbyLeave').onclick=()=>toMenu();
+$('#btnStart').onclick=()=>{if(G.mode!=='host'&&G.mode!=='solo')return;SFX.good();G.started=true;
+  for(const id in G.players){const pl=G.players[id];pl.epoch=pl.home;const sp=LEVELS[G.lv].spawn;pl.x=sp[0]+ (Math.random()*2-1);pl.z=sp[1]+(Math.random()*2-1);pl.carry=null}
+  resetWorld(G.lv,true);};
+$('#btnNext').onclick=()=>{SFX.click();netSend({t:'next'})};
+$('#btnReplay').onclick=()=>{SFX.click();netSend({t:'replay'})};
+$('#btnWinMenu').onclick=()=>toMenu();
+function nextLevel(){G.lv=G.lv===1?2:1;resetWorld(G.lv)}
+function resetWorld(lv,keep){
+  G.lv=lv;G.F=LEVELS[lv].flags();G.t0=Date.now();G.started=true;G.stats={shifts:0,acts:0};
+  const sp=LEVELS[lv].spawn;
+  for(const id in G.players){const pl=G.players[id];pl.epoch=pl.home||'past';pl.x=sp[0]+(Math.random()*2-1);pl.z=sp[1]+(Math.random()*2-1);pl.carry=null;pl.tw=null;pl.cdReady=0}
+  G.myTween=null;applyFlagsOnly._sig='';
+  if(G.mode!=='guest')hostSendState();
+  enterGame();
+  say('Эпоха: '+LEVELS[lv].name+'. '+LEVELS[lv].sub,'good');
 }
-function applySnapshot(d){
- game.T=d.T;game.F=d.F;game.tasksMask=d.m;
- const oldMask=game._pm||0;
- const L=LEVELS[game.levelIdx];
- for(let i=0;i<L.tasks.length;i++){if((d.m&(1<<i))&&!(oldMask&(1<<i))&&i<L.tasks.length-1)toast('✅ '+L.tasks[i],'good')}
- game._pm=d.m;
- d.pl.forEach(a=>{
-  const[id,era,x,z,carry,frags,boat,hint]=a;
-  let p=game.players.get(id);
-  if(!p){p={id,era,name:''};game.players.set(id,p)}
-  p.era=era;p.tx=x;p.tz=z;p.carry=carry===0?null:carry;p.frags=frags;p.inBoat=boat;p.hint=hint;
- });
- updateFragChip();
- if(!$('taskPanel').classList.contains('hidden'))renderTasks();
+function enterGame(){showScreen('game');setView();updateHUD(true)}
+function toMenu(){
+  if(G.peer){try{G.peer.destroy()}catch(e){}}G.peer=null;G.conns={};G.hostConn=null;
+  G.mode=null;G.started=false;G.players={};G.F=null;G.my='P1';
+  disposeScene();scene=null;menuScene=true;
+  showScreen('menu');
 }
-/* ================= render loop ================= */
-const clock=new THREE.Clock();
-function frame(){
- requestAnimationFrame(frame);
- const dt=Math.min(clock.getDelta(),.05);const rt=clock.elapsedTime;
- if(game.mode==='game'&&game.started){
-  if(game.role!=='guest'&&!game.F.won){hostTick(dt)}
-  else if(game.role!=='guest'&&game.F.won){game.T+=dt;game.F.T=game.T}
-  if(game.role!=='guest')sendSnapshot();
- }
- renderGame(dt,rt);
+function renderLobby(isGuest){
+  const c=$('#lobbyPlayers');c.innerHTML='';
+  const list=Object.values(G.players).filter(p=>p.x<9000||p.id==='guest'||G.mode!=='guest');
+  const arr=G.mode==='guest'&&!isGuest?list:Object.values(G.players);
+  for(const p of arr){
+    const row=document.createElement('div');row.className='prow';
+    row.innerHTML='<span class="pn">'+(p.id===G.my?'⭐ ':'')+p.name+'</span>';
+    EPS.forEach(ep=>{const b=document.createElement('button');b.className='epbtn'+(p.home===ep?' on':'');
+      b.style.color=EP_CSS[ep];b.textContent=EP_RU[ep].slice(0,4)+'.';
+      const can=(G.mode==='host'&&p.id==='P1')||(G.mode==='guest'&&p.id==='guest')||(G.mode==='solo');
+      if(can)b.onclick=()=>{if(G.mode==='solo'){G.players.P1.home=ep;G.players.P1.epoch=ep}else if(G.mode==='host'){p.home=ep;p.epoch=ep;broadcastLobby()}else netSend({t:'pick',ep});SFX.click()};
+      row.appendChild(b)});
+    c.appendChild(row);
+  }
+  buildLvCards($('#lobbyLvRow'),()=>{if(G.mode==='host')broadcastLobby()});
+  const hostBtn=$('#btnStart');hostBtn.style.display=(G.mode==='host'||G.mode==='solo')?'':'none';
+  $('#lobbyWait').textContent=G.mode==='guest'?'Ожидание, пока хост начнёт погружение...':'Нажмите «Начать погружение», когда все будут готовы.';
+  $('#roomCode').style.display=G.mode==='host'?'':'none';
 }
-function renderGame(dt,rt){
- if(!currentView||!game.F)return;
- const F=game.F;
- currentView.update(F,dt,rt);
- // sync character meshes
- const localId=game.localId||'H';
- game.players.forEach(p=>{
-  const c=ensureChar(p.id,p.era);
-  if(c.x===null){c.x=p.tx??p.x;c.z=p.tz??p.z}
-  c.tx=p.tx??p.x;c.tz=p.tz??p.z;
-  const moving=dist2(c.x,c.z,c.tx,c.tz)>.02;
-  c.x=lerp(c.x,c.tx,Math.min(1,dt*12));c.z=lerp(c.z,c.tz,Math.min(1,dt*12));
-  c.grp.position.set(c.x,0,c.z);
-  c.mesh.body.position.y=.5+Math.abs(Math.sin(rt*9))*.07*(moving?1:0);
-  c.mesh.ring.material.emissiveIntensity=p.id===localId?.9+Math.sin(rt*5)*.3:.4;
-  for(const k in c.mesh.items)c.mesh.items[k].visible=(p.carry===k);
-  c.mesh.fragOrbs.forEach((o,i)=>{o.visible=i<(p.frags||0);if(o.visible){o.position.set(Math.cos(rt*3+i*2.1)*.5,1.5+Math.sin(rt*2+i)*.1,Math.sin(rt*3+i*2.1)*.5)}});
-  const pingOn=p.ping&&performance.now()-p.ping<2500;
-  c.mesh.spr.visible=!!pingOn;if(pingOn)c.mesh.spr.position.y=2.3+Math.sin(rt*6)*.08;
- });
- // hint
- const me=game.players.get(localId);
- const hint=game.role==='guest'?(me?.hint||''):findHint(me||{era:0,x:0,z:0});
- const h=$('hint');if(hint){h.textContent='⚡ '+hint+(isTouch?' — кнопка ДЕЙСТВИЕ':' — [E]');h.classList.remove('hidden')}else h.classList.add('hidden');
- // cameras
- const W=innerWidth,H=innerHeight;
- renderer.setScissorTest(false);renderer.setViewport(0,0,W,H);
- [0,1,2].forEach(e=>{
-  const cam=cams[e];
-  let target=null;
-  game.players.forEach(p=>{if(p.era===e){const c=chars[p.id];if(c)target=[c.x,c.z]}});
-  if(!target){const G=gridsCache[game.levelIdx][0];target=[G[0].length/2,G.length/2]}
-  camPos[e].x=lerp(camPos[e].x,target[0],.08);camPos[e].z=lerp(camPos[e].z,target[1],.08);
-  const far=cam.aspect<.8?12.5:10;
-  cam.position.set(camPos[e].x,far*.82,camPos[e].z+far*.62);
-  cam.lookAt(camPos[e].x,0,camPos[e].z);
- });
- cams[game.myEra].aspect=W/H;cams[game.myEra].updateProjectionMatrix();
- renderer.setClearColor(THEMES[game.myEra].sky);
- renderer.render(currentView.scenes[game.myEra],cams[game.myEra]);
- // previews
- game.pvErs=game.pvEls||[];
- game.pvErs.forEach(({el,era})=>{
-  const r=el.getBoundingClientRect();if(r.width<10)return;
-  const pr=renderer.getPixelRatio();
-  renderer.setScissorTest(true);
-  const vx=r.left*pr,vy=(innerHeight-r.bottom)*pr,vw=r.width*pr,vh=r.height*pr;
-  renderer.setViewport(vx,vy,vw,vh);renderer.setScissor(vx,vy,vw,vh);
-  cams[era].aspect=r.width/r.height;cams[era].updateProjectionMatrix();
-  renderer.setClearColor(THEMES[era].sky);
-  renderer.render(currentView.scenes[era],cams[era]);
- });
- renderer.setScissorTest(false);
+/* ================= ПОБЕДА ================= */
+function showVictory(){
+  if(!G.F||!G.F.done||G.screen==='win')return;
+  showScreen('win');
+  $('#winTitle').textContent=G.lv===1?'ДОЛИНА СПАСЕНА':'МАЯК ГОРИТ СКВОЗЬ ВЕКА';
+  $('#winSub').textContent=LEVELS[G.lv].win;
+  const st=G.F._stats||{time:Date.now()-G.t0,shifts:G.stats.shifts,acts:G.stats.acts};
+  $('#stTime').textContent=fmtT(st.time);$('#stShift').textContent=st.shifts;$('#stAct').textContent=st.acts;
+  $('#btnNext').classList.toggle('hidden',G.lv!==1||G.mode==='guest');
 }
-requestAnimationFrame(frame);
-/* ================= menu wiring ================= */
-$('nameInput').addEventListener('change',e=>myName=e.target.value.trim());
-$('btnHow').onclick=()=>showOnly('menuHow');
-$('btnHowBack').onclick=()=>showOnly('menuMain');
-$('btnCreate').onclick=()=>{myName=$('nameInput').value.trim()||'Хранитель';createRoom()};
-$('btnJoin').onclick=()=>{myName=$('nameInput').value.trim()||'Странник';const c=$('joinCodeInput').value.trim().toUpperCase();if(c.length<4){toast('Введите код комнаты');return}joinRoom(c)};
-$('btnSolo').onclick=()=>{myName=$('nameInput').value.trim()||'Хранитель';game.role='solo';net.conns.clear();startLevel(1,[{id:'H',era:0,name:myName}])};
-$('btnBack1').onclick=()=>{net.peer&&net.peer.destroy();showOnly('menuMain')};
-$('btnBack2').onclick=()=>{net.peer&&net.peer.destroy();showOnly('menuMain')};
-$('btnBack3').onclick=()=>location.reload();
-$('btnCopyCode').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(net.code).then(()=>toast('Код скопирован: '+net.code,'gold')).catch(()=>toast('Код: '+net.code,'gold'));};
-$('btnStart').onclick=()=>hostStart(1);
-$('btnStartSoloHost').onclick=()=>hostStart(1);
-// guest: relay name once hello received (already done via join) — host stores name
-const origHostOnData=hostOnData;
-hostOnData=function(id,d){if(d.t==='join'){const c=net.conns.get(id);if(c)c._name=d.name||'Напарник';updateLobby();return}origHostOnData(id,d)};
-/* fullscreen on first tap for iOS audio */
-document.addEventListener('pointerdown',()=>{sfx&&0},{once:true});
+/* ================= МЕНЮ-СЦЕНА ================= */
+let menuScene=true;
+function buildMenuScene(){
+  scene=new THREE.Scene();
+  const saved=G.F;G.F=flags1();G.lv=1;
+  const{sc,ups}=buildLevelScene(1,'past');scene.add(sc);V.group=sc;V.ups=ups;
+  G.F=saved||null;if(!saved)G.lv=1;
+}
+/* ================= ГЛАВНЫЙ ЦИКЛ ================= */
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(.05,clock.getDelta());tGlobal+=dt;
+  if(!scene){renderer.render(new THREE.Scene(),camera);return}
+  if(G.screen==='game'&&G.started&&G.F){
+    updMy(dt);
+    // лерп чужих позиций
+    for(const id in G.players){const pl=G.players[id];if(id===G.my)continue;
+      if(pl.tx!==undefined){pl.x=lerp(pl.x,pl.tx,.25);pl.z=lerp(pl.z,pl.tz,.25)}
+      if(pl.tw){const k=(Date.now()-pl.tw.t0)/pl.tw.d;if(k>=1){pl.x=pl.tw.x1;pl.z=pl.tw.z1;pl.tw=null}else{pl.x=lerp(pl.tw.x0,pl.tw.x1,k);pl.z=lerp(pl.tw.z0,pl.tw.z1,k)}}}
+    // камера
+    const me=myPl();const hy=(G.lv===1?H1(me.x,me.z):H2(me.x,me.z));
+    camTarget.lerp(new THREE.Vector3(me.x,hy,me.z),.12);
+    camera.position.lerp(new THREE.Vector3(camTarget.x,camTarget.y+16.5,camTarget.z+13.5),.1);
+    camera.lookAt(camTarget.x,camTarget.y+1,camTarget.z-1);
+    // аватары
+    for(const id in V.av){const A=V.av[id];const pl=G.players[id];if(!pl){continue}
+      const py=(G.lv===1?H1(pl.x,pl.z):H2(pl.x,pl.z));
+      A.g.position.lerp(new THREE.Vector3(pl.x,py,pl.z),id===G.my?.6:.3);
+      A.g.rotation.y=pl.face;
+      // смена эпохи/предмета → пересоздать
+      const needEcho=pl.epoch!==myPl().epoch;
+      if(needEcho!==A.echo||A.lastCarry!==pl.carry){A.lastCarry=pl.carry;const np=A.g.position.clone(),nr=A.g.rotation.y;V.group.remove(A.g);
+        const g2=buildAvatar(pl,needEcho);g2.position.copy(np);g2.rotation.y=nr;V.group.add(g2);A.g=g2;A.echo=needEcho}
+      if(A.g.userData.carry){const c=A.g.userData.carry;c.clear();if(pl.carry){const m=carryMesh(pl.carry);c.add(m)}}
+      if(A.g.userData.ring)A.g.userData.ring.material.color.setHex(EP_COL[pl.epoch]);
+      if(A.g.userData.carry)A.g.userData.carry.rotation.y=tGlobal*1.5;
+      A.g.position.y=py+(G.myTween&&id===G.my?Math.sin(Math.PI*clamp((Date.now()-G.myTween.t0)/G.myTween.d,0,1))*1.6:0);
+    }
+    updateHUD();
+  }else{
+    // орбита меню
+    const t=tGlobal*.12;camera.position.set(Math.cos(t)*34,20,14+Math.sin(t)*30);camera.lookAt(0,2,12);
+  }
+  for(const u of V.ups)u(tGlobal,dt);
+  updFX(dt);
+  renderer.render(scene,camera);
+}
+/* ================= СТАРТ ================= */
+try{
+  initThree();
+  G.F=null;buildMenuScene();
+  animate();
+  setInterval(()=>{if(G.mode!=='guest'&&G.started)hostTick()},50);
+  setInterval(()=>{if(G.mode==='guest'&&G.hostConn&&G.started&&myPl()){send(G.hostConn,{t:'mv',x:Math.round(myPl().x*100)/100,z:Math.round(myPl().z*100)/100,f:Math.round(myPl().face*100)/100})}},70);
+}catch(e){
+  document.body.insertAdjacentHTML('beforeend','<div style="position:fixed;inset:0;background:#111;color:#fff;z-index:99;padding:40px;font-family:sans-serif">Ошибка запуска: '+e.message+'</div>');
+}
 </script>
 </body>
 </html>
