@@ -1,733 +1,379 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Push Messenger</title>
-    <style>
-        :root {
-            --bg: #0d1117;
-            --card: #161b22;
-            --text: #c9d1d9;
-            --accent: #58a6ff;
-            --border: #30363d;
-            --user-bubble: #1f6feb;
-            --peer-bubble: #21262d;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            display: flex;
-            justify-content: center;
-            padding: 12px;
-            min-height: 100vh;
-        }
-        .app { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
-        .card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 16px;
-        }
-        h2 { font-size: 16px; margin-bottom: 12px; color: #fff; }
-        button {
-            background: var(--accent);
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            padding: 10px 16px;
-            font-size: 14px;
-            cursor: pointer;
-            width: 100%;
-            transition: opacity .2s;
-        }
-        button:disabled { opacity: .4; cursor: not-allowed; }
-        button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
-        input, textarea {
-            width: 100%;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 10px;
-            color: var(--text);
-            font-size: 14px;
-            outline: none;
-            resize: none;
-        }
-        .hidden { display: none; }
-        #qr-container { display: flex; justify-content: center; margin: 12px 0; }
-        #qr-container canvas, #qr-container img { border-radius: 8px; }
-        .contact-info { font-size: 12px; color: #8b949e; word-break: break-all; margin-top: 8px; }
-        #chat-messages {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            max-height: 360px;
-            overflow-y: auto;
-            padding: 4px 0;
-        }
-        .message {
-            max-width: 85%;
-            padding: 8px 12px;
-            border-radius: 16px;
-            font-size: 14px;
-            line-height: 1.4;
-            word-break: break-word;
-        }
-        .message.sent {
-            align-self: flex-end;
-            background: var(--user-bubble);
-            border-bottom-right-radius: 4px;
-        }
-        .message.received {
-            align-self: flex-start;
-            background: var(--peer-bubble);
-            border-bottom-left-radius: 4px;
-        }
-        .message .meta { font-size: 10px; opacity: .7; margin-top: 4px; }
-        .status { font-size: 12px; padding: 6px 10px; border-radius: 8px; text-align: center; }
-        .status.ok { background: #1a3a1a; color: #7ee787; }
-        .status.err { background: #3d1f1f; color: #f85149; }
-        .status.info { background: #1f2a3d; color: #79c0ff; }
-        .flex-row { display: flex; gap: 8px; }
-        .flex-row button { flex: 1; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Messenger</title>
+<style>
+:root{--bg:#0d1117;--card:#161b22;--text:#c9d1d9;--accent:#58a6ff;--border:#30363d;--user:#1f6feb;--peer:#21262d}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);display:flex;justify-content:center;padding:12px;min-height:100vh}
+.app{width:100%;max-width:420px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+h2{font-size:16px;margin-bottom:12px;color:#fff}
+button{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;width:100%}
+button:disabled{opacity:.4}
+button.secondary{background:transparent;border:1px solid var(--border);color:var(--text)}
+input,textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:14px;outline:none;resize:none}
+.hidden{display:none}
+#qr-container{display:flex;justify-content:center;margin:12px 0}
+#qr-container img,#qr-container canvas{border-radius:8px}
+.contact-info{font-size:11px;color:#8b949e;word-break:break-all;margin-top:8px}
+#chat-messages{display:flex;flex-direction:column;gap:8px;max-height:360px;overflow-y:auto;padding:4px 0}
+.message{max-width:85%;padding:8px 12px;border-radius:16px;font-size:14px;line-height:1.4;word-break:break-word}
+.message.sent{align-self:flex-end;background:var(--user);border-bottom-right-radius:4px}
+.message.received{align-self:flex-start;background:var(--peer);border-bottom-left-radius:4px}
+.message .meta{font-size:10px;opacity:.7;margin-top:4px}
+.status{font-size:12px;padding:6px 10px;border-radius:8px;text-align:center;margin-top:8px}
+.status.ok{background:#1a3a1a;color:#7ee787}
+.status.err{background:#3d1f1f;color:#f85149}
+.status.info{background:#1f2a3d;color:#79c0ff}
+.flex-row{display:flex;gap:8px}
+.flex-row button{flex:1}
+#scanner-container{margin-top:12px}
+</style>
 </head>
 <body>
 <div class="app">
 
-    <!-- ===== ЭТАП 1: Инициализация и обмен контактами ===== -->
-    <div id="step-init" class="card">
-        <h2>🔑 Ваш контакт</h2>
-        <p style="font-size:13px;color:#8b949e;margin-bottom:12px;">
-            Покажите этот QR-код собеседнику, чтобы он добавил вас в контакты.
-        </p>
-        <div id="qr-container"></div>
-        <div id="my-id-display" class="contact-info"></div>
-        <button id="btn-copy-id" class="secondary" style="margin-top:8px;">📋 Скопировать мой контакт</button>
-    </div>
+<div id="step-init" class="card">
+  <h2>🔑 Ваш контакт</h2>
+  <p style="font-size:13px;color:#8b949e;margin-bottom:12px">Покажите этот QR-код собеседнику.</p>
+  <div id="qr-container"></div>
+  <div id="my-id-display" class="contact-info"></div>
+  <button id="btn-copy-id" class="secondary" style="margin-top:8px">📋 Скопировать мой контакт</button>
+</div>
 
-    <!-- ===== ЭТАП 2: Добавление контакта ===== -->
-    <div id="step-add" class="card">
-        <h2>📇 Добавить контакт</h2>
-        <p style="font-size:13px;color:#8b949e;margin-bottom:12px;">
-            Отсканируйте QR-код собеседника или вставьте его контакт вручную.
-        </p>
-        <div class="flex-row" style="margin-bottom:8px;">
-            <button id="btn-scan">📷 Сканировать QR</button>
-            <button id="btn-paste" class="secondary">📋 Вставить</button>
-        </div>
-        <textarea id="paste-area" rows="3" placeholder="Вставьте сюда контакт собеседника..."></textarea>
-        <button id="btn-add-contact" style="margin-top:8px;">✅ Добавить контакт</button>
-        <div id="add-status" class="status hidden" style="margin-top:8px;"></div>
-    </div>
+<div id="step-add" class="card">
+  <h2>📇 Добавить контакт</h2>
+  <p style="font-size:13px;color:#8b949e;margin-bottom:12px">Отсканируйте QR или вставьте вручную.</p>
+  <div class="flex-row" style="margin-bottom:8px">
+    <button id="btn-scan">📷 Сканировать</button>
+    <button id="btn-paste" class="secondary">📋 Вставить</button>
+  </div>
+  <textarea id="paste-area" rows="3" placeholder="Контакт собеседника..."></textarea>
+  <button id="btn-add-contact" style="margin-top:8px">✅ Добавить</button>
+  <div id="add-status" class="status hidden"></div>
+  <div id="scanner-container" class="hidden">
+    <video id="scanner-video" style="width:100%;border-radius:8px" playsinline></video>
+    <button id="btn-stop-scan" class="secondary" style="margin-top:8px">Остановить</button>
+  </div>
+</div>
 
-    <!-- ===== ЭТАП 3: Чат ===== -->
-    <div id="step-chat" class="card hidden">
-        <h2>💬 Чат с <span id="peer-name">...</span></h2>
-        <div id="chat-messages"></div>
-        <div style="display:flex;gap:8px;margin-top:12px;">
-            <input id="msg-input" type="text" placeholder="Введите сообщение..." />
-            <button id="btn-send" style="width:auto;padding:10px 20px;">➤</button>
-        </div>
-        <div id="chat-status" class="status hidden" style="margin-top:8px;"></div>
-        <button id="btn-reset" class="secondary" style="margin-top:12px;">🔄 Сбросить и начать заново</button>
-    </div>
-
-    <!-- Скрытый элемент для сканирования QR -->
-    <div id="scanner-container" class="hidden" style="margin-top:12px;">
-        <video id="scanner-video" style="width:100%;border-radius:8px;" playsinline></video>
-        <button id="btn-stop-scan" class="secondary" style="margin-top:8px;">Остановить сканирование</button>
-    </div>
+<div id="step-chat" class="card hidden">
+  <h2>💬 Чат с <span id="peer-name">...</span></h2>
+  <div id="chat-messages"></div>
+  <div style="display:flex;gap:8px;margin-top:12px">
+    <input id="msg-input" type="text" placeholder="Сообщение..." />
+    <button id="btn-send" style="width:auto;padding:10px 20px">➤</button>
+  </div>
+  <div id="chat-status" class="status hidden"></div>
+  <button id="btn-reset" class="secondary" style="margin-top:12px">🔄 Сбросить</button>
+</div>
 
 </div>
 
-<!-- Подключаем библиотеки для QR-кодов -->
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-
 <script>
-/* ==========================================================================
-   Web Push Messenger — полностью клиентский E2E-мессенджер
-   ==========================================================================
-   Архитектура:
-   1. Каждый пользователь генерирует пару ключей ECDH (P-256) и случайный UID.
-   2. Контакт = { uid, publicKey (base64 SPKI), pushSubscription (JSON) }.
-   3. Обмен контактами через QR-код или текст.
-   4. Сообщение шифруется с помощью ECDH (приватный ключ отправителя +
-      публичный ключ получателя) → AES-GCM.
-   5. Зашифрованное сообщение отправляется как payload push-уведомления
-      через Push API напрямую на endpoint получателя.
-   6. Получатель расшифровывает сообщение своим приватным ключом.
-   ========================================================================== */
+/* ============================================================
+   Messenger на ntfy.sh  (транспорт) + ECDH/AES-GCM (шифрование)
+   ============================================================ */
 
-// ---------- Глобальное состояние ----------
+const NTFY_HTTP = 'https://ntfy.sh';
+const NTFY_WS   = 'wss://ntfy.sh';
+const TOPIC_PREFIX = 'wmsgr_'; // чтобы не пересекаться с чужими топиками
+
 const state = {
-    myUID: null,              // Уникальный идентификатор
-    myKeyPair: null,          // ECDH KeyPair (CryptoKey)
-    myPublicKeyB64: null,     // Публичный ключ в base64 (SPKI)
-    mySubscription: null,     // PushSubscription объект
-    contact: null,            // Контакт собеседника { uid, publicKey, subscription }
-    messages: [],             // История сообщений
-    scanStream: null          // MediaStream для сканера QR
+  myUID: null,
+  myKeyPair: null,
+  myPublicKeyB64: null,
+  contact: null,
+  ws: null,
+  wsReconnectTimer: null
 };
 
-// ---------- Утилиты ----------
+// ---------- утилиты ----------
+const uid = () => 'u' + Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4);
+const bufToB64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const b64ToBuf = b64 => { const s = atob(b64); const a = new Uint8Array(s.length); for (let i=0;i<s.length;i++) a[i]=s.charCodeAt(i); return a.buffer; };
+const strToBuf = s => new TextEncoder().encode(s).buffer;
+const bufToStr = b => new TextDecoder().decode(b);
 
-/** Генерация короткого UID */
-function generateUID() {
-    return 'u_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+function showStatus(id, text, type='info') {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'status ' + type;
+  el.classList.remove('hidden');
+  if (type === 'ok') setTimeout(() => el.classList.add('hidden'), 4000);
 }
 
-/** ArrayBuffer → base64 */
-function bufToB64(buf) {
-    return btoa(String.fromCharCode(...new Uint8Array(buf)));
-}
-
-/** base64 → ArrayBuffer */
-function b64ToBuf(b64) {
-    const bin = atob(b64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return bytes.buffer;
-}
-
-/** UTF-8 строка → ArrayBuffer */
-function strToBuf(str) {
-    return new TextEncoder().encode(str).buffer;
-}
-
-/** ArrayBuffer → UTF-8 строка */
-function bufToStr(buf) {
-    return new TextDecoder().decode(buf);
-}
-
-/** Показать статус-сообщение */
-function showStatus(elementId, text, type = 'info') {
-    const el = document.getElementById(elementId);
-    el.textContent = text;
-    el.className = 'status ' + type;
-    el.classList.remove('hidden');
-    if (type === 'ok') setTimeout(() => el.classList.add('hidden'), 4000);
-}
-
-/** Скачать файл (для Service Worker) */
-function getSWBlob() {
-    const swCode = `
-/* service-worker.js — обработчик push-событий */
-self.addEventListener('push', function(event) {
-    let data = {};
-    try {
-        data = event.data ? event.data.json() : {};
-    } catch(e) { data = { title: 'Новое сообщение', body: '...' }; }
-
-    const title = data.title || '💬 Новое сообщение';
-    const options = {
-        body: data.body || 'Откройте чат для просмотра',
-        icon: data.icon || 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple/img/apple/64/1f4ac.png',
-        badge: data.badge || 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple/img/apple/64/1f4ac.png',
-        data: data.custom || {},
-        tag: 'msg-' + Date.now(),
-        renotify: true,
-        vibrate: [200, 100, 200]
-    };
-
-    event.waitUntil(self.registration.showNotification(title, options));
-});
-
-self.addEventListener('notificationclick', function(event) {
-    event.notification.close();
-    event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-            for (const client of clientList) {
-                if ('focus' in client) return client.focus();
-            }
-            if (clients.openWindow) return clients.openWindow('/');
-        })
-    );
-});
-`;
-    return new Blob([swCode], { type: 'application/javascript' });
-}
-
-// ---------- Криптография (Web Crypto API + ECDH) ----------
-
-/** Генерация пары ключей ECDH P-256 */
+// ---------- крипто ----------
 async function generateKeyPair() {
-    const keyPair = await crypto.subtle.generateKey(
-        { name: 'ECDH', namedCurve: 'P-256' },
-        true,
-        ['deriveKey', 'deriveBits']
-    );
-    // Экспортируем публичный ключ в формате SPKI (base64)
-    const exported = await crypto.subtle.exportKey('spki', keyPair.publicKey);
-    return { keyPair, publicKeyB64: bufToB64(exported) };
+  const kp = await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'}, true, ['deriveBits']);
+  const spki = await crypto.subtle.exportKey('spki', kp.publicKey);
+  return { keyPair: kp, publicKeyB64: bufToB64(spki) };
+}
+async function importPub(b64) {
+  return crypto.subtle.importKey('spki', b64ToBuf(b64),
+    {name:'ECDH',namedCurve:'P-256'}, true, []);
+}
+async function deriveAesKey(myPriv, theirPubB64) {
+  const theirPub = await importPub(theirPubB64);
+  const bits = await crypto.subtle.deriveBits({name:'ECDH', public: theirPub}, myPriv, 256);
+  return crypto.subtle.importKey('raw', bits, {name:'AES-GCM'}, false, ['encrypt','decrypt']);
+}
+async function encryptMessage(plain, myPriv, theirPubB64) {
+  const key = await deriveAesKey(myPriv, theirPubB64);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, strToBuf(plain));
+  return { iv: bufToB64(iv.buffer), ct: bufToB64(ct) };
+}
+async function decryptMessage(ivB64, ctB64, myPriv, theirPubB64) {
+  const key = await deriveAesKey(myPriv, theirPubB64);
+  const iv = new Uint8Array(b64ToBuf(ivB64));
+  const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, b64ToBuf(ctB64));
+  return bufToStr(pt);
 }
 
-/** Импорт публичного ключа ECDH из base64 SPKI */
-async function importPublicKey(b64) {
-    return crypto.subtle.importKey(
-        'spki',
-        b64ToBuf(b64),
-        { name: 'ECDH', namedCurve: 'P-256' },
-        true,
-        []
-    );
+// ---------- ntfy: приём ----------
+function myTopic() { return TOPIC_PREFIX + state.myUID; }
+
+function connectWebSocket() {
+  if (state.ws) try { state.ws.close(); } catch(_) {}
+  const url = `${NTFY_WS}/${myTopic()}/ws`;
+  console.log('[WS] connect', url);
+  const ws = new WebSocket(url);
+  state.ws = ws;
+
+  ws.onopen = () => {
+    console.log('[WS] open');
+    showStatus('chat-status', 'На связи ✓', 'ok');
+  };
+  ws.onmessage = async (ev) => {
+    let frame;
+    try { frame = JSON.parse(ev.data); } catch { return; }
+    if (frame.event !== 'message') return;   // open/keepalive — игнор
+    await handleIncoming(frame.message);
+  };
+  ws.onclose = () => {
+    console.log('[WS] closed, reconnecting in 3s');
+    clearTimeout(state.wsReconnectTimer);
+    state.wsReconnectTimer = setTimeout(connectWebSocket, 3000);
+  };
+  ws.onerror = (e) => console.warn('[WS] error', e);
 }
 
-/**
- * Шифрование сообщения для получателя.
- * @param {string} plaintext — текст сообщения
- * @param {CryptoKey} myPrivateKey — приватный ключ отправителя
- * @param {string} theirPublicKeyB64 — публичный ключ получателя (base64)
- * @returns {{ iv: string, ciphertext: string }}
- */
-async function encryptMessage(plaintext, myPrivateKey, theirPublicKeyB64) {
-    const theirPublicKey = await importPublicKey(theirPublicKeyB64);
-    // Выводим общий секрет (ECDH)
-    const sharedBits = await crypto.subtle.deriveBits(
-        { name: 'ECDH', public: theirPublicKey },
-        myPrivateKey,
-        256
-    );
-    // Импортируем общий секрет как ключ AES-GCM
-    const aesKey = await crypto.subtle.importKey(
-        'raw', sharedBits, { name: 'AES-GCM' }, false, ['encrypt']
-    );
-    // Генерируем случайный IV (12 байт)
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const ciphertext = await crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv },
-        aesKey,
-        strToBuf(plaintext)
-    );
-    return {
-        iv: bufToB64(iv.buffer),
-        ciphertext: bufToB64(ciphertext)
-    };
+// ---------- ntfy: отправка ----------
+async function publish(topic, body) {
+  const res = await fetch(`${NTFY_HTTP}/${topic}`, {
+    method: 'POST',
+    body: body
+  });
+  if (!res.ok) throw new Error('ntfy вернул ' + res.status);
 }
 
-/**
- * Расшифровка входящего сообщения.
- * @param {string} ivB64 — IV в base64
- * @param {string} ciphertextB64 — зашифрованный текст в base64
- * @param {CryptoKey} myPrivateKey — приватный ключ получателя
- * @param {string} theirPublicKeyB64 — публичный ключ отправителя (base64)
- * @returns {string} — расшифрованный текст
- */
-async function decryptMessage(ivB64, ciphertextB64, myPrivateKey, theirPublicKeyB64) {
-    const theirPublicKey = await importPublicKey(theirPublicKeyB64);
-    const sharedBits = await crypto.subtle.deriveBits(
-        { name: 'ECDH', public: theirPublicKey },
-        myPrivateKey,
-        256
+// ---------- обработка входящего ----------
+async function handleIncoming(bodyText) {
+  if (!state.contact) return;
+  let payload;
+  try { payload = JSON.parse(bodyText); } catch { return; }
+
+  // защита от эха (ntfy вернёт и наши собственные сообщения, если мы случайно отправим в свой топик)
+  if (payload.fromUID === state.myUID) return;
+
+  // если ключ отправителя не совпадает с сохранённым контактом — игнорируем
+  if (payload.fromUID !== state.contact.uid) {
+    console.warn('Неизвестный отправитель:', payload.fromUID);
+    return;
+  }
+
+  try {
+    const text = await decryptMessage(
+      payload.iv, payload.ct,
+      state.myKeyPair.privateKey,
+      state.contact.publicKey
     );
-    const aesKey = await crypto.subtle.importKey(
-        'raw', sharedBits, { name: 'AES-GCM' }, false, ['decrypt']
-    );
-    const iv = new Uint8Array(b64ToBuf(ivB64));
-    const plaintextBuf = await crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv },
-        aesKey,
-        b64ToBuf(ciphertextB64)
-    );
-    return bufToStr(plaintextBuf);
+    addMessageToUI(text, 'received', payload.timestamp || Date.now());
+    notify(text);
+  } catch (e) {
+    console.error('Расшифровка не удалась', e);
+    addMessageToUI('[не удалось расшифровать]', 'received');
+  }
 }
 
-// ---------- Push API ----------
-
-/** Регистрация Service Worker (из Blob — чтобы не требовать отдельный файл) */
-async function registerServiceWorker() {
-    if (!('serviceWorker' in navigator)) {
-        throw new Error('Service Worker не поддерживается');
-    }
-    // Создаём Service Worker из blob-URL
-    const blob = getSWBlob();
-    const swUrl = URL.createObjectURL(blob);
-    try {
-        const reg = await navigator.serviceWorker.register(swUrl);
-        console.log('[SW] Зарегистрирован:', reg.scope);
-        return reg;
-    } finally {
-        URL.revokeObjectURL(swUrl);
-    }
+// ---------- всплывающее уведомление браузера ----------
+function notify(text) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    new Notification('💬 Новое сообщение', { body: text.slice(0, 120), tag: 'msg' });
+  }
 }
 
-/** Получение PushSubscription */
-async function subscribeToPush() {
-    const reg = await navigator.serviceWorker.ready;
-
-    // VAPID публичный ключ. Сгенерируйте свой на https://vapidkeys.com/
-    // или с помощью библиотеки web-push.
-    const VAPID_PUBLIC_KEY = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8';
-
-    const subscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: b64ToBuf(VAPID_PUBLIC_KEY.replace(/-/g, '+').replace(/_/g, '/'))
-    });
-
-    console.log('[Push] Подписка:', JSON.stringify(subscription));
-    return subscription;
+// ---------- UI ----------
+function addMessageToUI(text, direction, ts = Date.now()) {
+  const c = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'message ' + direction;
+  const time = new Date(ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  const safe = document.createElement('div');
+  safe.textContent = text;
+  div.appendChild(safe);
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  meta.textContent = time;
+  div.appendChild(meta);
+  c.appendChild(div);
+  c.scrollTop = c.scrollHeight;
 }
 
-// ---------- Отправка push-сообщения ----------
-
-/**
- * Отправляет зашифрованное сообщение на push-endpoint получателя.
- * ВАЖНО: Это прямой fetch к push-сервису (FCM/Mozilla) с подписью VAPID.
- * В реальном приложении подпись VAPID должна генерироваться на сервере
- * с использованием приватного VAPID-ключа. Здесь мы используем упрощённый
- * подход — отправляем без подписи (сработает не везде, см. ограничения).
- */
-async function sendPushMessage(contact, encryptedPayload) {
-    const endpoint = contact.subscription.endpoint;
-    const p256dh = contact.subscription.keys?.p256dh;
-    const auth = contact.subscription.keys?.auth;
-
-    if (!endpoint) throw new Error('Нет push endpoint у контакта');
-
-    // Формируем payload, который получит Service Worker получателя
-    const pushBody = {
-        title: '💬 Новое сообщение',
-        body: '🔒 Зашифрованное сообщение',
-        custom: {
-            type: 'encrypted_message',
-            iv: encryptedPayload.iv,
-            ciphertext: encryptedPayload.ciphertext,
-            fromUID: state.myUID,
-            fromPublicKey: state.myPublicKeyB64,
-            timestamp: Date.now()
-        }
-    };
-
-    // Прямой fetch на push-endpoint (упрощённо, без полной VAPID-подписи)
-    const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'TTL': '86400'
-        },
-        body: JSON.stringify(pushBody)
-    });
-
-    if (!response.ok) {
-        const errText = await response.text().catch(() => '');
-        throw new Error(`Push-сервис вернул ${response.status}: ${errText}`);
-    }
-    return true;
-}
-
-// ---------- UI: инициализация ----------
-
-/** Показывает QR-код с контактом пользователя */
 async function renderMyQR() {
-    const contactData = {
-        uid: state.myUID,
-        publicKey: state.myPublicKeyB64,
-        subscription: state.mySubscription
-    };
-    const jsonStr = JSON.stringify(contactData);
-
-    // Отображаем текстовую версию
-    document.getElementById('my-id-display').textContent =
-        `UID: ${state.myUID}\nКлюч: ${state.myPublicKeyB64.substring(0, 40)}...`;
-
-    // Рендерим QR-код
-    const qrContainer = document.getElementById('qr-container');
-    qrContainer.innerHTML = '';
-    new QRCode(qrContainer, {
-        text: jsonStr,
-        width: 220,
-        height: 220,
-        colorDark: '#000000',
-        colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.M
-    });
+  const contact = {
+    uid: state.myUID,
+    publicKey: state.myPublicKeyB64
+  };
+  document.getElementById('my-id-display').textContent = 'UID: ' + state.myUID;
+  const box = document.getElementById('qr-container');
+  box.innerHTML = '';
+  new QRCode(box, {
+    text: JSON.stringify(contact),
+    width: 220, height: 220,
+    correctLevel: QRCode.CorrectLevel.M
+  });
 }
 
-/** Инициализация приложения */
-async function init() {
-    try {
-        showStatus('chat-status', 'Инициализация...', 'info');
-
-        // 1. Генерируем UID и ключи
-        state.myUID = generateUID();
-        const { keyPair, publicKeyB64 } = await generateKeyPair();
-        state.myKeyPair = keyPair;
-        state.myPublicKeyB64 = publicKeyB64;
-
-        // 2. Регистрируем Service Worker и получаем подписку
-        await registerServiceWorker();
-        state.mySubscription = await subscribeToPush();
-
-        // 3. Показываем QR-код
-        await renderMyQR();
-
-        console.log('[Init] Готово. UID:', state.myUID);
-        console.log('[Init] Публичный ключ:', state.myPublicKeyB64);
-
-    } catch (e) {
-        console.error('[Init] Ошибка:', e);
-        showStatus('chat-status', 'Ошибка инициализации: ' + e.message, 'err');
-    }
-}
-
-// ---------- UI: добавление контакта ----------
-
-/** Парсит контакт из JSON-строки */
 function parseContact(str) {
-    try {
-        const obj = JSON.parse(str.trim());
-        if (!obj.uid || !obj.publicKey || !obj.subscription) {
-            throw new Error('Не хватает полей: uid, publicKey, subscription');
-        }
-        return obj;
-    } catch (e) {
-        throw new Error('Некорректный формат контакта: ' + e.message);
-    }
+  const o = JSON.parse(str.trim());
+  if (!o.uid || !o.publicKey) throw new Error('Не хватает uid или publicKey');
+  return o;
 }
 
-/** Добавляет контакт и переключает интерфейс в режим чата */
-async function addContact(contactJson) {
-    try {
-        const contact = parseContact(contactJson);
-        if (contact.uid === state.myUID) {
-            throw new Error('Нельзя добавить себя');
-        }
-        state.contact = contact;
-        document.getElementById('peer-name').textContent = contact.uid;
-
-        // Переключаем экраны
-        document.getElementById('step-init').classList.add('hidden');
-        document.getElementById('step-add').classList.add('hidden');
-        document.getElementById('step-chat').classList.remove('hidden');
-
-        showStatus('chat-status', 'Контакт добавлен. Можно писать!', 'ok');
-        console.log('[Contact] Добавлен:', contact.uid);
-    } catch (e) {
-        showStatus('add-status', e.message, 'err');
-    }
+async function addContact(jsonStr) {
+  try {
+    const c = parseContact(jsonStr);
+    if (c.uid === state.myUID) throw new Error('Это ваш собственный контакт');
+    state.contact = c;
+    document.getElementById('peer-name').textContent = c.uid;
+    document.getElementById('step-init').classList.add('hidden');
+    document.getElementById('step-add').classList.add('hidden');
+    document.getElementById('step-chat').classList.remove('hidden');
+    showStatus('chat-status', 'Контакт добавлен', 'ok');
+  } catch (e) {
+    showStatus('add-status', 'Ошибка: ' + e.message, 'err');
+  }
 }
-
-// ---------- UI: отправка сообщения ----------
 
 async function sendMessage() {
-    const input = document.getElementById('msg-input');
-    const text = input.value.trim();
-    if (!text) return;
-    if (!state.contact) return showStatus('chat-status', 'Нет контакта', 'err');
-
-    try {
-        showStatus('chat-status', 'Шифрование...', 'info');
-
-        // 1. Шифруем
-        const encrypted = await encryptMessage(
-            text,
-            state.myKeyPair.privateKey,
-            state.contact.publicKey
-        );
-
-        // 2. Отправляем push
-        await sendPushMessage(state.contact, encrypted);
-
-        // 3. Отображаем в чате
-        addMessageToUI(text, 'sent');
-        input.value = '';
-        showStatus('chat-status', 'Отправлено ✓', 'ok');
-
-    } catch (e) {
-        console.error('[Send] Ошибка:', e);
-        showStatus('chat-status', 'Ошибка отправки: ' + e.message, 'err');
-    }
-}
-
-/** Добавляет сообщение в UI */
-function addMessageToUI(text, direction, timestamp = Date.now()) {
-    const container = document.getElementById('chat-messages');
-    const div = document.createElement('div');
-    div.className = `message ${direction}`;
-    const time = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    div.innerHTML = `${escapeHtml(text)}<div class="meta">${time}</div>`;
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
-}
-
-function escapeHtml(str) {
-    const d = document.createElement('div');
-    d.textContent = str;
-    return d.innerHTML;
-}
-
-// ---------- Обработка входящих push (через Service Worker) ----------
-
-/**
- * В реальном сценарии Service Worker получает push и показывает уведомление.
- * Но чтобы расшифровать сообщение в контексте страницы, нам нужно
- * использовать postMessage или IndexedDB.
- * 
- * В этой упрощённой версии мы предполагаем, что пользователь открывает
- * страницу, и мы проверяем наличие новых сообщений в localStorage/IndexedDB.
- * 
- * Для полноценной работы Service Worker должен:
- * 1. Получить push с зашифрованным payload.
- * 2. Сохранить его в IndexedDB.
- * 3. Отправить postMessage в открытые вкладки.
- * 4. Вкладка расшифровывает и отображает.
- * 
- * Здесь мы реализуем упрощённый вариант: SW показывает уведомление,
- * а страница при загрузке проверяет IndexedDB на новые сообщения.
- */
-
-/** Проверка новых сообщений (вызывается при загрузке и периодически) */
-async function checkForNewMessages() {
-    // В упрощённой версии — читаем из localStorage (в реальном проекте — IndexedDB)
-    const raw = localStorage.getItem('pending_messages');
-    if (!raw) return;
-    const pending = JSON.parse(raw);
-    if (!pending.length) return;
-
-    if (!state.contact) return; // Нет контакта — не можем расшифровать
-
-    for (const msg of pending) {
-        try {
-            const plaintext = await decryptMessage(
-                msg.iv,
-                msg.ciphertext,
-                state.myKeyPair.privateKey,
-                msg.fromPublicKey
-            );
-            addMessageToUI(plaintext, 'received', msg.timestamp);
-        } catch (e) {
-            console.error('[Decrypt] Ошибка:', e);
-            addMessageToUI('[Не удалось расшифровать]', 'received');
-        }
-    }
-    localStorage.removeItem('pending_messages');
-}
-
-// ---------- Сканер QR ----------
-
-async function startScan() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment' }
-        });
-        state.scanStream = stream;
-        const video = document.getElementById('scanner-video');
-        video.srcObject = stream;
-        await video.play();
-        document.getElementById('scanner-container').classList.remove('hidden');
-        requestAnimationFrame(scanFrame);
-    } catch (e) {
-        showStatus('add-status', 'Ошибка камеры: ' + e.message, 'err');
-    }
-}
-
-function scanFrame() {
-    const video = document.getElementById('scanner-video');
-    if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
-        requestAnimationFrame(scanFrame);
-        return;
-    }
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height);
-    if (code) {
-        stopScan();
-        addContact(code.data);
-    } else {
-        requestAnimationFrame(scanFrame);
-    }
-}
-
-function stopScan() {
-    if (state.scanStream) {
-        state.scanStream.getTracks().forEach(t => t.stop());
-        state.scanStream = null;
-    }
-    document.getElementById('scanner-container').classList.add('hidden');
-}
-
-// ---------- Сброс ----------
-
-function resetApp() {
-    localStorage.clear();
-    location.reload();
-}
-
-// ---------- Привязка событий ----------
-
-document.getElementById('btn-copy-id').addEventListener('click', async () => {
-    const contactData = {
-        uid: state.myUID,
-        publicKey: state.myPublicKeyB64,
-        subscription: state.mySubscription
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  if (!text || !state.contact) return;
+  try {
+    const enc = await encryptMessage(text, state.myKeyPair.privateKey, state.contact.publicKey);
+    const payload = {
+      fromUID: state.myUID,
+      iv: enc.iv,
+      ct: enc.ct,
+      timestamp: Date.now()
     };
-    try {
-        await navigator.clipboard.writeText(JSON.stringify(contactData));
-        showStatus('add-status', 'Контакт скопирован в буфер обмена', 'ok');
-    } catch (e) {
-        showStatus('add-status', 'Ошибка копирования: ' + e.message, 'err');
+    // отправляем в топик ПОЛУЧАТЕЛЯ
+    await publish(TOPIC_PREFIX + state.contact.uid, JSON.stringify(payload));
+    addMessageToUI(text, 'sent');
+    input.value = '';
+  } catch (e) {
+    console.error(e);
+    showStatus('chat-status', 'Ошибка: ' + e.message, 'err');
+  }
+}
+
+// ---------- сканер QR ----------
+async function startScan() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'environment' } });
+    state.scanStream = stream;
+    const v = document.getElementById('scanner-video');
+    v.srcObject = stream;
+    await v.play();
+    document.getElementById('scanner-container').classList.remove('hidden');
+    requestAnimationFrame(scanFrame);
+  } catch (e) {
+    showStatus('add-status', 'Камера недоступна: ' + e.message, 'err');
+  }
+}
+function scanFrame() {
+  const v = document.getElementById('scanner-video');
+  if (!v || v.readyState !== v.HAVE_ENOUGH_DATA) return requestAnimationFrame(scanFrame);
+  const cv = document.createElement('canvas');
+  cv.width = v.videoWidth; cv.height = v.videoHeight;
+  const ctx = cv.getContext('2d');
+  ctx.drawImage(v, 0, 0);
+  const img = ctx.getImageData(0, 0, cv.width, cv.height);
+  const code = jsQR(img.data, img.width, img.height);
+  if (code) {
+    stopScan();
+    addContact(code.data);
+  } else {
+    requestAnimationFrame(scanFrame);
+  }
+}
+function stopScan() {
+  if (state.scanStream) { state.scanStream.getTracks().forEach(t=>t.stop()); state.scanStream = null; }
+  document.getElementById('scanner-container').classList.add('hidden');
+}
+
+// ---------- init ----------
+async function init() {
+  try {
+    // просим разрешение на уведомления
+    if ('Notification' in window && Notification.permission === 'default') {
+      try { await Notification.requestPermission(); } catch(_) {}
     }
-});
 
-document.getElementById('btn-scan').addEventListener('click', startScan);
-document.getElementById('btn-stop-scan').addEventListener('click', stopScan);
+    state.myUID = uid();
+    const { keyPair, publicKeyB64 } = await generateKeyPair();
+    state.myKeyPair = keyPair;
+    state.myPublicKeyB64 = publicKeyB64;
 
-document.getElementById('btn-paste').addEventListener('click', async () => {
-    try {
-        const text = await navigator.clipboard.readText();
-        document.getElementById('paste-area').value = text;
-    } catch (e) {
-        showStatus('add-status', 'Нет доступа к буферу обмена', 'err');
+    await renderMyQR();
+    connectWebSocket();
+
+    // пробуем восстановить контакт
+    const saved = localStorage.getItem('contact');
+    if (saved) {
+      try { await addContact(saved); } catch(_) {}
     }
+  } catch (e) {
+    console.error(e);
+    alert('Ошибка инициализации: ' + e.message);
+  }
+}
+
+// ---------- события ----------
+document.getElementById('btn-copy-id').onclick = async () => {
+  const contact = { uid: state.myUID, publicKey: state.myPublicKeyB64 };
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(contact));
+    showStatus('add-status', 'Контакт скопирован', 'ok');
+  } catch (e) { showStatus('add-status', 'Буфер недоступен', 'err'); }
+};
+document.getElementById('btn-scan').onclick = startScan;
+document.getElementById('btn-stop-scan').onclick = stopScan;
+document.getElementById('btn-paste').onclick = async () => {
+  try { document.getElementById('paste-area').value = await navigator.clipboard.readText(); }
+  catch { showStatus('add-status','Нет доступа к буферу','err'); }
+};
+document.getElementById('btn-add-contact').onclick = async () => {
+  const v = document.getElementById('paste-area').value.trim();
+  if (!v) return showStatus('add-status','Пусто','err');
+  try { parseContact(v); localStorage.setItem('contact', v); } catch(_) {}
+  await addContact(v);
+};
+document.getElementById('btn-send').onclick = sendMessage;
+document.getElementById('msg-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
+document.getElementById('btn-reset').onclick = () => { localStorage.clear(); location.reload(); };
 
-document.getElementById('btn-add-contact').addEventListener('click', () => {
-    const val = document.getElementById('paste-area').value.trim();
-    if (!val) return showStatus('add-status', 'Вставьте контакт', 'err');
-    addContact(val);
-});
-
-document.getElementById('btn-send').addEventListener('click', sendMessage);
-document.getElementById('msg-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-});
-
-document.getElementById('btn-reset').addEventListener('click', resetApp);
-
-// ---------- Запуск ----------
-
-window.addEventListener('load', async () => {
-    await init();
-    // Проверяем «отложенные» сообщения
-    setTimeout(checkForNewMessages, 1000);
-    // Периодическая проверка (в реальном приложении — через postMessage из SW)
-    setInterval(checkForNewMessages, 5000);
-});
-
-// Слушаем postMessage от Service Worker (если он будет расширен)
-navigator.serviceWorker?.addEventListener('message', async (event) => {
-    if (event.data?.type === 'push_message') {
-        const msg = event.data.payload;
-        if (!state.contact) return;
-        try {
-            const plaintext = await decryptMessage(
-                msg.iv, msg.ciphertext,
-                state.myKeyPair.privateKey,
-                msg.fromPublicKey
-            );
-            addMessageToUI(plaintext, 'received', msg.timestamp);
-        } catch (e) { console.error('Decrypt error:', e); }
-    }
-});
-
+window.addEventListener('load', init);
 </script>
 </body>
 </html>
