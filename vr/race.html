@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>NEON RACER — VR</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body {
+    width:100%; height:100%; overflow:hidden; background:#04000c;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    color:#cfefff; -webkit-user-select:none; user-select:none;
+  }
+  canvas { display:block; }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    position:fixed; inset:0; pointer-events:none; z-index:10;
+    text-shadow:0 0 12px rgba(0,220,255,.85);
+  }
+  .panel {
+    position:absolute; padding:12px 18px;
+    background:linear-gradient(180deg, rgba(0,40,70,.35), rgba(0,10,30,.55));
+    border:1px solid rgba(0,230,255,.35);
+    border-radius:10px;
+    backdrop-filter: blur(6px);
+    box-shadow:0 0 24px rgba(0,180,255,.18), inset 0 0 24px rgba(0,120,255,.12);
+  }
+  .tl { top:20px; left:20px; }
+  .tr { top:20px; right:20px; min-width:210px; }
+  .bl { bottom:20px; left:20px; min-width:210px; }
+  .br { bottom:20px; right:20px; text-align:right; }
+
+  .label { font-size:11px; letter-spacing:3px; color:#5fd8ff; opacity:.85; margin-bottom:6px; }
+  .value { font-size:34px; font-weight:700; color:#8ff4ff; line-height:1; }
+
+  .bar { width:100%; height:12px; border-radius:6px; background:rgba(0,40,60,.7);
+         border:1px solid rgba(0,220,255,.3); overflow:hidden; }
+  .bar i { display:block; height:100%; width:100%; border-radius:6px;
+           background:linear-gradient(90deg,#00ffb2,#00d0ff); transition:width .12s linear;
+           box-shadow:0 0 14px rgba(0,255,200,.8); }
+  .bar.nitro i { background:linear-gradient(90deg,#ff2bd6,#7a3cff); box-shadow:0 0 14px rgba(255,60,220,.8); }
+
+  .speed { font-size:52px; font-weight:800; line-height:.9;
+           color:#b6f7ff; text-shadow:0 0 22px rgba(0,220,255,1); }
+  .speed small { font-size:14px; font-weight:400; opacity:.7; margin-left:6px; letter-spacing:2px;}
+
+  #crosshair {
+    position:absolute; left:50%; top:50%; width:26px; height:26px;
+    margin:-13px 0 0 -13px; opacity:.6;
+  }
+  #crosshair::before, #crosshair::after {
+    content:""; position:absolute; background:#7ff0ff; box-shadow:0 0 8px #00e5ff;
+  }
+  #crosshair::before { left:50%; top:0; width:2px; height:100%; margin-left:-1px; }
+  #crosshair::after  { top:50%; left:0; height:2px; width:100%; margin-top:-1px; }
+
+  #gameover {
+    position:absolute; left:50%; top:38%; transform:translate(-50%,-50%);
+    font-size:44px; font-weight:800; letter-spacing:8px; color:#ff3b6b;
+    text-shadow:0 0 30px rgba(255,0,80,.9); opacity:0; transition:opacity .2s;
+  }
+  #gameover.show { opacity:1; }
+
+  /* ---------- Оверлей старта ---------- */
+  #overlay {
+    position:fixed; inset:0; z-index:20;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:22px; text-align:center;
+    background:radial-gradient(circle at 50% 45%, rgba(20,0,60,.85), rgba(2,0,10,.97));
+    backdrop-filter: blur(3px);
+  }
+  #overlay h1 {
+    font-size:clamp(34px, 7vw, 78px); font-weight:900; letter-spacing:10px;
+    color:#aef6ff; text-shadow:0 0 30px #00d5ff, 0 0 70px #0066ff;
+  }
+  #overlay h1 span { color:#ff45d8; text-shadow:0 0 30px #ff00c8, 0 0 70px #a000ff; }
+  #overlay p { font-size:15px; line-height:1.9; color:#9fd8ee; opacity:.9; letter-spacing:1px; }
+  #overlay kbd {
+    display:inline-block; padding:2px 9px; border-radius:5px; font-size:13px;
+    background:rgba(0,200,255,.12); border:1px solid rgba(0,220,255,.45); color:#bff3ff;
+  }
+  #startBtn {
+    margin-top:8px; padding:16px 54px; font-size:19px; letter-spacing:5px; font-weight:700;
+    color:#001a22; cursor:pointer; border:none; border-radius:50px;
+    background:linear-gradient(90deg,#00ffc8,#00c3ff);
+    box-shadow:0 0 40px rgba(0,220,255,.7);
+    transition:transform .15s, box-shadow .15s;
+  }
+  #startBtn:hover { transform:scale(1.06); box-shadow:0 0 60px rgba(0,230,255,1); }
+
+  /* ---------- Кнопка VR ---------- */
+  #VRButton {
+    position:fixed !important;
+    left:50% !important; bottom:26px !important; top:auto !important; right:auto !important;
+    transform:translateX(-50%) !important;
+    z-index:30 !important;
+    padding:13px 34px !important;
+    font-family:inherit !important; font-size:14px !important; font-weight:700 !important;
+    letter-spacing:3px !important;
+    border:1px solid rgba(255,80,220,.65) !important;
+    border-radius:40px !important;
+    background:rgba(40,0,60,.75) !important;
+    color:#ffb6f2 !important;
+    text-decoration:none !important;
+    box-shadow:0 0 30px rgba(255,0,200,.45) !important;
+    cursor:pointer !important;
+  }
+  #VRButton:hover { background:rgba(80,0,110,.9) !important; }
+
+  /* ---------- Скрытие UI в VR ---------- */
+  body.vr #hud,
+  body.vr #overlay,
+  body.vr #VRButton { display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="panel tl">
+    <div class="label">ОЧКИ</div>
+    <div class="value" id="score">0</div>
+  </div>
+
+  <div class="panel tr">
+    <div class="label">КОРПУС</div>
+    <div class="bar"><i id="hpbar"></i></div>
+  </div>
+
+  <div class="panel bl">
+    <div class="label">НИТРО</div>
+    <div class="bar nitro"><i id="nitrobar"></i></div>
+  </div>
+
+  <div class="panel br">
+    <div class="speed"><span id="speed">0</span><small>КМ/Ч</small></div>
+    <div class="label" id="dist">0 М</div>
+  </div>
+
+  <div id="crosshair"></div>
+  <div id="gameover">WIPEOUT</div>
+</div>
+
+<div id="overlay">
+  <h1>NEON <span>RACER</span></h1>
+  <p>
+    <kbd>A</kbd> <kbd>D</kbd> / <kbd>←</kbd> <kbd>→</kbd> — маневрировать<br>
+    <kbd>Shift</kbd> — нитро &nbsp;•&nbsp; <kbd>Space</kbd> — огонь &nbsp;•&nbsp; <kbd>R</kbd> — рестарт<br>
+    <span style="opacity:.6">В VR: стик контроллера — руль, триггер — огонь, стик вперёд — нитро</span>
+  </p>
+  <button id="startBtn">СТАРТ</button>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
+
+/* =========================================================
+   БАЗОВАЯ СЦЕНА
+   ========================================================= */
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x04000c);
+scene.fog = new THREE.FogExp2(0x04000c, 0.006);
+
+const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.08, 700);
+
+// Группа игрока. В VR позиция камеры берётся из позы шлема относительно этой группы.
+const playerGroup = new THREE.Group();
+playerGroup.position.y = -0.55;         // опускаем "пол" чтобы голова оказалась на высоте кокпита
+playerGroup.add(camera);
+scene.add(playerGroup);
+
+// Не-VR позиция водителя
+camera.position.set(0, 1.6, 0.2);
+
+/* ---------- Свет ---------- */
+scene.add(new THREE.HemisphereLight(0x3355ff, 0x110022, 1.5));
+const dirLight = new THREE.DirectionalLight(0xaaccff, 1.1);
+dirLight.position.set(-0.4, 1, 0.5);
+scene.add(dirLight);
+
+/* =========================================================
+   МАТЕМАТИКА ТРАССЫ
+   ========================================================= */
+const ROAD_HALF     = 9;
+const SEG_LEN       = 30;
+const SEG_GEO_LEN   = 31.5;
+const SEG_COUNT     = 14;
+const START_Z       = 90;
+
+const roadCenterX = z => 26 * Math.sin(z * 0.0085) + 44 * Math.sin(z * 0.0032 + 1.3);
+const roadSlope   = z => 0.221 * Math.cos(z * 0.0085) + 0.1408 * Math.cos(z * 0.0032 + 1.3);
+
+const _v = new THREE.Vector3();
+function roadToWorld(z, u, y, out) {
+  const th = Math.atan(roadSlope(z));
+  return out.set(roadCenterX(z) + u * Math.cos(th), y, z - u * Math.sin(th));
+}
+
+/* =========================================================
+   МАТЕРИАЛЫ И ГЕОМЕТРИИ
+   ========================================================= */
+const deckMat  = new THREE.MeshStandardMaterial({ color: 0x0b0e18, roughness: 0.72, metalness: 0.55 });
+const railMat  = new THREE.MeshStandardMaterial({ color: 0x1a1030, roughness: 0.45, metalness: 0.8, emissive: 0x180030 });
+const neonA    = new THREE.MeshBasicMaterial({ color: 0x00eaff });
+const neonB    = new THREE.MeshBasicMaterial({ color: 0xff2bd6 });
+const neonC    = new THREE.MeshBasicMaterial({ color: 0x7a3cff });
+
+const geoDeck      = new THREE.BoxGeometry(ROAD_HALF * 2, 0.5, SEG_GEO_LEN);
+const geoEdge      = new THREE.BoxGeometry(0.35, 0.22, SEG_GEO_LEN);
+const geoRail      = new THREE.BoxGeometry(0.35, 1.1, SEG_GEO_LEN);
+const geoDash      = new THREE.BoxGeometry(0.3, 0.05, 3);
+const geoPillar    = new THREE.BoxGeometry(1.0, 26, 1.0);
+const geoPillarGlow= new THREE.BoxGeometry(0.2, 26, 0.2);
+
+/* =========================================================
+   СЕГМЕНТЫ ДОРОГИ
+   ========================================================= */
+function makeSegment() {
+  const g = new THREE.Group();
+
+  const deck = new THREE.Mesh(geoDeck, deckMat);
+  deck.position.y = -0.25;
+  g.add(deck);
+
+  for (let i = 0; i < 3; i++) {
+    const d = new THREE.Mesh(geoDash, neonA);
+    d.position.set(0, 0.03, -10 + i * 10);
+    g.add(d);
+  }
+
+  const eL = new THREE.Mesh(geoEdge, neonA);
+  eL.position.set(-ROAD_HALF, 0.06, 0);
+  const eR = new THREE.Mesh(geoEdge, neonB);
+  eR.position.set(ROAD_HALF, 0.06, 0);
+  g.add(eL, eR);
+
+  const rL = new THREE.Mesh(geoRail, railMat);
+  rL.position.set(-(ROAD_HALF + 0.4), 0.55, 0);
+  const rR = new THREE.Mesh(geoRail, railMat);
+  rR.position.set(ROAD_HALF + 0.4, 0.55, 0);
+  g.add(rL, rR);
+
+  for (const side of [-1, 1]) {
+    const pz = (Math.random() - 0.5) * 14;
+    const p = new THREE.Mesh(geoPillar, railMat);
+    p.position.set(side * (ROAD_HALF + 9), 13, pz);
+    g.add(p);
+
+    const gl = new THREE.Mesh(geoPillarGlow, Math.random() < 0.5 ? neonC : neonB);
+    gl.position.set(side * (ROAD_HALF + 9) + side * 0.62, 13, pz);
+    g.add(gl);
+  }
+
+  return g;
+}
+
+const segments = [];
+for (let i = 0; i < SEG_COUNT; i++) {
+  const g = makeSegment();
+  g.userData.z = START_Z - i * SEG_LEN;
+  scene.add(g);
+  segments.push(g);
+}
+
+function placeSegment(g) {
+  const z = g.userData.z;
+  g.position.set(roadCenterX(z), 0, z);
+  g.rotation.y = Math.atan(roadSlope(z));
+}
+segments.forEach(placeSegment);
+
+function updateSegments() {
+  let minZ = Infinity;
+  for (const g of segments) if (g.userData.z < minZ) minZ = g.userData.z;
+
+  for (const g of segments) {
+    if (g.userData.z > player.z + 70) {
+      g.userData.z = minZ - SEG_LEN;
+      minZ = g.userData.z;
+      placeSegment(g);
+    }
+  }
+}
+
+/* =========================================================
+   КОРПУС БОЛИДА (вид от первого лица)
+   ========================================================= */
+const car = new THREE.Group();
+playerGroup.add(car);
+
+const hullMat  = new THREE.MeshStandardMaterial({ color: 0x1a1f36, metalness: 0.95, roughness: 0.28 });
+const darkMat  = new THREE.MeshStandardMaterial({ color: 0x0d1020, metalness: 0.85, roughness: 0.4 });
+const glowMat  = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
+const glowMat2 = new THREE.MeshBasicMaterial({ color: 0xff2bd6 });
+const glassMat = new THREE.MeshStandardMaterial({
+  color: 0x66ffff, transparent: true, opacity: 0.13,
+  metalness: 0.2, roughness: 0.05, side: THREE.DoubleSide
+});
+
+// передняя палуба
+const front = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.42, 2.8), hullMat);
+front.position.set(0, 0.86, -1.7);
+car.add(front);
+
+// задний блок
+const rear = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.42, 2.4), hullMat);
+rear.position.set(0, 0.86, 1.7);
+car.add(rear);
+
+// боковые балки (кокпит-«ванна»)
+for (const s of [-1, 1]) {
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.62, 2.6), hullMat);
+  rail.position.set(s * 1.03, 0.98, 0);
+  car.add(rail);
+
+  const strip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 2.4), s < 0 ? glowMat : glowMat2);
+  strip.position.set(s * 1.31, 1.18, 0);
+  car.add(strip);
+}
+
+// нос
+const nose = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.34, 2.0), hullMat);
+nose.position.set(0, 0.8, -3.6);
+car.add(nose);
+
+const noseGlow = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 1.6), glowMat);
+noseGlow.position.set(0, 1.0, -3.6);
+car.add(noseGlow);
+
+// лобовое стекло
+const shield = new THREE.Mesh(new THREE.BoxGeometry(2.45, 1.05, 0.06), glassMat);
+shield.position.set(0, 1.55, -2.25);
+shield.rotation.x = 0.36;
+car.add(shield);
+
+// приборная панель
+const dash = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.12, 0.7), darkMat);
+dash.position.set(0, 1.3, -1.35);
+dash.rotation.x = -0.35;
+car.add(dash);
+
+const dashGlow = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.04, 0.12), glowMat);
+dashGlow.position.set(0, 1.36, -1.65);
+car.add(dashGlow);
+
+// двигатели
+for (const s of [-1, 1]) {
+  const eng = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.38, 0.9, 12), darkMat);
+  eng.rotation.x = Math.PI / 2;
+  eng.position.set(s * 0.75, 1.0, 3.0);
+  car.add(eng);
+
+  const flame = new THREE.Mesh(new THREE.CircleGeometry(0.3, 12), glowMat2);
+  flame.position.set(s * 0.75, 1.0, 3.46);
+  car.add(flame);
+}
+
+// подвесы-антиграв
+for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 0.18, 10), darkMat);
+  pad.position.set(sx * 1.15, 0.62, sz * 2.1);
+  car.add(pad);
+}
+
+// фары
+const headlight = new THREE.SpotLight(0x99ddff, 5, 130, Math.PI / 5, 0.6, 1.6);
+headlight.position.set(0, 1.1, -3.2);
+const hlTarget = new THREE.Object3D();
+hlTarget.position.set(0, 0.2, -45);
+car.add(headlight, hlTarget);
+headlight.target = hlTarget;
+
+/* =========================================================
+   VR-КОНТРОЛЛЕРЫ
+   ========================================================= */
+const controllers = [renderer.xr.getController(0), renderer.xr.getController(1)];
+controllers.forEach((c, i) => {
+  playerGroup.add(c);
+
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.07, 0.07, 0.30),
+    new THREE.MeshStandardMaterial({ color: 0x222233, metalness: 0.9, roughness: 0.3 })
+  );
+  body.position.z = -0.12;
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.038, 8, 8), i === 0 ? glowMat : glowMat2);
+  tip.position.z = -0.29;
+  g.add(body, tip);
+  c.add(g);
+
+  c.addEventListener('selectstart', fire);
+});
+
+/* =========================================================
+   ПУЛИ
+   ========================================================= */
+const bulletGeo = new THREE.SphereGeometry(0.22, 8, 8);
+const bulletMat = new THREE.MeshBasicMaterial({ color: 0x8ff8ff });
+const bullets = [];
+
+for (let i = 0; i < 36; i++) {
+  const m = new THREE.Mesh(bulletGeo, bulletMat);
+  m.visible = false;
+  scene.add(m);
+  bullets.push({ mesh: m, z: 0, u: 0, alive: false });
+}
+
+let fireCooldown = 0;
+
+function fire() {
+  if (!running || gameOver || fireCooldown > 0) return;
+  const b = bullets.find(x => !x.alive);
+  if (!b) return;
+
+  b.alive = true;
+  b.z = player.z - 3.5;
+  b.u = player.u;
+  b.mesh.visible = true;
+  fireCooldown = 0.11;
+}
+
+/* =========================================================
+   ВРАГИ / ПРЕПЯТСТВИЯ
+   ========================================================= */
+const enemyGeo = new THREE.BoxGeometry(2.3, 1.5, 3.4);
+const enemyMat = new THREE.MeshStandardMaterial({
+  color: 0x2a0410, emissive: 0xff2200, emissiveIntensity: 0.75,
+  metalness: 0.8, roughness: 0.35
+});
+const enemies = [];
+
+for (let i = 0; i < 16; i++) {
+  const m = new THREE.Mesh(enemyGeo, enemyMat);
+  m.visible = false;
+  scene.add(m);
+  enemies.push({ mesh: m, z: 0, u: 0, vu: 0, alive: false });
+}
+
+function respawnEnemy(o) {
+  let minZ = player.z - 220;
+  for (const q of enemies) {
+    if (q !== o && q.alive && q.z < minZ) minZ = q.z;
+  }
+  o.z = minZ - (65 + Math.random() * 120);
+  o.u = (Math.random() * 2 - 1) * (ROAD_HALF - 2.2);
+  o.vu = Math.random() < 0.45 ? (Math.random() - 0.5) * 9 : 0;
+  o.alive = true;
+  o.mesh.visible = true;
+}
+
+/* =========================================================
+   ВЗРЫВЫ
+   ========================================================= */
+const explosions = [];
+for (let i = 0; i < 12; i++) {
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xffaa33, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 12), mat);
+  m.visible = false;
+  scene.add(m);
+  explosions.push({ mesh: m, t: 0, active: false });
+}
+
+function boom(pos, color) {
+  const e = explosions.find(x => !x.active);
+  if (!e) return;
+  e.active = true;
+  e.t = 0;
+  e.mesh.visible = true;
+  e.mesh.position.copy(pos);
+  e.mesh.scale.setScalar(0.3);
+  e.mesh.material.color.setHex(color);
+  e.mesh.material.opacity = 1;
+}
+
+/* =========================================================
+   СОСТОЯНИЕ ИГРЫ
+   ========================================================= */
+const CRUISE_SPEED = 62;
+const NITRO_SPEED  = 130;
+
+const player = { z: 0, u: 0, speed: 25, health: 100, distance: 0, kills: 0 };
+let running = false;
+let gameOver = false;
+let gameOverTimer = 0;
+let shake = 0;
+let nitroVisual = 0;
+
+const keys = { left: false, right: false, nitro: false };
+let vrSteer = 0;
+let vrNitro = false;
+
+/* =========================================================
+   ВВОД
+   ========================================================= */
+addEventListener('keydown', e => {
+  switch (e.code) {
+    case 'ArrowLeft': case 'KeyA': keys.left = true; break;
+    case 'ArrowRight': case 'KeyD': keys.right = true; break;
+    case 'ShiftLeft': case 'ShiftRight': keys.nitro = true; break;
+    case 'Space': fire(); e.preventDefault(); break;
+    case 'KeyR': resetGame(); break;
+  }
+});
+addEventListener('keyup', e => {
+  switch (e.code) {
+    case 'ArrowLeft': case 'KeyA': keys.left = false; break;
+    case 'ArrowRight': case 'KeyD': keys.right = false; break;
+    case 'ShiftLeft': case 'ShiftRight': keys.nitro = false; break;
+  }
+});
+
+function readXRInput() {
+  vrSteer = 0;
+  vrNitro = false;
+
+  const session = renderer.xr.getSession();
+  if (!session) return;
+
+  for (const src of session.inputSources) {
+    const gp = src.gamepad;
+    if (!gp) continue;
+
+    const ax = gp.axes;
+    if (ax && ax.length >= 4) {
+      const x = ax[2] || 0;
+      const y = ax[3] || 0;
+      if (Math.abs(x) > Math.abs(vrSteer)) vrSteer = x;
+      if (y < -0.55) vrNitro = true;
+    }
+    const bt = gp.buttons;
+    if (bt && bt.length > 5 && bt[5] && bt[5].pressed) vrNitro = true;
+  }
+
+  if (Math.abs(vrSteer) < 0.16) vrSteer = 0;
+}
+
+/* =========================================================
+   ИГРОВОЙ ЦИКЛ
+   ========================================================= */
+const clock = new THREE.Clock();
+
+function update(dt) {
+  const t = performance.now() * 0.001;
+
+  /* --- руль --- */
+  let steer = 0;
+  if (keys.left) steer -= 1;
+  if (keys.right) steer += 1;
+  steer += vrSteer;
+  steer = Math.max(-1, Math.min(1, steer));
+
+  const nitro = (keys.nitro || vrNitro) && !gameOver;
+
+  /* --- скорость --- */
+  const targetSpeed = gameOver ? 0 : (nitro ? NITRO_SPEED : CRUISE_SPEED);
+  const accel = nitro ? 1.5 : 0.55;
+  player.speed += (targetSpeed - player.speed) * Math.min(1, dt * accel);
+
+  /* --- боковое смещение --- */
+  const lateralSpeed = 15.5;
+  player.u += steer * lateralSpeed * dt;
+
+  const limit = ROAD_HALF - 1.4;
+  if (player.u > limit) { player.u = limit; player.speed *= 0.992; }
+  if (player.u < -limit) { player.u = -limit; player.speed *= 0.992; }
+
+  /* --- движение вперёд --- */
+  player.z -= player.speed * dt;
+  player.distance += player.speed * dt;
+
+  /* --- позиционирование группы игрока --- */
+  roadToWorld(player.z, player.u, 0, _v);
+  const yaw = Math.atan(roadSlope(player.z));
+
+  shake = Math.max(0, shake - dt * 2.4);
+  const shakeAmt = shake * 0.045;
+
+  playerGroup.position.set(
+    _v.x + (Math.random() - 0.5) * shakeAmt,
+    -0.55 + Math.sin(t * 7.5) * 0.028 + Math.sin(t * 13.1) * 0.012,
+    _v.z
+  );
+  playerGroup.rotation.y = yaw + steer * 0.06;
+  playerGroup.rotation.z = -steer * 0.10 + (Math.random() - 0.5) * shakeAmt;
+
+  /* --- наклон корпуса --- */
+  car.rotation.z += (-steer * 0.13 - car.rotation.z) * Math.min(1, dt * 6);
+  car.rotation.y += (steer * 0.05 - car.rotation.y) * Math.min(1, dt * 6);
+
+  /* --- визуал нитро --- */
+  nitroVisual += ((nitro ? 1 : 0) - nitroVisual) * Math.min(1, dt * 5);
+  car.children.forEach(c => {
+    if (c.geometry && c.geometry.type === 'CircleGeometry') {
+      c.scale.setScalar(0.8 + nitroVisual * 1.4 + Math.random() * 0.25);
+    }
+  });
+
+  /* --- дорога --- */
+  updateSegments();
+
+  /* --- кулдаун выстрела --- */
+  if (fireCooldown > 0) fireCooldown -= dt;
+
+  /* --- пули --- */
+  for (const b of bullets) {
+    if (!b.alive) continue;
+
+    b.z -= 250 * dt;
+
+    if (b.z < player.z - 420) {
+      b.alive = false;
+      b.mesh.visible = false;
+      continue;
+    }
+
+    let hit = false;
+    for (const o of enemies) {
+      if (!o.alive) continue;
+      if (Math.abs(b.z - o.z) < 3.6 && Math.abs(b.u - o.u) < 2.0) {
+        o.alive = false;
+        o.mesh.visible = false;
+        player.kills++;
+        shake = Math.max(shake, 0.25);
+        roadToWorld(o.z, o.u, 0.9, _v);
+        boom(_v, 0xffcc33);
+        hit = true;
+        break;
+      }
+    }
+    if (hit) {
+      b.alive = false;
+      b.mesh.visible = false;
+      continue;
+    }
+
+    roadToWorld(b.z, b.u, 0.85, _v);
+    b.mesh.position.copy(_v);
+  }
+
+  /* --- враги --- */
+  for (const o of enemies) {
+    if (!o.alive) {
+      respawnEnemy(o);
+      continue;
+    }
+
+    if (o.z > player.z + 45) {
+      respawnEnemy(o);
+      continue;
+    }
+
+    o.u += o.vu * dt;
+    const lim = ROAD_HALF - 2.2;
+    if (o.u > lim) { o.u = lim; o.vu *= -1; }
+    if (o.u < -lim) { o.u = -lim; o.vu *= -1; }
+
+    roadToWorld(o.z, o.u, 0.95, _v);
+    o.mesh.position.copy(_v);
+    o.mesh.rotation.y = Math.atan(roadSlope(o.z)) + Math.sin(t * 2 + o.z) * 0.15;
+    o.mesh.rotation.z = Math.sin(t * 3 + o.z * 0.1) * 0.06;
+
+    /* --- столкновение с игроком --- */
+    if (!gameOver &&
+        Math.abs(o.z - player.z) < 3.2 &&
+        Math.abs(o.u - player.u) < 2.1) {
+
+      o.alive = false;
+      o.mesh.visible = false;
+      player.health -= 20;
+      player.speed *= 0.42;
+      shake = 1.0;
+
+      roadToWorld(o.z, o.u, 0.9, _v);
+      boom(_v, 0xff3300);
+
+      if (player.health <= 0) {
+        player.health = 0;
+        triggerGameOver();
+      }
+    }
+  }
+
+  /* --- взрывы --- */
+  for (const e of explosions) {
+    if (!e.active) continue;
+    e.t += dt;
+    const k = e.t / 0.45;
+    if (k >= 1) {
+      e.active = false;
+      e.mesh.visible = false;
+      continue;
+    }
+    e.mesh.scale.setScalar(0.3 + k * 13);
+    e.mesh.material.opacity = 1 - k;
+  }
+
+  /* --- game over --- */
+  if (gameOver) {
+    gameOverTimer -= dt;
+    if (gameOverTimer <= 0) resetGame();
+  }
+
+  /* --- частицы скорости --- */
+  updateSpeedParticles(dt);
+}
+
+/* =========================================================
+   ЧАСТИЦЫ СКОРОСТИ (ощущение движения)
+   ========================================================= */
+const SPARK_COUNT = 90;
+const sparkGeo = new THREE.BufferGeometry();
+const sparkPos = new Float32Array(SPARK_COUNT * 3);
+sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+const sparkMat = new THREE.PointsMaterial({
+  color: 0x88f0ff, size: 0.28, transparent: true, opacity: 0.75,
+  blending: THREE.AdditiveBlending, depthWrite: false
+});
+const sparks = new THREE.Points(sparkGeo, sparkMat);
+sparks.frustumCulled = false;
+scene.add(sparks);
+
+const sparkData = [];
+for (let i = 0; i < SPARK_COUNT; i++) {
+  sparkData.push({
+    z: player.z - Math.random() * 260,
+    u: (Math.random() * 2 - 1) * (ROAD_HALF + 10),
+    y: Math.random() * 18
+  });
+}
+
+function updateSpeedParticles(dt) {
+  const mult = 1 + player.speed * 0.05;
+  for (let i = 0; i < SPARK_COUNT; i++) {
+    const s = sparkData[i];
+    s.z -= player.speed * dt * 2.2;
+
+    if (s.z > player.z + 30 || s.z < player.z - 320) {
+      s.z = player.z - 320 + Math.random() * 40;
+      s.u = (Math.random() * 2 - 1) * (ROAD_HALF + 10);
+      s.y = Math.random() * 18;
+    }
+
+    roadToWorld(s.z, s.u, s.y, _v);
+    sparkPos[i * 3]     = _v.x;
+    sparkPos[i * 3 + 1] = _v.y;
+    sparkPos[i * 3 + 2] = _v.z;
+  }
+  sparkGeo.attributes.position.needsUpdate = true;
+  sparkMat.opacity = 0.35 + Math.min(0.5, player.speed / 300) * mult * 0.4;
+}
+
+/* =========================================================
+   HUD
+   ========================================================= */
+const elScore    = document.getElementById('score');
+const elSpeed    = document.getElementById('speed');
+const elDist     = document.getElementById('dist');
+const elHp       = document.getElementById('hpbar');
+const elNitro    = document.getElementById('nitrobar');
+const elGameOver = document.getElementById('gameover');
+const elOverlay  = document.getElementById('overlay');
+
+let hudAccum = 0;
+
+function updateHUD(dt) {
+  if (renderer.xr.isPresenting) return;
+
+  hudAccum += dt;
+  if (hudAccum < 0.07) return;
+  hudAccum = 0;
+
+  elScore.textContent = (Math.floor(player.distance) + player.kills * 250).toLocaleString('ru-RU');
+  elSpeed.textContent = Math.round(player.speed * 3.6);
+  elDist.textContent  = Math.round(player.distance) + ' М';
+  elHp.style.width    = Math.max(0, player.health) + '%';
+  elNitro.style.width = Math.min(100, (player.speed / NITRO_SPEED) * 100) + '%';
+
+  elGameOver.classList.toggle('show', gameOver);
+}
+
+/* =========================================================
+   СБРОС / СТАРТ
+   ========================================================= */
+function triggerGameOver() {
+  gameOver = true;
+  gameOverTimer = 2.6;
+}
+
+function resetGame() {
+  player.z = 0;
+  player.u = 0;
+  player.speed = 25;
+  player.health = 100;
+  player.distance = 0;
+  player.kills = 0;
+  gameOver = false;
+  shake = 0;
+
+  for (let i = 0; i < segments.length; i++) {
+    segments[i].userData.z = START_Z - i * SEG_LEN;
+    placeSegment(segments[i]);
+  }
+
+  for (const b of bullets) { b.alive = false; b.mesh.visible = false; }
+  for (const o of enemies) { o.alive = false; o.mesh.visible = false; }
+  for (let i = 0; i < enemies.length; i++) {
+    enemies[i].z = player.z - 220 - i * 80 - Math.random() * 60;
+    enemies[i].u = (Math.random() * 2 - 1) * (ROAD_HALF - 2.2);
+    enemies[i].vu = Math.random() < 0.45 ? (Math.random() - 0.5) * 9 : 0;
+    enemies[i].alive = true;
+    enemies[i].mesh.visible = true;
+  }
+
+  elGameOver.classList.remove('show');
+}
+
+/* =========================================================
+   VR UI
+   ========================================================= */
+document.body.appendChild(VRButton.createButton(renderer));
+
+renderer.xr.addEventListener('sessionstart', () => {
+  document.body.classList.add('vr');
+  elOverlay.style.display = 'none';
+  if (!running) { running = true; resetGame(); }
+  clock.getDelta();
+});
+
+renderer.xr.addEventListener('sessionend', () => {
+  document.body.classList.remove('vr');
+  elOverlay.style.display = 'flex';
+  camera.position.set(0, 1.6, 0.2);
+  clock.getDelta();
+});
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  elOverlay.style.display = 'none';
+  running = true;
+  resetGame();
+  clock.getDelta();
+});
+
+/* =========================================================
+   RENDER LOOP
+   ========================================================= */
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  readXRInput();
+
+  if (running) {
+    update(dt);
+    updateHUD(dt);
+  }
+
+  renderer.render(scene, camera);
+});
+
+/* =========================================================
+   RESIZE
+   ========================================================= */
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ---------- Инициализация ---------- */
+resetGame();
+</script>
+</body>
+</html>
