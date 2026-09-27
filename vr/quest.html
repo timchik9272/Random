@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#07090f">
+<title>Храм Изумрудного Пламени — VR квест</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oranienbaum&family=Philosopher:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --gold:#e0b45c; --gold2:#f6dfa2; --ink:#07090f;
+  --panel:rgba(13,16,25,.84); --line:rgba(224,180,92,.42);
+  --emer:#3fe08f;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{position:fixed;inset:0;overflow:hidden;background:var(--ink);
+  font-family:'Philosopher',system-ui,sans-serif;color:#e9e2d0;
+  user-select:none;-webkit-user-select:none;touch-action:none}
+#c{position:absolute;inset:0;display:block}
+
+/* ── HUD ── */
+.hud{position:absolute;inset:0;pointer-events:none;z-index:5}
+.quest{position:absolute;top:calc(10px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);
+  max-width:88vw;text-align:center;background:var(--panel);border:1px solid var(--line);
+  padding:8px 22px 9px;backdrop-filter:blur(3px)}
+.quest::before,.quest::after{content:'✦';position:absolute;top:50%;transform:translateY(-50%);
+  color:var(--gold);font-size:11px;opacity:.9}
+.quest::before{left:7px}.quest::after{right:7px}
+.quest .cap{font-size:9px;letter-spacing:.42em;color:var(--gold);opacity:.9}
+.quest .txt{font-size:15px;line-height:1.25;margin-top:2px}
+.chip{position:absolute;top:calc(12px + env(safe-area-inset-top));left:12px;
+  background:var(--panel);border:1px solid var(--line);padding:6px 10px;
+  font-size:12px;letter-spacing:.08em;color:#cfc6ad}
+.btns{position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;display:flex;gap:8px;pointer-events:auto}
+.btns button{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);
+  background:var(--panel);color:var(--gold2);font-family:inherit;font-size:13px;font-weight:700;
+  letter-spacing:.05em;transition:transform .12s, box-shadow .2s, background .2s}
+.btns button:active{transform:scale(.92)}
+.btns button.on{background:linear-gradient(180deg,#3a2f14,#241d0c);box-shadow:0 0 14px rgba(224,180,92,.5)}
+.inv{position:absolute;left:14px;bottom:calc(16px + env(safe-area-inset-bottom));display:flex;gap:12px}
+.slot{width:22px;height:22px;transform:rotate(45deg);border:1.5px solid var(--line);
+  background:rgba(0,0,0,.35);transition:all .3s}
+.slot.filled{box-shadow:0 0 14px currentColor;border-color:transparent}
+.slot.placed{opacity:.32}
+.inv .lbl{position:absolute;left:0;bottom:-16px;font-size:9px;letter-spacing:.3em;color:#8d8468;white-space:nowrap}
+.label{position:absolute;bottom:calc(64px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
+  font-style:italic;font-size:16px;color:var(--gold2);text-shadow:0 2px 10px #000;
+  opacity:0;transition:opacity .18s;white-space:nowrap}
+.toast{position:absolute;top:22%;left:50%;transform:translateX(-50%) translateY(8px);
+  max-width:84vw;text-align:center;font-size:17px;font-style:italic;color:var(--gold2);
+  text-shadow:0 2px 12px #000,0 0 30px rgba(224,180,92,.3);opacity:0;transition:all .4s}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.hintbar{position:absolute;bottom:calc(16px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
+  font-size:12px;letter-spacing:.06em;color:#9a917a;background:rgba(10,12,18,.6);
+  padding:6px 14px;border:1px solid rgba(224,180,92,.18);transition:opacity .6s}
+.divider{position:absolute;top:0;bottom:0;left:50%;width:2px;z-index:4;display:none;
+  background:linear-gradient(180deg,transparent,rgba(0,0,0,.9) 20%,rgba(0,0,0,.9) 80%,transparent)}
+body.vr .divider{display:block}
+.flash{position:absolute;inset:0;background:radial-gradient(circle,#d8ffe9,#7dffc4 55%,#0c3);
+  opacity:0;pointer-events:none;transition:opacity 1.1s;z-index:8}
+
+/* ── Оверлеи ── */
+.ov{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:24px;text-align:center;overflow:hidden;
+  background:radial-gradient(120% 90% at 50% 12%,#141a2b 0%,#0a0d16 48%,#05060b 100%);
+  transition:opacity .7s,visibility .7s}
+.ov.hide{opacity:0;visibility:hidden;pointer-events:none}
+.rune{position:absolute;font-size:22px;color:var(--gold);opacity:0;animation:runefloat linear infinite;pointer-events:none}
+@keyframes runefloat{0%{transform:translateY(20vh) rotate(0);opacity:0}
+  12%{opacity:.5}80%{opacity:.35}100%{transform:translateY(-110vh) rotate(40deg);opacity:0}}
+.emblem{width:118px;height:118px;margin-bottom:6px;animation:spin 26s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ov .cap{font-size:10px;letter-spacing:.5em;color:var(--gold);margin:14px 0 6px}
+.ov h1{font-family:'Oranienbaum',serif;font-weight:400;font-size:clamp(30px,8vw,52px);
+  letter-spacing:.1em;line-height:1.08;color:var(--gold2);
+  text-shadow:0 0 22px rgba(224,180,92,.35),0 3px 0 rgba(0,0,0,.6)}
+.ov .sub{margin-top:10px;font-style:italic;font-size:15px;color:#b9ae90}
+.how{margin:26px 0 4px;width:min(430px,88vw);text-align:left}
+.how div{display:flex;gap:14px;align-items:center;padding:10px 4px;font-size:14.5px;color:#d8cfb6;
+  border-bottom:1px solid rgba(224,180,92,.16)}
+.how b{font-size:20px;width:30px;text-align:center;flex:none}
+.cta{display:flex;gap:14px;margin-top:26px;flex-wrap:wrap;justify-content:center}
+.cta button{pointer-events:auto;font-family:'Philosopher';font-size:16px;letter-spacing:.14em;
+  padding:14px 30px;border:1px solid var(--gold);cursor:pointer;transition:all .15s;
+  background:linear-gradient(180deg,#e6c069,#b98a34);color:#1b1405;font-weight:700;
+  box-shadow:0 0 22px rgba(224,180,92,.25), inset 0 1px 0 rgba(255,255,255,.5)}
+.cta button.ghost{background:transparent;color:var(--gold2);box-shadow:none}
+.cta button:active{transform:scale(.95)}
+.foot{margin-top:20px;font-size:11.5px;letter-spacing:.08em;color:#7c7460}
+.vstats{margin:18px 0 4px;font-size:16px;color:#d8cfb6;line-height:1.9}
+.vstats b{color:var(--gold2);font-size:20px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="hud" id="hud" style="display:none">
+  <div class="chip" id="chip">⏱ 0:00 · тапов: 0</div>
+  <div class="quest"><div class="cap">ХРАМ ИЗУМРУДНОГО ПЛАМЕНИ</div><div class="txt" id="qtxt">…</div></div>
+  <div class="btns">
+    <button id="bSnd">🔊</button>
+    <button id="bVR">VR</button>
+  </div>
+  <div class="inv" id="inv"><div class="slot"></div><div class="slot"></div><div class="slot"></div>
+    <div class="lbl">КАМНИ ХРАНИТЕЛИ</div></div>
+  <div class="label" id="label"></div>
+  <div class="toast" id="toast"></div>
+  <div class="hintbar" id="hintbar">Наведите центр экрана на предмет и тапните</div>
+</div>
+<div class="divider"></div>
+<div class="flash" id="flash"></div>
+
+<!-- ИНТРО -->
+<div class="ov" id="intro">
+  <svg class="emblem" viewBox="0 0 100 100">
+    <circle cx="50" cy="50" r="46" fill="none" stroke="#e0b45c" stroke-width="1.4" stroke-dasharray="4 7"/>
+    <circle cx="50" cy="50" r="37" fill="none" stroke="#e0b45c" stroke-width=".8" opacity=".6"/>
+    <path d="M50 22 L74 66 L26 66 Z" fill="none" stroke="#f6dfa2" stroke-width="1.6"/>
+    <circle cx="50" cy="52" r="7" fill="#3fe08f" opacity=".9"/>
+    <circle cx="50" cy="52" r="12" fill="none" stroke="#3fe08f" stroke-width=".7" opacity=".5"/>
+  </svg>
+  <div class="cap">VR-КВЕСТ · УПРАВЛЕНИЕ ТАПОМ</div>
+  <h1>ХРАМ<br>ИЗУМРУДНОГО ПЛАМЕНИ</h1>
+  <div class="sub">Три камня. Четыре стража. Одни врата.</div>
+  <div class="how">
+    <div><b>📱</b><span>Поворачивайте телефон, чтобы осмотреться. Предмет ловится центром экрана.</span></div>
+    <div><b>👆</b><span>Тап — единственное действие: взять, открыть, разбить, идти.</span></div>
+    <div><b>🥽</b><span>Кнопка «VR» — стереорежим для очков типа Cardboard.</span></div>
+  </div>
+  <div class="cta">
+    <button id="bPlay">▶&nbsp; ИГРАТЬ</button>
+    <button id="bVRgo" class="ghost">🥽 СРАЗУ В VR</button>
+  </div>
+  <div class="foot">Играйте в наушниках · звук включится после первого тапа</div>
+</div>
+
+<!-- ПОБЕДА -->
+<div class="ov hide" id="win">
+  <svg class="emblem" viewBox="0 0 100 100">
+    <circle cx="50" cy="50" r="46" fill="none" stroke="#3fe08f" stroke-width="1.4" stroke-dasharray="4 7"/>
+    <circle cx="50" cy="52" r="18" fill="#3fe08f" opacity=".25"/>
+    <path d="M50 20 L50 84 M28 52 L72 52" stroke="#f6dfa2" stroke-width="2"/>
+  </svg>
+  <div class="cap">ИСПЫТАНИЕ ЗАВЕРШЕНО</div>
+  <h1>ВРАТА ПРОЙДЕНЫ</h1>
+  <div class="sub">Изумрудное Пламя теперь с вами</div>
+  <div class="vstats">Время: <b id="vTime">0:00</b><br>Тапов: <b id="vTaps">0</b></div>
+  <div class="cta"><button onclick="location.reload()">↻&nbsp; ЗАНОВО</button></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+/* ═══════════════ БАЗА ═══════════════ */
+const $=id=>document.getElementById(id);
+const R=Math.random, PI=Math.PI;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const ease=t=>t*t*(3-2*t);
+let W=innerWidth,H=innerHeight;
+
+const renderer=new THREE.WebGLRenderer({canvas:$('c'),antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));
+renderer.setSize(W,H);
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.15;
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x07090f);
+scene.fog=new THREE.FogExp2(0x07090f,.028);
+
+/* игрок → голова → камеры */
+const player=new THREE.Group(); scene.add(player); player.position.set(0,0,3.4);
+const head=new THREE.Group(); head.position.y=1.6; player.add(head);
+function mkCam(){const c=new THREE.PerspectiveCamera(72,W/H,.1,60);head.add(c);return c;}
+const camMono=mkCam(), camL=mkCam(), camR=mkCam();
+camL.position.x=-.032; camR.position.x=.032;
+
+scene.add(new THREE.HemisphereLight(0x33405e,0x241a10,.5));
+
+/* ═══════════════ ТЕКСТУРЫ (процедурные) ═══════════════ */
+function canvasTex(w,h,draw,repX,repY){
+  const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+  draw(cv.getContext('2d'),w,h);
+  const t=new THREE.CanvasTexture(cv);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  if(repX)t.repeat.set(repX,repY||repX);
+  t.encoding=THREE.sRGBEncoding;
+  t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+  return t;
+}
+const texFloor=canvasTex(512,512,(g,w,h)=>{
+  g.fillStyle='#242019';g.fillRect(0,0,w,h);
+  const n=4,s=w/n;
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++){
+    const v=28+R()*16;
+    g.fillStyle=`rgb(${v+8},${v+4},${v-4})`;
+    g.fillRect(i*s+3,j*s+3,s-6,s-6);
+    g.fillStyle='rgba(0,0,0,.18)';
+    for(let k=0;k<26;k++)g.fillRect(i*s+R()*s,j*s+R()*s,2,2);
+  }
+  g.strokeStyle='#100e0b';g.lineWidth=6;
+  for(let i=0;i<=n;i++){g.beginPath();g.moveTo(i*s,0);g.lineTo(i*s,h);g.stroke();
+    g.beginPath();g.moveTo(0,i*s);g.lineTo(w,i*s);g.stroke();}
+},6,6);
+const texWall=canvasTex(512,512,(g,w,h)=>{
+  g.fillStyle='#403a31';g.fillRect(0,0,w,h);
+  const bw=128,bh=64;
+  for(let y=0;y<h;y+=bh){
+    const off=((y/bh)%2)*bw/2;
+    for(let x=-bw;x<w+bw;x+=bw){
+      const v=52+R()*22;
+      g.fillStyle=`rgb(${v+6},${v},${v-10})`;
+      g.fillRect(x+off+3,y+3,bw-6,bh-6);
+    }}
+  g.fillStyle='rgba(0,0,0,.25)';
+  for(let k=0;k<400;k++)g.fillRect(R()*w,R()*h,3,2);
+},3,2);
+const texWood=canvasTex(256,256,(g,w,h)=>{
+  g.fillStyle='#5a3c20';g.fillRect(0,0,w,h);
+  for(let y=0;y<h;y+=3){g.fillStyle=`rgba(${30+R()*40},${18+R()*22},8,${.12+R()*.2})`;g.fillRect(0,y,w,2);}
+  g.strokeStyle='rgba(20,10,4,.6)';g.lineWidth=3;
+  for(let x=0;x<w;x+=64){g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke();}
+},1,1);
+const texBanner=canvasTex(256,512,(g,w,h)=>{
+  g.fillStyle='#4c1420';g.fillRect(0,0,w,h);
+  g.strokeStyle='#c9a24b';g.lineWidth=8;g.strokeRect(10,10,w-20,h-20);
+  g.strokeStyle='#e8c877';g.lineWidth=4;
+  for(let i=0;i<6;i++){
+    const x=40+R()*(w-80),y=60+i*66;
+    g.beginPath();g.moveTo(x,y);g.lineTo(x+30+R()*30,y+14+R()*22);
+    g.lineTo(x-10+R()*40,y+34+R()*18);g.stroke();
+  }
+});
+const texMosaic=canvasTex(512,512,(g,w,h)=>{
+  g.fillStyle='#0d1a14';g.fillRect(0,0,w,h);
+  const c=w/2;
+  g.strokeStyle='#c9a24b';
+  [.46,.38,.27,.16].forEach((r,i)=>{g.lineWidth=i===0?8:3;
+    g.beginPath();g.arc(c,c,r*w,0,PI*2);g.stroke();});
+  g.lineWidth=3;
+  for(let i=0;i<12;i++){const a=i/12*PI*2;
+    g.beginPath();g.moveTo(c+Math.cos(a)*.16*w,c+Math.sin(a)*.16*w);
+    g.lineTo(c+Math.cos(a)*.27*w,c+Math.sin(a)*.27*w);g.stroke();}
+  g.fillStyle='#3fe08f';g.beginPath();g.arc(c,c,.07*w,0,PI*2);g.fill();
+});
+const texGlow=(()=>{const cv=document.createElement('canvas');cv.width=cv.height=128;
+  const g=cv.getContext('2d'),gr=g.createRadialGradient(64,64,0,64,64,64);
+  gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.35,'rgba(255,255,255,.55)');
+  gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,128,128);
+  return new THREE.CanvasTexture(cv);})();
+const texPage=canvasTex(128,128,(g,w,h)=>{
+  g.fillStyle='#e6d9b8';g.fillRect(0,0,w,h);
+  g.fillStyle='rgba(60,40,20,.7)';
+  for(let y=14;y<h-10;y+=11)g.fillRect(12,y,w-24-R()*30,2.5);
+});
+
+/* ═══════════════ МАТЕРИАЛЫ ═══════════════ */
+const M={
+  floor:new THREE.MeshStandardMaterial({map:texFloor,roughness:.92}),
+  wall:new THREE.MeshStandardMaterial({map:texWall,roughness:.95}),
+  dark:new THREE.MeshStandardMaterial({color:0x17130e,roughness:1}),
+  wood:new THREE.MeshStandardMaterial({map:texWood,roughness:.85}),
+  woodD:new THREE.MeshStandardMaterial({map:texWood,color:0x8a6a48,roughness:.9}),
+  gold:new THREE.MeshStandardMaterial({color:0xd8ab4a,metalness:.85,roughness:.32,emissive:0x3a2708,emissiveIntensity:.3}),
+  bronze:new THREE.MeshStandardMaterial({color:0x8a5a2c,metalness:.7,roughness:.5}),
+  stoneD:new THREE.MeshStandardMaterial({color:0x57504a,roughness:.95}),
+  clay:new THREE.MeshStandardMaterial({color:0xa8683e,roughness:.9}),
+  bone:new THREE.MeshStandardMaterial({color:0xd9cdb2,roughness:.7}),
+};
+
+/* ═══════════════ УТИЛИТЫ СЦЕНЫ ═══════════════ */
+const interactives=[];
+function box(w,h,d,mat,x,y,z,parent){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+  m.position.set(x,y,z);(parent||scene).add(m);return m;}
+function cyl(rt,rb,h,mat,x,y,z,parent,seg=14){const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg),mat);
+  m.position.set(x,y,z);(parent||scene).add(m);return m;}
+function glow(color,scale,x,y,z,parent){const s=new THREE.Sprite(new THREE.SpriteMaterial({
+  map:texGlow,color,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
+  s.scale.set(scale,scale,1);s.position.set(x,y,z);s.raycast=()=>{};(parent||scene).add(s);return s;}
+function hitProxy(geo,parent,handler,label){const m=new THREE.Mesh(geo,
+  new THREE.MeshBasicMaterial({visible:false}));
+  m.userData.onTap=handler;m.userData.label=label;parent.add(m);interactives.push(m);return m;}
+
+/* ═══════════════ КОМНАТА ═══════════════ */
+(function buildRoom(){
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(14.6,14.6),M.floor);
+  floor.rotation.x=-PI/2;floor.position.z=-1;scene.add(floor);
+  const mosaic=new THREE.Mesh(new THREE.CircleGeometry(2.7,48),
+    new THREE.MeshStandardMaterial({map:texMosaic,roughness:.85,emissive:0x0a2a1a,emissiveIntensity:.6}));
+  mosaic.rotation.x=-PI/2;mosaic.position.set(0,.012,-5.2);scene.add(mosaic);
+  const ceil=new THREE.Mesh(new THREE.PlaneGeometry(14.6,14.6),M.dark);
+  ceil.rotation.x=PI/2;ceil.position.set(0,6,-1);scene.add(ceil);
+  box(14.8,6,.4,M.wall,0,3,6.2);                       // юг
+  box(.4,6,14.8,M.wall,7.2,3,-1); box(.4,6,14.8,M.wall,-7.2,3,-1); // восток/запад
+  box(5.3,6,.4,M.wall,-4.55,3,-8.2); box(5.3,6,.4,M.wall,4.55,3,-8.2); // север (проём врат)
+  box(4.2,2.6,.4,M.wall,0,4.7,-8.2);
+  const arch=new THREE.Mesh(new THREE.TorusGeometry(2.05,.2,10,26,PI),M.gold);
+  arch.position.set(0,3.35,-8.05);scene.add(arch);
+  // пилястры
+  const pz=[-6,-3,0,3];
+  pz.forEach(z=>{box(.5,6,.34,M.stoneD,6.95,3,z);box(.5,6,.34,M.stoneD,-6.95,3,z);});
+  [-5,0,5].forEach(x=>box(.5,6,.34,M.stoneD,x,3,5.95));
+  box(.6,6,.6,M.stoneD,-1.9,3,-7.95);box(.6,6,.6,M.stoneD,1.9,3,-7.95);
+  // балки потолка
+  [-6,-3,0,3].forEach(z=>box(14.4,.32,.42,M.woodD,0,5.72,z));
+  box(.42,.32,13,M.woodD,-4,5.5,-1);box(.42,.32,13,M.woodD,4,5.5,-1);
+  // знамёна
+  function banner(x,y,z,ry){const b=new THREE.Mesh(new THREE.PlaneGeometry(1.15,3),
+    new THREE.MeshStandardMaterial({map:texBanner,roughness:.9,side:THREE.DoubleSide}));
+    b.position.set(x,y,z);b.rotation.y=ry;scene.add(b);
+    cyl(.03,.03,1.3,M.gold,x,3.55,z,scene,8);return b;}
+  banner(-2.6,3.6,5.93,PI);banner(2.6,3.6,5.93,PI);banner(-6.93,3.6,.9,PI/2);
+  // световой столб над алтарём
+  const shaft=new THREE.Mesh(new THREE.ConeGeometry(1.7,4.4,24,1,true),
+    new THREE.MeshBasicMaterial({color:0x54ffb0,transparent:true,opacity:.05,
+      blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+  shaft.position.set(0,3.9,-5.2);scene.add(shaft);
+})();
+
+/* ═══════════════ АЛТАРЬ ═══════════════ */
+const sockets=[];
+const altar=(function(){
+  const g=new THREE.Group();g.position.set(0,0,-5.2);scene.add(g);
+  box(2.6,.5,1.6,M.stoneD,0,.25,0,g);
+  box(2.1,.45,1.25,M.stoneD,0,.72,0,g);
+  box(2.4,.14,1.45,new THREE.MeshStandardMaterial({color:0x1c2b22,roughness:.4,metalness:.2}),0,1.0,0,g);
+  box(2.62,.06,1.62,M.gold,0,.5,0,g);
+  [-0.55,0,0.55].forEach(x=>{
+    cyl(.14,.1,.09,M.bronze,x,1.08,0,g);
+    const rim=new THREE.Mesh(new THREE.TorusGeometry(.145,.022,8,22),M.gold);
+    rim.rotation.x=PI/2;rim.position.set(x,1.12,0);g.add(rim);
+    sockets.push({pos:new THREE.Vector3(x,1.16,0),rim,lit:false});
+  });
+  hitProxy(new THREE.BoxGeometry(2.7,1.6,1.8).translate(0,.8,0),g,onAltarTap,'Возложить камень');
+  const l=new THREE.PointLight(0x3fe08f,.7,7,2);l.position.set(0,2.2,0);g.add(l);
+  return g;
+})();
+
+/* ═══════════════ ГЕМЫ ═══════════════ */
+const GEM={em:{c:0x3fe08f,n:'Изумрудный'},rb:{c:0xff5468,n:'Рубиновый'},sp:{c:0x5aa7ff,n:'Сапфировый'}};
+function makeGem(key){
+  const g=new THREE.Group();
+  const core=new THREE.Mesh(new THREE.OctahedronGeometry(.13,0),
+    new THREE.MeshStandardMaterial({color:GEM[key].c,emissive:GEM[key].c,
+      emissiveIntensity:.9,metalness:.3,roughness:.25,transparent:true}));
+  g.add(core);glow(GEM[key].c,.8,0,0,0,g);
+  g.userData={kind:'gem',key,core};
+  g.userData.onTap=o=>collectGem(g);
+  g.userData.label='Взять камень';
+  interactives.push(g);
+  return g;
+}
+const gemShelf=makeGem('em');gemShelf.position.set(6.45,3.0,-1.2);scene.add(gemShelf);
+const floaters=[gemShelf];
+
+/* ═══════════════ ПОЛКИ И КНИГИ ═══════════════ */
+(function shelves(){
+  const bookCols=[0x7c3b3b,0x3f6b4f,0x33507d,0x8a6d3b,0x5d3f6e,0xa0522d,0x445a5e,0x716030];
+  function shelf(x,z){
+    const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=-PI/2;scene.add(g);
+    box(.09,2.7,.38,M.wood,-.92,1.35,0,g);box(.09,2.7,.38,M.wood,.92,1.35,0,g);
+    box(1.9,.09,.4,M.wood,0,2.72,0,g);box(1.9,.12,.42,M.wood,0,.09,0,g);
+    [.55,1.15,1.75,2.35].forEach(y=>box(1.8,.05,.36,M.wood,0,y,0,g));
+    const inst=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),
+      new THREE.MeshStandardMaterial({roughness:.85}),76);
+    const d=new THREE.Object3D(),col=new THREE.Color();let i=0;
+    [.585,1.185,1.785,2.385].forEach(y=>{
+      for(let bx=-.74;bx<=.74&&i<76;bx+=.068){
+        if(R()<.14)continue;
+        const h=.2+R()*.11, lean=R()<.08?.14:0;
+        d.position.set(bx,y+h/2,(R()-.5)*.05);
+        d.rotation.set(0,(R()-.5)*.06,lean);
+        d.scale.set(.055,h,.2);d.updateMatrix();
+        inst.setMatrixAt(i,d.matrix);
+        col.setHex(bookCols[(R()*bookCols.length)|0]).multiplyScalar(.8+R()*.4);
+        inst.setColorAt(i,col);i++;
+      }});
+    inst.count=i;inst.instanceMatrix.needsUpdate=true;
+    if(inst.instanceColor)inst.instanceColor.needsUpdate=true;
+    g.add(inst);
+    hitProxy(new THREE.BoxGeometry(1.9,2.8,.5).translate(0,1.4,0),g,
+      ()=>flavor('Полки древней библиотеки. Сотни истёртых томов.'),'Осмотреть полки');
+    return g;
+  }
+  shelf(6.72,-1.2);shelf(6.72,1.8);
+})();
+
+/* ═══════════════ СТОЛ С ПРЕДМЕТАМИ ═══════════════ */
+(function table(){
+  const g=new THREE.Group();g.position.set(-3.3,0,1.8);g.rotation.y=.4;scene.add(g);
+  box(1.6,.09,.85,M.wood,0,.78,0,g);
+  [[-.7,-.34],[.7,-.34],[-.7,.34],[.7,.34]].forEach(p=>box(.09,.78,.09,M.woodD,p[0],.39,p[1],g));
+  // раскрытая книга
+  const bg=new THREE.Group();bg.position.set(-.35,.845,.1);bg.rotation.y=-.5;g.add(bg);
+  const p1=box(.3,.025,.42,new THREE.MeshStandardMaterial({map:texPage,roughness:.9}),-.145,.01,0,bg);
+  const p2=p1.clone();p1.rotation.z=.09;p2.rotation.z=-.09;p2.position.x=.145;
+  hitProxy(new THREE.BoxGeometry(.7,.25,.55),bg,
+    ()=>flavor(loreBooks[(loreI++)%loreBooks.length]),'Прочесть книгу');
+  // свеча
+  cyl(.026,.03,.14,M.bone,.5,.9,-.2,g);
+  const cf=glow(0xffc46b,.3,.5,1.02,-.2,g);flames.push({s:cf,base:.3,ph:R()*9,noLight:true});
+  const cl=new THREE.PointLight(0xffc46b,.55,4,2);cl.position.set(.5,1.05,-.2);g.add(cl);candleLight=cl;
+  // зелья
+  function potion(x,z,c){const p=new THREE.Group();p.position.set(x,.825,z);g.add(p);
+    const body=new THREE.Mesh(new THREE.SphereGeometry(.07,12,10),
+      new THREE.MeshPhongMaterial({color:c,transparent:true,opacity:.78,shininess:90}));
+    body.position.y=.07;p.add(body);
+    cyl(.022,.022,.07,new THREE.MeshPhongMaterial({color:c,transparent:true,opacity:.7}),0,.15,0,p);
+    cyl(.028,.028,.03,M.woodD,0,.19,0,p,8);
+    hitProxy(new THREE.SphereGeometry(.14),p,()=>flavor('Пузырёк тихо булькает… и светится изнутри.'),'Зелье');}
+  potion(.12,-.22,0x54ffb0);potion(.3,.05,0xb06cff);
+  // череп
+  const sk=new THREE.Group();sk.position.set(-.55,.85,-.22);sk.rotation.y=.7;g.add(sk);
+  const cr=new THREE.Mesh(new THREE.SphereGeometry(.14,14,12),M.bone);
+  cr.scale.set(1,.92,1.05);cr.position.y=.1;sk.add(cr);
+  box(.12,.06,.1,M.bone,0,.0,.1,sk);
+  [-.05,.05].forEach(x=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.028,8,8),M.dark);
+    e.position.set(x,.11,.12);sk.add(e);});
+  hitProxy(new THREE.SphereGeometry(.22),sk,()=>flavor('Череп смотрит пустыми глазницами. Ему тут одиноко.'),'Череп');
+  // свиток и монеты
+  const sc=cyl(.03,.03,.34,new THREE.MeshStandardMaterial({color:0xd9c8a0,roughness:.8}),.35,.855,.28,g,10);
+  sc.rotation.z=PI/2;sc.rotation.y=.6;
+  [[.05,.3],[-.02,.36],[.12,.38]].forEach(p=>cyl(.035,.035,.012,M.gold,p[0],.832,p[1],g,14));
+})();
+let candleLight=null;
+const loreBooks=['«…пламя не гаснет, пока помнят его имя…»',
+  '«Стражи отвечают лишь тем, кто повторит их песнь света»',
+  '«Камень найдёт дорогу к чаше сам — стоит коснуться алтаря»',
+  'Страницы истёрты. Различимо лишь: «…не разбивай напрасно…»'];
+let loreI=0;
+
+/* ═══════════════ СУНДУК ═══════════════ */
+const chest={opened:false,spawned:false};
+(function(){
+  const g=new THREE.Group();g.position.set(-5.6,0,-2.4);g.rotation.y=.5;scene.add(g);
+  box(.9,.52,.6,M.wood,0,.26,0,g);
+  box(.94,.07,.64,M.gold,0,.5,0,g);
+  [[-.44],[.44]].forEach(p=>box(.05,.54,.64,M.woodD,p[0],.27,0,g));
+  const pivot=new THREE.Group();pivot.position.set(0,.53,-.3);g.add(pivot);
+  box(.9,.14,.6,M.wood,0,.07,.3,pivot);
+  box(.94,.04,.62,M.gold,0,.14,.3,pivot);
+  box(.1,.12,.05,M.gold,0,-.02,.58,g);
+  chest.pivot=pivot;
+  hitProxy(new THREE.BoxGeometry(1.1,.9,.85).translate(0,.45,0),g,onChestTap,'Открыть сундук');
+})();
+
+/* ═══════════════ АМФОРЫ ═══════════════ */
+const amphoraPts=[];
+[[.001,0],[.18,.02],[.27,.2],[.3,.5],[.22,.82],[.12,.95],[.15,1.06],[.2,1.12]]
+  .forEach(p=>amphoraPts.push(new THREE.Vector2(p[0],p[1])));
+let amphoraKey;
+(function(){
+  const geo=new THREE.LatheGeometry(amphoraPts,18);
+  [[-6.15,.55,true],[-6.4,1.5,false],[-5.8,2.1,false]].forEach((cfg,i)=>{
+    const m=new THREE.Mesh(geo,M.clay);
+    m.position.set(cfg[0],0,cfg[1]);m.rotation.y=R()*PI;scene.add(m);
+    if(cfg[2]){
+      amphoraKey=m;
+      m.userData.onTap=onAmphoraTap;m.userData.label='Разбить амфору';
+      interactives.push(m);
+      const sg=glow(0x5aa7ff,.5,0,.55,0);m.add(sg);sg.raycast=()=>{};
+      pulses.push({s:sg,base:.5,sp:2.2,ph:0});
+    } else {
+      m.userData.onTap=()=>flavor('Пустая амфора. Пахнет пылью и древним маслом.');
+      m.userData.label='Осмотреть амфору';interactives.push(m);
+    }
+  });
+})();
+
+/* ═══════════════ ЯЩИКИ, БОЧКИ ═══════════════ */
+(function clutter(){
+  function crate(x,y,z,s,ry){const c=box(s,s,s,M.wood,x,y,z);c.rotation.y=ry;
+    box(s*1.02,s*.12,s*1.02,M.woodD,x,y,z).rotation.y=ry;}
+  crate(4.6,.36,3.4,.72,.2);crate(4.55,1.08,3.35,.72,-.15);crate(5.35,.29,3.0,.58,.7);
+  function barrel(x,z){const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
+    cyl(.33,.3,.92,M.woodD,0,.46,0,g,16);
+    [.16,.46,.76].forEach(y=>{const t=new THREE.Mesh(new THREE.TorusGeometry(.335,.02,6,20),M.bronze);
+      t.rotation.x=PI/2;t.position.y=y;g.add(t);});
+    hitProxy(new THREE.CylinderGeometry(.4,.4,1),g,()=>flavor('Бочка пуста. Кто-то выпил всё ещё до вас.'),'Осмотреть бочку');}
+  barrel(5.9,4.5);barrel(5.15,5.1);
+  // кувшин на ящике
+  const j=new THREE.Mesh(new THREE.LatheGeometry(amphoraPts.map(p=>new THREE.Vector2(p.x*.5,p.y*.5)),14),M.clay);
+  j.position.set(4.55,1.44,3.35);scene.add(j);
+})();
+
+/* ═══════════════ ФАКЕЛЫ ═══════════════ */
+const torches=[],flames=[],pulses=[];
+function makeTorch(x,z,isPuzzle){
+  const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
+  cyl(.07,.1,1.5,M.stoneD,0,.75,0,g);
+  cyl(.09,.07,.1,M.bronze,0,1.5,0,g,10);
+  cyl(.17,.09,.16,M.bronze,0,1.6,0,g);
+  const fl=glow(0xffa64d,.55,0,1.82,0,g);
+  flames.push({s:fl,base:.55,ph:R()*9});
+  const t={g,flame:fl,flare:0,red:0,light:null};
+  if(isPuzzle){
+    t.light=new THREE.PointLight(0xff9a3c,1.15,9,2);t.light.position.set(0,1.9,0);g.add(t.light);
+    hitProxy(new THREE.CylinderGeometry(.45,.45,2.2).translate(0,1.1,0),g,
+      ()=>onTorchTap(torches.indexOf(t)),'Факел стража');
+  }
+  torches.push(t);return t;
+}
+makeTorch(-3.2,-6.5,true);makeTorch(3.2,-6.5,true);
+makeTorch(-5.5,-2.7,true);makeTorch(5.5,-2.7,true);
+makeTorch(-6.6,3.8,false);makeTorch(6.6,3.8,false);
+
+/* ═══════════════ ВРАТА И ПОРТАЛ ═══════════════ */
+const doorL=box(1.94,3.4,.26,M.stoneD,-.97,1.7,-8.05);
+const doorR=box(1.94,3.4,.26,M.stoneD,.97,1.7,-8.05);
+box(.06,3.3,.3,M.gold,-.12,1.7,-8.0);box(.06,3.3,.3,M.gold,.12,1.7,-8.0);
+box(10,7,.4,M.dark,0,3,-11.2);
+const portal=new THREE.Group();portal.position.set(0,1.7,-9.7);portal.visible=false;scene.add(portal);
+(function(){
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.3,.13,12,40),M.gold);portal.add(ring);
+  const disc=new THREE.Mesh(new THREE.CircleGeometry(1.24,40),
+    new THREE.MeshBasicMaterial({color:0x54ffb0,transparent:true,opacity:.5,
+      blending:THREE.AdditiveBlending,side:THREE.DoubleSide}));
+  portal.add(disc);portal.userData.disc=disc;
+  glow(0x7dffc4,4.4,0,0,-.1,portal);
+  const N=46,pos=new Float32Array(N*3);
+  for(let i=0;i<N;i++){const a=i/N*PI*2,r=1.05+R()*.35;
+    pos[i*3]=Math.cos(a)*r;pos[i*3+1]=Math.sin(a)*r;pos[i*3+2]=(R()-.5)*.4;}
+  const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const pts=new THREE.Points(pg,new THREE.PointsMaterial({color:0xa8ffd8,size:.07,map:texGlow,
+    transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
+  portal.add(pts);portal.userData.pts=pts;
+  const pl=new THREE.PointLight(0x54ffb0,0,10,2);pl.position.z=.6;portal.add(pl);portal.userData.light=pl;
+  hitProxy(new THREE.CylinderGeometry(1.4,1.4,3).rotateX(PI/2),portal,()=>{ if(S.phase==='gate')winPortal(); },'Войти в портал');
+})();
+
+/* ═══════════════ ТОЧКИ ПЕРЕМЕЩЕНИЯ ═══════════════ */
+const nodes=[new THREE.Vector3(0,0,3.4),new THREE.Vector3(0,0,.6),new THREE.Vector3(0,0,-2.4),
+  new THREE.Vector3(-4.2,0,-.4),new THREE.Vector3(4.3,0,1.7)];
+const markers=[];
+nodes.forEach((n,i)=>{ if(i===0)return; markers.push(makeMarker(n)); });
+function makeMarker(n){
+  const g=new THREE.Group();g.position.copy(n);scene.add(g);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.34,.46,36),
+    new THREE.MeshBasicMaterial({color:0xe0b45c,transparent:true,opacity:.5,side:THREE.DoubleSide}));
+  ring.rotation.x=-PI/2;ring.position.y=.02;g.add(ring);
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.3,.42,1.3,20,1,true),
+    new THREE.MeshBasicMaterial({color:0xe0b45c,transparent:true,opacity:.06,
+      blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+  beam.position.y=.65;g.add(beam);
+  const hit=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.9),
+    new THREE.MeshBasicMaterial({visible:false}));
+  hit.position.y=.4;hit.userData.onTap=()=>goTo(n);hit.userData.label='Идти сюда';
+  g.add(hit);interactives.push(hit);
+  const m={g,ring,n};pulses.push({marker:m});markers.push(m);return m;
+}
+
+/* ═══════════════ ПЫЛЬ ═══════════════ */
+let dust;
+(function(){
+  const N=240,pos=new Float32Array(N*3),base=[];
+  for(let i=0;i<N;i++){const x=(R()-.5)*13,z=-7.5+R()*13,y=R()*5.5;
+    pos[i*3]=x;pos[i*3+1]=y;pos[i*3+2]=z;base.push({x,z,y,sp:.08+R()*.2,ph:R()*9});}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  dust=new THREE.Points(g,new THREE.PointsMaterial({color:0xcfae6a,size:.045,map:texGlow,
+    transparent:true,opacity:.4,blending:THREE.AdditiveBlending,depthWrite:false}));
+  dust.userData.base=base;scene.add(dust);
+})();
+
+/* ═══════════════ ПРИЦЕЛ (в сцене — виден в обоих глазахх VR) ═══════════════ */
+const reticle=new THREE.Group();reticle.position.z=-1.8;head.add(reticle);
+const retRing=new THREE.Mesh(new THREE.RingGeometry(.014,.022,28),
+  new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.85,depthTest:false}));
+retRing.renderOrder=999;reticle.add(retRing);
+const retDot=new THREE.Mesh(new THREE.CircleGeometry(.004,10),retRing.material);
+retDot.renderOrder=999;reticle.add(retDot);
+
+/* ═══════════════ ЗВУК ═══════════════ */
+let AC=null,master=null,muted=false;
+function ensureAudio(){
+  if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();
+    master=AC.createGain();master.gain.value=.4;master.connect(AC.destination);}catch(e){}}
+  if(AC&&AC.state==='suspended')AC.resume();
+}
+function tone(f,dur,type='sine',vol=.5,delay=0,slide=0){
+  if(!AC||muted)return;const t=AC.currentTime+delay;
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.type=type;o.frequency.setValueAtTime(f,t);
+  if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,f+slide),t+dur);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.02);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g);g.connect(master);o.start(t);o.stop(t+dur+.1);
+}
+function noise(dur,vol=.3,delay=0,fc=700){
+  if(!AC||muted)return;const t=AC.currentTime+delay;
+  const len=AC.sampleRate*dur,buf=AC.createBuffer(1,len,AC.sampleRate),d=buf.getChannelData(0);
+  for(let i=0;i<len;i++)d[i]=(R()*2-1)*(1-i/len);
+  const src=AC.createBufferSource();src.buffer=buf;
+  const f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=fc;
+  const g=AC.createGain();g.gain.value=vol;
+  src.connect(f);f.connect(g);g.connect(master);src.start(t);
+}
+const sClick=()=>tone(640,.06,'square',.14);
+const sGem=()=>{tone(880,.14,'sine',.4);tone(1320,.2,'sine',.3,.09);};
+const sPlace=()=>{tone(392,.4,'triangle',.5);tone(523,.5,'sine',.3,.12);};
+const sFlash=i=>tone(300+i*110,.35,'triangle',.45);
+const sError=()=>{tone(160,.5,'sawtooth',.3,0,-90);noise(.3,.15,0,300);};
+const sDoor=()=>{noise(2.4,.5,0,180);tone(55,2.4,'sine',.5,0,-15);};
+const sCreak=()=>tone(170,.4,'sawtooth',.2,0,-80);
+const sBreak=()=>{noise(.4,.5,0,1400);tone(220,.2,'square',.15,0,-120);};
+const sWhoosh=()=>noise(.5,.2,0,500);
+const sWin=()=>[523,659,784,1046,1318].forEach((f,i)=>tone(f,.7,'sine',.35,i*.14));
+
+/* ═══════════════ СОСТОЯНИЕ ═══════════════ */
+const S={started:false,phase:'find',inv:[],placed:0,taps:0,t0:0,win:false,hints:[false,false,false]};
+let moveTarget=null,shake=0,doorT=-1,portalAnim=-1,hintT=0;
+const flyGems=[],shards=[],collectAnim=[];
+const loreQ=[];let toastTimer=null;
+
+function toast(txt,ms=2800){
+  const t=$('toast');t.textContent=txt;t.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),ms);
+}
+function flavor(txt){toast(txt,2400);sClick();}
+function setQuest(key){
+  const Q={find:'Найдите три Камня Хранителя, скрытые в храме',
+    carry:'Камни у вас — возложите их на чаши алтаря',
+    show:'Стражи зажигают факелы. Запомните порядок',
+    input:'Повторите последовательность вспышек',
+    gate:'Врата открыты. Войдите в портал'};
+  $('qtxt').textContent=Q[key];
+}
+function updateInvHUD(){
+  const slots=document.querySelectorAll('.slot');
+  slots.forEach((s,i)=>{s.className='slot';s.style.background='';s.style.color='';});
+  S.inv.forEach((k,i)=>{const s=slots[i];s.classList.add('filled');
+    const c='#'+GEM[k].c.toString(16).padStart(6,'0');
+    s.style.background=c;s.style.color=c;});
+  for(let i=S.inv.length;i<S.inv.length+S.placed&&i<3;i++)slots[i].classList.add('placed');
+}
+
+/* ═══════════════ ДЕЙСТВИЯ ═══════════════ */
+function collectGem(g){
+  const key=g.userData.key;
+  interactives.splice(interactives.indexOf(g),1);
+  const i=floaters.indexOf(g);if(i>=0)floaters.splice(i,1);
+  collectAnim.push({g,t:0});
+  S.inv.push(key);S.taps++;sGem();updateInvHUD();
+  toast(`${GEM[key].n} камень найден (${S.inv.length+S.placed}/3)`);
+  if(S.inv.length+S.placed===3&&S.phase==='find'){S.phase='carry';setQuest('carry');}
+}
+function onChestTap(){
+  S.taps++;
+  if(!chest.opened){
+    chest.opened=true;sCreak();
+    const anim={t:0};chestAnims.push(anim);
+    setTimeout(()=>{ if(!chest.spawned){chest.spawned=true;
+      const g=makeGem('rb');g.position.set(-5.35,.78,-2.15);scene.add(g);floaters.push(g);
+      glow(0xff5468,.6,-5.35,.85,-2.15);} },650);
+    toast('Сундук со скрипом открылся…');
+  } else flavor(chest.spawned?'В сундуке больше ничего нет.':'Сундук пуст.');
+}
+const chestAnims=[];
+function onAmphoraTap(){
+  if(!amphoraKey)return;
+  S.taps++;sBreak();shake=.25;
+  for(let i=0;i<11;i++){
+    const m=new THREE.Mesh(new THREE.TetrahedronGeometry(.06+R()*.07),M.clay);
+    m.position.set(amphoraKey.position.x+(R()-.5)*.2,.3+R()*.7,amphoraKey.position.z+(R()-.5)*.2);
+    scene.add(m);
+    shards.push({m,v:new THREE.Vector3((R()-.5)*2.4,1.5+R()*2,(R()-.5)*2.4),
+      rv:new THREE.Vector3(R()*8,R()*8,R()*8),life:1.4});
+  }
+  scene.remove(amphoraKey);amphoraKey=null;
+  const g=makeGem('sp');g.position.set(-6.15,.13,.55);scene.add(g);floaters.push(g);
+  toast('Амфора разбилась — внутри камень!');
+}
+function onAltarTap(){
+  S.taps++;
+  if(S.phase==='gate'||S.phase==='win')return;
+  if(S.inv.length===0){
+    flavor(S.placed<3?'Чаши пусты. Сначала найдите камни.':'Алтарь пробуждён. Стражи ждут.');
+    return;
+  }
+  const key=S.inv.shift();
+  const g=makeGem(key);
+  interactives.splice(interactives.indexOf(g),1);g.userData.onTap=null;
+  const wp=new THREE.Vector3();altar.getWorldPosition(wp);
+  g.position.set(wp.x,1.9,wp.z+1.1);scene.add(g);
+  const sock=sockets[S.placed];
+  flyGems.push({g,target:sock,done:false});
+  updateInvHUD();tone(660,.15,'sine',.25);
+}
+function flavor_dummy(){}
+
+/* ── ритуал факелов ── */
+const puzzle={phase:'off',seq:[],idx:0,round:0};
+function makeSeq(n){const s=[];let last=-1;
+  for(let i=0;i<n;i++){let v;do{v=(R()*4)|0}while(v===last);s.push(v);last=v;}return s;}
+function beginRitual(){
+  puzzle.round=1;puzzle.seq=makeSeq(3);
+  toast('Алтарь вспыхнул! Стражи зажигают факелы…',3200);
+  setTimeout(playSequence,1400);
+}
+function playSequence(){
+  puzzle.phase='show';puzzle.idx=0;setQuest('show');
+  puzzle.seq.forEach((ti,i)=>setTimeout(()=>{ if(puzzle.phase!=='show'&&puzzle.phase!=='input')return;
+    flare(torches[ti]);sFlash(ti);},900+i*820));
+  setTimeout(()=>{ if(puzzle.phase==='show'){puzzle.phase='input';setQuest('input');} },
+    900+puzzle.seq.length*820+350);
+}
+function flare(t,red){t.flare=1;if(red)t.red=1;}
+function onTorchTap(i){
+  if(puzzle.phase==='off'){flavor('Факел древнего стража. Пока он молчит.');S.taps++;return;}
+  if(puzzle.phase==='show'){flavor('Тише… смотрите внимательно.');return;}
+  if(puzzle.phase!=='input')return;
+  S.taps++;flare(torches[i]);sFlash(i);
+  if(i===puzzle.seq[puzzle.idx]){
+    puzzle.idx++;
+    if(puzzle.idx>=puzzle.seq.length){
+      puzzle.phase='wait';
+      if(puzzle.round===1){
+        toast('Первое испытание пройдено. Стражи усложняют песнь…');
+        setTimeout(()=>{puzzle.round=2;puzzle.seq=makeSeq(4);playSequence();},1800);
+      } else {
+        puzzle.phase='done';toast('Песнь света спета верно!');
+        setTimeout(openDoor,1000);
+      }
+    }
+  } else {
+    puzzle.phase='wait';sError();shake=.3;
+    torches.forEach(t=>t.red=1);
+    toast('Порядок нарушен — стражи зажигают заново');
+    setTimeout(()=>playSequence(),1900);
+  }
+}
+function openDoor(){
+  S.phase='gate';setQuest('gate');sDoor();doorT=0;shake=.2;
+  portal.visible=true;portalAnim=0;
+  setTimeout(()=>{
+    markers.push(makeMarker(new THREE.Vector3(0,0,-6.3)));
+    toast('Каменные створы расходятся… Врата открыты!',3200);
+  },2300);
+}
+function winPortal(){
+  if(S.win)return;S.win=true;S.phase='win';S.taps++;
+  tone(220,3,'sine',.25);tone(330,3,'sine',.2,.1);
+  moveTarget=new THREE.Vector3(0,0,-9.1);
+  markers.forEach(m=>m.g.visible=false);
+  setTimeout(()=>{$('flash').style.opacity=1;},1700);
+  setTimeout(()=>{
+    sWin();
+    const sec=((performance.now()-S.t0)/1000)|0;
+    $('vTime').textContent=`${(sec/60)|0}:${String(sec%60).padStart(2,'0')}`;
+    $('vTaps').textContent=S.taps;
+    $('win').classList.remove('hide');
+  },2700);
+}
+
+/* ═══════════════ УПРАВЛЕНИЕ: ГИРОСКОП + ТАП ═══════════════ */
+let gyro=null,hasGyro=false,needCalib=true;
+const initQ=new THREE.Quaternion(),tmpQ=new THREE.Quaternion(),tmpQ2=new THREE.Quaternion();
+const zee=new THREE.Vector3(0,0,1),eul=new THREE.Euler();
+const Q1=new THREE.Quaternion(-Math.sqrt(.5),0,0,Math.sqrt(.5));
+window.addEventListener('deviceorientation',e=>{
+  if(e.alpha==null||e.beta==null)return;
+  gyro={a:e.alpha*PI/180,b:e.beta*PI/180,g:e.gamma*PI/180};hasGyro=true;
+},true);
+function screenAngle(){return ((screen.orientation&&screen.orientation.angle)||window.orientation||0)*PI/180;}
+let yaw=0,pitch=0,dragging=false,dx0=0,dy0=0,yaw0=0,pitch0=0,moved=0,pdTime=0;
+
+const cv=$('c');
+cv.addEventListener('pointerdown',e=>{
+  ensureAudio();
+  if(dragging)return;
+  dragging=true;moved=0;dx0=e.clientX;dy0=e.clientY;yaw0=yaw;pitch0=pitch;pdTime=performance.now();
+});
+cv.addEventListener('pointermove',e=>{
+  if(!dragging)return;
+  const mx=e.clientX-dx0,my=e.clientY-dy0;
+  moved=Math.max(moved,Math.abs(mx)+Math.abs(my));
+  if(!hasGyro&&moved>10){
+    yaw=yaw0-mx*.004;pitch=clamp(pitch0-my*.004,-1.3,1.3);
+  }
+});
+cv.addEventListener('pointerup',e=>{
+  if(!dragging)return;dragging=false;
+  if(moved<14&&performance.now()-pdTime<400)handleTap(e.clientX,e.clientY);
+});
+cv.addEventListener('pointercancel',()=>dragging=false);
+document.addEventListener('contextmenu',e=>e.preventDefault());
+
+const _ray=new THREE.Raycaster();_ray.far=11;
+const _v1=new THREE.Vector3(),_v2=new THREE.Vector3(),_q=new THREE.Quaternion(),_ndc=new THREE.Vector2();
+function resolveHit(hit){
+  let o=hit.object;
+  while(o){if(o.userData&&o.userData.onTap)return o;o=o.parent;}
+  return null;
+}
+function gazeHit(){
+  head.getWorldPosition(_v1);head.getWorldQuaternion(_q);
+  _v2.set(0,0,-1).applyQuaternion(_q);
+  _ray.ray.origin.copy(_v1);_ray.ray.direction.copy(_v2);
+  const h=_ray.intersectObjects(interactives,true);
+  return h.length?resolveHit(h[0]):null;
+}
+function tapHit(x,y){
+  let nx=(x/W)*2-1;
+  if(vrMode)nx=nx<0?nx*2+1:(nx-.5)*2;   // в стерео тап в любой глаз → центр взора
+  _ndc.set(nx,-(y/H)*2+1);
+  _ray.setFromCamera(_ndc,vrMode?camL:camMono);
+  const h=_ray.intersectObjects(interactives,true);
+  return h.length?resolveHit(h[0]):null;
+}
+let hovered=null;
+function handleTap(x,y){
+  if(!S.started||S.win)return;
+  let obj=null;
+  if(!vrMode)obj=tapHit(x,y);
+  if(!obj)obj=hovered;
+  if(obj&&obj.userData.onTap)obj.userData.onTap(obj);
+}
+function goTo(n){
+  S.taps++;sWhoosh();moveTarget=n.clone();
+  $('hintbar').style.opacity=0;
+}
+
+/* ═══════════════ VR ═══════════════ */
+let vrMode=false;
+async function askGyro(){
+  if(typeof DeviceOrientationEvent!=='undefined'&&DeviceOrientationEvent.requestPermission){
+    try{await DeviceOrientationEvent.requestPermission();}catch(e){}
+  }
+}
+async function setVR(on){
+  if(on){await askGyro();needCalib=true;vrMode=true;$('bVR').classList.add('on');}
+  else{vrMode=false;$('bVR').classList.remove('on');}
+  onResize();
+}
+$('bVR').addEventListener('pointerup',e=>{e.stopPropagation();setVR(!vrMode);});
+$('bSnd').addEventListener('pointerup',e=>{e.stopPropagation();muted=!muted;
+  $('bSnd').textContent=muted?'🔇':'🔊';if(!muted)sClick();});
+
+/* ═══════════════ СТАРТ ═══════════════ */
+async function startGame(vr){
+  await askGyro();
+  $('intro').classList.add('hide');
+  $('hud').style.display='block';
+  S.started=true;S.t0=performance.now();needCalib=true;
+  setQuest('find');
+  setTimeout(()=>toast('Осмотритесь: камни спрятаны среди вещей храма',3400),900);
+  setTimeout(()=>{$('hintbar').style.opacity=0;},9000);
+  if(vr)setVR(true);
+}
+$('bPlay').addEventListener('click',()=>startGame(false));
+$('bVRgo').addEventListener('click',()=>startGame(true));
+// руны в интро
+(function(){const chars='ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛈᛉᛋᛏᛒᛖᛗᛚᛞᛟ';
+  for(let i=0;i<16;i++){const s=document.createElement('span');s.className='rune';
+    s.textContent=chars[(R()*chars.length)|0];
+    s.style.left=(R()*100)+'vw';s.style.top=(40+R()*60)+'vh';
+    s.style.fontSize=(14+R()*22)+'px';
+    s.style.animationDuration=(9+R()*14)+'s';s.style.animationDelay=(-R()*14)+'s';
+    $('intro').appendChild(s);}})();
+
+/* ═══════════════ ЦИКЛ ═══════════════ */
+const clock=new THREE.Clock();
+let retScale=1;
+function loop(){
+  requestAnimationFrame(loop);
+  const dt=Math.min(.05,clock.getDelta()),t=clock.elapsedTime;
+
+  /* ориентация */
+  if(hasGyro&&gyro){
+    eul.set(gyro.b,gyro.a,-gyro.g,'YXZ');
+    tmpQ.setFromEuler(eul).multiply(Q1)
+        .multiply(tmpQ2.setFromAxisAngle(zee,-screenAngle()));
+    if(needCalib){initQ.copy(tmpQ).invert();needCalib=false;}
+    head.quaternion.copy(tmpQ).multiply(initQ);
+  } else {
+    head.quaternion.setFromEuler(eul.set(pitch,yaw,0,'YXZ'));
+  }
+
+  /* перемещение */
+  if(moveTarget){
+    _v1.copy(moveTarget).sub(player.position);_v1.y=0;
+    const d=_v1.length();
+    if(d<.06){moveTarget=null;}
+    else{
+      _v1.normalize();player.position.addScaledVector(_v1,Math.min(d,dt*2.7));
+      head.position.y=1.6+Math.sin(t*11)*.025;
+    }
+  } else head.position.y+=(1.6-head.position.y)*.2;
+  if(shake>0){shake=Math.max(0,shake-dt*.8);
+    head.position.x=(R()-.5)*shake*.12;head.position.y+=(R()-.5)*shake*.12;}
+  else{head.position.x*=.8;}
+
+  /* наведение */
+  hovered=(S.started&&!S.win)?gazeHit():null;
+  const target=hovered?1.75:1;
+  retScale+=(target-retScale)*.2;reticle.scale.setScalar(retScale);
+  retRing.material.color.lerp(new THREE.Color(hovered?0xe0b45c:0xffffff),.25);
+  const lb=$('label');
+  if(hovered&&hovered.userData.label){lb.textContent=hovered.userData.label;lb.style.opacity=1;}
+  else lb.style.opacity=0;
+
+  /* пламя */
+  flames.forEach(f=>{
+    const n=Math.sin(t*13+f.ph)*.5+Math.sin(t*7.3+f.ph*2)*.5;
+    const s=f.base*(1+n*.13);
+    f.s.scale.set(s,s*1.55,1);
+  });
+  torches.forEach((tc,i)=>{
+    tc.flare*=Math.exp(-dt*3);tc.red*=Math.exp(-dt*2.2);
+    const s=tc.flame.scale.x*(1+tc.flare*1.5);
+    tc.flame.scale.set(s,s*1.5,1);
+    tc.flame.material.color.setHex(0xffa64d).lerp(new THREE.Color(0xffffff),tc.flare)
+      .lerp(new THREE.Color(0xff3030),tc.red*.8);
+    if(tc.light)tc.light.intensity=1.15*(1+tc.flare*2.6)+Math.sin(t*11+i*3)*.12;
+  });
+  if(candleLight)candleLight.intensity=.5+Math.sin(t*15)*.09+Math.sin(t*6.7)*.06;
+
+  /* левитирующие камни, пульсации */
+  floaters.forEach((g,i)=>{g.position.y+=Math.sin(t*2+i*2)*.0016;g.rotation.y+=dt*.9;});
+  pulses.forEach(p=>{
+    if(p.marker){
+      const k=.5+Math.sin(t*2.4)*.28;
+      p.marker.ring.material.opacity=k;
+      p.marker.ring.scale.setScalar(1+Math.sin(t*2.4)*.07);
+      const near=player.position.distanceTo(p.marker.n)<1.1;
+      p.marker.g.visible=!near&&!S.win;
+      return;
+    }
+    p.s.scale.setScalar(p.base*(1+Math.sin(t*p.sp+p.ph)*.35));
+  });
+
+  /* анимации */
+  for(let i=chestAnims.length-1;i>=0;i--){const a=chestAnims[i];a.t+=dt*2;
+    chest.pivot.rotation.x=-1.95*ease(Math.min(1,a.t));
+    if(a.t>=1)chestAnims.splice(i,1);}
+  for(let i=collectAnim.length-1;i>=0;i--){const a=collectAnim[i];a.t+=dt*2.4;
+    a.g.scale.setScalar(1+a.t*1.6);a.g.rotation.y+=dt*6;
+    if(a.g.userData.core)a.g.userData.core.material.opacity=Math.max(0,1-a.t);
+    if(a.t>=1){scene.remove(a.g);collectAnim.splice(i,1);}}
+  for(let i=flyGems.length-1;i>=0;i--){const f=flyGems[i];
+    _v1.copy(f.target.pos).add(altar.position);
+    f.g.position.lerp(_v1,dt*4);f.g.rotation.y+=dt*4;
+    if(f.g.position.distanceTo(_v1)<.03){
+      f.g.position.copy(_v1);flyGems.splice(i,1);
+      S.placed++;sPlace();updateInvHUD();
+      f.target.rim.material.emissive=new THREE.Color(0x3fe08f);
+      f.target.rim.material.emissiveIntensity=1.2;
+      glow(0x3fe08f,.7,_v1.x,_v1.y+.1,_v1.z);
+      toast(`Камень лёг в чашу (${S.placed}/3)`);
+      if(S.placed===3){S.phase='show';setTimeout(beginRitual,1300);}
+    }}
+  for(let i=shards.length-1;i>=0;i--){const s=shards[i];
+    s.v.y-=dt*7;s.m.position.addScaledVector(s.v,dt);
+    s.m.rotation.x+=s.rv.x*dt;s.m.rotation.z+=s.rv.z*dt;
+    if(s.m.position.y<.04){s.m.position.y=.04;s.v.y*=-.3;s.v.x*=.6;s.v.z*=.6;}
+    s.life-=dt;if(s.life<=0){scene.remove(s.m);shards.splice(i,1);}}
+  if(doorT>=0&&doorT<1){doorT=Math.min(1,doorT+dt/2.6);const e=ease(doorT);
+    doorL.position.x=-.97-e*1.95;doorR.position.x=.97+e*1.95;
+    shake=Math.max(shake,.06);}
+  if(portalAnim>=0){portalAnim=Math.min(1,portalAnim+dt/2.2);
+    const e=ease(portalAnim);
+    portal.scale.setScalar(.15+.85*e);
+    portal.userData.light.intensity=2.2*e;
+    portal.userData.disc.material.opacity=.5*e;}
+  if(portal.visible){
+    portal.userData.disc.rotation.z+=dt*.8;
+    portal.userData.pts.rotation.z-=dt*.5;
+    portal.userData.disc.material.opacity=.35+Math.sin(t*3)*.15;}
+
+  /* пыль */
+  const dp=dust.geometry.attributes.position,base=dust.userData.base;
+  for(let i=0;i<base.length;i++){const b=base[i];
+    dp.array[i*3+1]=((b.y+t*b.sp)%5.5);
+    dp.array[i*3]=b.x+Math.sin(t*.4+b.ph)*.3;}
+  dp.needsUpdate=true;
+
+  /* HUD время */
+  if(S.started&&!S.win){
+    const sec=((performance.now()-S.t0)/1000)|0;
+    $('chip').textContent=`⏱ ${(sec/60)|0}:${String(sec%60).padStart(2,'0')} · тапов: ${S.taps}`;
+    // подсказки по поиску
+    if(S.phase==='find'){hintT+=dt;
+      if(hintT>22&&!S.hints[0]){S.hints[0]=1;toast('Один камень мерцает высоко над книжными полками…',3400);}
+      if(hintT>48&&!S.hints[1]){S.hints[1]=1;toast('Загляните в сундук у западной стены…',3400);}
+      if(hintT>74&&!S.hints[2]){S.hints[2]=1;toast('В одной из амфор что-то светится. Разбейте её.',3400);}}
+  }
+
+  /* рендер */
+  if(vrMode){
+    renderer.setScissorTest(true);
+    renderer.setScissor(0,0,W/2,H);renderer.setViewport(0,0,W/2,H);
+    renderer.render(scene,camL);
+    renderer.setScissor(W/2,0,W/2,H);renderer.setViewport(W/2,0,W/2,H);
+    renderer.render(scene,camR);
+    renderer.setScissorTest(false);
+  } else renderer.render(scene,camMono);
+}
+function onResize(){
+  W=innerWidth;H=innerHeight;
+  renderer.setSize(W,H);
+  [camMono,camL,camR].forEach(c=>{c.aspect=vrMode?(W/2)/H:W/H;c.updateProjectionMatrix();});
+}
+addEventListener('resize',onResize);
+addEventListener('orientationchange',()=>setTimeout(()=>{onResize();needCalib=true;},300));
+onResize();
+loop();
+</script>
+</body>
+</html>
